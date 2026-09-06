@@ -45,3 +45,5 @@
 15:43 | verification retries | stale browser tab and sandbox socket inspection | ERR_CONNECTION_REFUSED on old dev tab; fresh production tab passed. Cannot open netlink socket: Operation not permitted; host inspection passed.
 15:43 | scope | no M3 or external-core implementation | additional providers and native Windows/macOS remain unverified; no live API key used
 15:44 | RF-01 commit preparation | three scans clean; final summary recorded | ready for commit with hook active, then branch-only push
+15:52 | new baseline A/B/C | CI 34052711361 success at 7a6160f; HANDOFF.md fully read | preserve all 13 core decisions; A scan config in progress
+15:52 | A | Next build cache retained; Gitleaks directory/history clean with explicit generated-artifact exclusions | passed; upstream rules retained
