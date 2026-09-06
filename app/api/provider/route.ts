@@ -2,12 +2,13 @@ import { localRequest } from '@/lib/server/http';
 import { readJson } from '@/lib/server/read-json';
 import { safeJson } from '@/lib/security/redact';
 import { configuredAdapter, providerProxy, providerStatus } from '@/lib/providers/runtime';
+import { mockEnabled } from '@/lib/server/runtime';
 import { ProviderFailure } from '@/lib/providers/adapter';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   if (!localRequest(request, false)) return safeJson({ error: 'Local requests only.' }, 403);
-  return safeJson(providerStatus());
+  return safeJson({ ...providerStatus(), mockAvailable: mockEnabled() });
 }
 export async function POST(request: Request) {
   if (!localRequest(request, true)) return safeJson({ error: 'Same-origin local requests only.' }, 403);

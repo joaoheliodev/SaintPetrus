@@ -2,6 +2,7 @@ import { localRequest } from '@/lib/server/http';
 import { readJson } from '@/lib/server/read-json';
 import { credentials } from '@/lib/security/runtime';
 import { providerId, providers } from '@/lib/security/encrypted-vault';
+import { validateSelection, selectProvider, clearSelection, providerProxy } from '@/lib/providers/runtime';
 import { safeJson } from '@/lib/security/redact';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,20 +12,34 @@ export async function GET(request: Request) {
   return safeJson(providers.map(provider => credentials().status(provider)));
 }
 export async function POST(request: Request) {
-  if (!localRequest(request, true) || request.headers.get('x-saintpetrus-client') !== 'terminal' || request.headers.has('sec-fetch-site')) return safeJson({ error: 'Use the local credential CLI.' }, 403);
+  const browser = request.headers.get('x-saintpetrus-client') === 'browser' && request.headers.get('sec-fetch-site') === 'same-origin';
+  const terminal = request.headers.get('x-saintpetrus-client') === 'terminal' && !request.headers.has('sec-fetch-site');
+  if (!localRequest(request, true) || (!browser && !terminal)) return safeJson({ error: 'Local configuration requests only.' }, 403);
   let input: unknown;
   try { input = await readJson(request); } catch { return safeJson({ error: 'Invalid request.' }, 400); }
   const task = tail.then(async () => {
     let secret: Buffer | undefined;
     try {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error();
-      const data = input as Record<string, unknown>; const provider = providerId(data.provider);
+      const data = input as Record<string, unknown>;
+      if (Object.keys(data).some(key => !['action', 'provider', 'model', 'key', 'remember'].includes(key))) throw new Error();
+      if (browser && data.action === 'set') validateSelection(data.provider, data.model);
+      if (browser && data.provider === 'mock') {
+        if (data.key || data.remember) throw new Error();
+        providerProxy().cancel();
+        if (data.action === 'set') selectProvider('mock', 'mock-v1');
+        else if (data.action === 'disconnect') clearSelection(); else throw new Error();
+        return safeJson({ provider: 'mock', connected: data.action === 'set', remembered: false });
+      }
+      const provider = providerId(data.provider);
       const store = credentials();
       if (data.action === 'set') {
         if (typeof data.key !== 'string' || (data.remember !== undefined && typeof data.remember !== 'boolean')) throw new Error();
         secret = Buffer.from(data.key); delete data.key;
+        providerProxy().cancel();
         await store.configure(provider, secret, data.remember === true);
-      } else if (data.action === 'disconnect') store.disconnect(provider);
+        if (browser) selectProvider(provider, data.model as string);
+      } else if (data.action === 'disconnect') { providerProxy().cancel(); store.disconnect(provider); }
       else if (data.action === 'forget') await store.forget(provider);
       else if (data.action === 'restore') await store.restore(provider);
       else throw new Error();

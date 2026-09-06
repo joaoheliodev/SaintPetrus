@@ -15,7 +15,11 @@ without explicit authorization. This work does not rewrite or force-push history
 
 Keys are entered through `npm run key -- set openai` in an interactive local
 terminal. Input is hidden, not accepted as argv, and sent to the loopback backend.
-The browser has no key field and cannot invoke the credential-write endpoint.
+Alternatively, Connect AI accepts a key in a transient password field. Only its
+same-origin local configuration POST may carry that key. The field is cleared on
+submission/close; it is never put in React state or browser storage. Completion
+requests carry no key. Both UI configuration and terminal configuration are
+validated by the backend; browser configuration requires same-origin Fetch Metadata.
 Browser API responses contain connection status only. Do not put keys in URLs,
 query strings, browser storage, shell commands or .env files. .env.example is a
 placeholder reference, not a request to populate it with a real credential.
@@ -30,7 +34,9 @@ provider identity, and HKDF-SHA-256 derivation from a random OS-protected master
 Linux uses Secret Service via libsecret's secret-tool; macOS uses Keychain via
 security; Windows wraps the master with DPAPI CurrentUser. No plaintext fallback.
 Keyring unavailable/locked means persistence fails. `restore` explicitly loads a
-remembered key into memory. Neither build nor tests access the real OS keyring.
+remembered key into memory. Build and the automated suite do not access the real OS keyring. A separate
+manual Linux roundtrip was verified with synthetic material; Windows/macOS
+native execution remains unverified.
 Native platform integration requires verification on each supported OS.
 
 Ciphertext lives under ignored data/vault with restrictive file permissions where

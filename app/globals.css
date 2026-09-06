@@ -122,3 +122,15 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 @media (max-width: 1100px) { .setup-panel { width: 210px; } .inspector { width: 230px; } }
 @media (max-width: 850px) { .app-shell { height: auto; min-height: 100dvh; overflow: visible; } .workspace-body { flex-wrap: wrap; } .setup-panel { width: 100%; max-height: 300px; } .center-panel { width: 100%; flex-basis: 100%; height: 620px; } .inspector { width: 100%; } .projectbar { flex-wrap: wrap; } .project-actions { flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+.provider-panel {
+  --tw-translate-x: 0px; --tw-translate-y: 0px;
+  top: 0; right: 0; left: auto; bottom: 0; transform: none; translate: none;
+  max-width: min(28rem, 100vw); overflow-y: auto; border-radius: 0;
+  align-content: start; line-height: 1.5;
+}
+.provider-panel label { display: grid; gap: .4rem; }
+.provider-panel input:not([type=checkbox]), .provider-panel select {
+  width: 100%; min-height: 2.5rem; padding: .5rem;
+  background: var(--background); color: var(--foreground); border: 1px solid var(--border);
+}

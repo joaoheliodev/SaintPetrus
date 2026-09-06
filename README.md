@@ -64,7 +64,17 @@ this server-side flag. Tests instantiate it explicitly without API keys.
 
 ## Credentials and security
 
-M1 provides a terminal-only credential boundary; no browser form receives keys.
+Click **Connect AI** in the header. Select OpenAI, enter the provider model ID
+(or select the already configured model), and enter the key in the password field.
+Show/Hide controls visibility. Connect stores the credential without testing it;
+Test connection configures it if needed and makes exactly one minimal call,
+showing status and latency. Disconnect clears backend memory. The badge remains
+visible when the panel closes and reflects the backend state.
+
+The key exists transiently in the browser field and the local configuration POST,
+then the field is cleared. It is never attached to completion requests, returned
+in responses or saved in browser storage. Remember key is unchecked by default
+and opts into encryption using the OS keyring. Terminal entry remains available:
 Use `npm run key -- set openai` for hidden entry while the local server is running.
 Use `npm run key -- disconnect openai` to clear memory, `forget` to remove any
 saved ciphertext, or `restore` to explicitly load remembered ciphertext.
@@ -81,7 +91,7 @@ Gitleaks runs in the pre-commit hook (fail-closed when missing) and in CI.
 
 With the server stopped, configure `SAINTPETRUS_PROVIDER=openai` and
 `SAINTPETRUS_MODEL=REPLACE_WITH_PROVIDER_MODEL_ID` in your ignored `.env.local`.
-Start the server and enter your key with the terminal command above. The header
+Start the server and enter your key in Connect AI or with the terminal command above. The header
 shows connection state. Test connection makes one minimal provider call and shows
 latency. Mock mode uses no network. No real API call was used for verification.
 
@@ -119,7 +129,8 @@ git remote set-url origin https://github.com/joaoheliodev/SaintPetrus.git
 
 M0–M2 scaffold and security/proxy foundation. Token budgets, health detectors,
 summarizer/reviewer agents and replacement workflows await later milestones.
-Windows/macOS use the same Node launcher; native testing was performed on Linux.
+Real Linux keyring encryption/decryption was verified with synthetic material.
+Windows/macOS keyring execution remains unverified; command adapters use test doubles.
 The full product README and complete accessibility audit belong to later milestones.
 
 ## Portuguese Brazil

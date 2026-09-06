@@ -92,3 +92,32 @@ test('M2 adapter keeps credentials in backend header; proxy redacts output, log,
     await rm(dir, { recursive: true });
   }
 });
+
+test('RF-01 same-origin UI configures memory-only credentials, tests once, and disconnects', async () => {
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/ui-');
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
+  const { POST: configure } = await import('../app/api/credentials/route');
+  const { providerStatus } = await import('../lib/providers/runtime');
+  const host = globalThis as typeof globalThis & { saintpetrusCredentials?: Credentials; saintpetrusSelection?: {provider: string; model: string} };
+  const previous = host.saintpetrusCredentials, selection = host.saintpetrusSelection, transport = globalThis.fetch;
+  host.saintpetrusCredentials = store;
+  const key = randomBytes(32).toString('hex'); let calls = 0;
+  const browserRequest = (body: unknown, origin = 'http://127.0.0.1:3000') => new Request('http://127.0.0.1:3000/api/credentials', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'X-SaintPetrus-Client': 'browser', 'Sec-Fetch-Site': 'same-origin' }, body: JSON.stringify(body) });
+  try {
+    const body = { action: 'set', provider: 'openai', model: 'test-model', key };
+    assert.equal((await configure(browserRequest(body, 'https://example.invalid'))).status, 403);
+    assert.equal((await configure(browserRequest({ ...body, model: 'invalid model' }))).status, 400);
+    assert.equal(store.status('openai').connected, false);
+    const saved = await configure(browserRequest(body)); assert.equal(saved.status, 200); assert.ok(!(await saved.text()).includes(key));
+    assert.equal(store.status('openai').remembered, false); assert.equal(providerStatus().model, 'test-model');
+    globalThis.fetch = async (_url, options) => {
+      calls++; assert.ok(new Headers(options?.headers).get('authorization') === `Bearer ${key}`);
+      return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] });
+    };
+    const result = await POST(request({ action: 'test' })); assert.equal(result.status, 200); assert.equal(calls, 1);
+    assert.ok(!(await result.text()).includes(key));
+    assert.equal((await configure(browserRequest({ action: 'disconnect', provider: 'openai' }))).status, 200);
+    assert.equal(store.status('openai').connected, false);
+    assert.equal((await POST(request({ action: 'test' }))).status, 409); assert.equal(calls, 1);
+  } finally { store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }
+});
