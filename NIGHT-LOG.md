@@ -1,3 +1,15 @@
+# A/B/C run — stopped at B
+
+- CI prerequisite: remote run 34052711361 passed at 7a6160f.
+- A passed with build cache present and was committed as ee948ba.
+- B FAILED its gate. The imported 168 core tests passed, and the isolated proxy call-site test passed (192 combined tests), but the official typecheck command did not pass. C was not started.
+- Literal blocking error: `tests/core/purity.test.ts(91,50): error TS1501: This regular expression flag is only available when targeting 'es2018' or later.`
+- A direct core compiler invocation passed after target alignment; the official command still failed. Cause remains unresolved; no success claimed for B.
+- Per the requested rollback, application/configuration content returns to 7a6160f. A is therefore also reverted by a new commit; no history rewritten. This log is the only intentional content difference from that baseline.
+- External core remains read-only and unchanged. No integration source, stub or TODO retained.
+- Decision needed: authorize a separate investigation of the compiler invocation mismatch before retrying B. No further fixes attempted in this run.
+- Generated cache remains present. Rollback scans use the explicit generated-artifact configuration saved under ignored .audit; the tracked .gitleaks.toml from A is removed by the required baseline rollback.
+
 # Night execution — night/m0-m2
 
 ## Final verification summary
@@ -47,3 +59,7 @@
 15:44 | RF-01 commit preparation | three scans clean; final summary recorded | ready for commit with hook active, then branch-only push
 15:52 | new baseline A/B/C | CI 34052711361 success at 7a6160f; HANDOFF.md fully read | preserve all 13 core decisions; A scan config in progress
 15:52 | A | Next build cache retained; Gitleaks directory/history clean with explicit generated-artifact exclusions | passed; upstream rules retained
+15:54 | B lint attempt 1 | warning: topSig is assigned a value but never used | removed unused destructuring binding only; no logic changed; retry gate once
+15:55 | B typecheck/build | TS1501: This regular expression flag is only available when targeting es2018 or later | align target to core ES2022; tests and logic unchanged
+15:57 | B GATE FAILED | official typecheck still TS1501 after target alignment; stop | restored baseline 7a6160f through revert, not reset/rebase; no C
+15:58 | rollback verification | lint/typecheck/23 baseline tests/build passed | directory scan with explicit generated-artifact config; history/staged scans clean; cache retained
