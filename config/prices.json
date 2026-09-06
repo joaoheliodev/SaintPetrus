@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-06",
+  "currency": "USD",
+  "note": "Only the free synthetic mock is configured. Add your provider model and verified rates locally before enabling real calls. No prices are fetched from the network.",
+  "models": {
+    "mock-v1": { "inputPerMillion": 0, "outputPerMillion": 0 }
+  }
+}

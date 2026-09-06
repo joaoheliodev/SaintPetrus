@@ -1,6 +1,7 @@
 import { runtime as getRuntime, mockEnabled } from '@/lib/server/runtime';
 import { localRequest, dispatch } from '@/lib/server/http';
 import { safeJson } from '@/lib/security/redact';
+import { tokenService } from '@/lib/tokens/runtime';
 import { GraphError } from '@/lib/server/graph-service';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,9 @@ export async function POST(request: Request) {
     }
     text += decoder.decode();
     const { graph, mock } = getRuntime();
-    return json(dispatch(graph, mock, mockEnabled(), JSON.parse(text)));
+    const command = JSON.parse(text);
+    if (['reset','start','resume','add'].includes(command?.action) && tokenService().isStopped()) return json({ error: 'Global kill switch is active.' }, 409);
+    return json(dispatch(graph, mock, mockEnabled(), command));
   } catch (error) {
     // Never echo request contents, provider credentials or raw stack traces.
     return json({ error: error instanceof GraphError ? error.message : 'Invalid request.' }, 400);

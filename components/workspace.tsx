@@ -10,11 +10,12 @@ import { Progress } from '@/components/ui/progress';
 import { connectionFeedback, type Agent, type Graph } from '@/lib/orchestrator';
 import { useProjection } from '@/lib/store';
 import { useGraphTransport } from '@/lib/use-graph-transport';
+import { TokenPanel } from './token-panel';
 import { ProviderStatus } from './provider-status';
 import { cn } from '@/lib/utils';
 import '@xyflow/react/dist/style.css';
 type AgentNodeType = Node<{ agent: Agent }, 'agent'>;
-const statusLabels = { ready: 'Ready', running: 'Running', completed: 'Completed', blocked: 'Blocked' };
+const statusLabels = { paused: 'Paused', ready: 'Ready', running: 'Running', completed: 'Completed', blocked: 'Blocked' };
 function AgentNode({ data, selected }: NodeProps<AgentNodeType>) {
   const a = data.agent;
   return <article className={cn('agent-card', selected && 'is-selected')}>
@@ -61,7 +62,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled }: Props) {
     await command({ action: 'connect', source, target });
   }
   return <main className="app-shell">
-    <header className="topbar"><div className="brand"><Workflow /><strong>SaintPetrus</strong></div><ProviderStatus /></header>
+    <header className="topbar"><div className="brand"><Workflow /><strong>SaintPetrus</strong></div><ProviderStatus /><TokenPanel /></header>
     <div className="projectbar"><h1>Agent workspace <small>M0</small></h1><div className="project-actions">
       <Button variant="outline" disabled={pending} onClick={() => command({ action: 'reset', objective })}><RotateCcw />Reset graph</Button>
       <Button disabled={pending} onClick={() => setDialog(true)}><Plus />Add agent</Button>

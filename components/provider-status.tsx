@@ -54,7 +54,7 @@ export function ProviderStatus() {
         if (action === 'test') {
           const response = await fetch('/api/provider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test' }) });
           const data = await response.json();
-          setResult(response.ok ? `${data.mocked ? 'Mock verified' : 'Connection verified'} · ${data.latencyMs} ms` : 'Connection test failed.');
+          setResult(response.ok ? `${data.mocked ? 'Mock verified' : 'Connection verified'} · ${data.latencyMs} ms` : response.status === 409 ? 'Execution paused or budget/model policy rejected the test. Open Tokens.' : 'Connection test failed.');
         } else setResult('Configured. Connection has not been tested.');
       }
     } catch { setResult('Operation failed. Check model/key and local server; remembering requires an unlocked OS keyring.'); }

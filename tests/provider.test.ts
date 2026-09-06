@@ -1,3 +1,4 @@
+import { TokenService } from '../lib/tokens/service';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -11,6 +12,11 @@ import { safeLog, safeStringify } from '../lib/security/redact';
 import { POST } from '../app/api/provider/route';
 import { GET as exportGraph } from '../app/api/graph/export/route';
 import { runtime } from '../lib/server/runtime';
+function tokenFixture() {
+  const host = globalThis as typeof globalThis & { saintpetrusTokens?: TokenService }; const previous = host.saintpetrusTokens;
+  host.saintpetrusTokens = new TokenService({ global: 10000, perAgent: 10000, perModel: 10000, perSession: 10000, cacheTtlMs: 0, models: { 'test-model': { provider: 'openai', max_tokens: 64, temperature: 0 } } }, { date: '2026-09-06', currency: 'USD', models: { 'test-model': { inputPerMillion: 0, outputPerMillion: 0 } } }, { ids: () => runtime().graph.snapshot().agents.map(a => a.id), pause: id => runtime().graph.setAgentStatus(id, 'paused'), pauseAll: () => runtime().graph.pauseAll() });
+  return () => { host.saintpetrusTokens = previous; };
+}
 const signal = () => new AbortController().signal;
 const request = (body: unknown) => new Request('http://127.0.0.1:3000/api/provider', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
@@ -53,6 +59,7 @@ test('M2 frontend test request carries no credential; server rejects credential 
 
 test('M2 adapter keeps credentials in backend header; proxy redacts output, log, stack, API error and export', async () => {
   await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/proxy-');
+  const restoreTokens = tokenFixture();
   const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden in this test'); } }));
   const secret = Buffer.from(randomBytes(32).toString('hex'));
   const host = globalThis as typeof globalThis & { saintpetrusCredentials?: Credentials };
@@ -67,7 +74,7 @@ test('M2 adapter keeps credentials in backend header; proxy redacts output, log,
       assert.ok(new Headers(options?.headers).get('authorization') === `Bearer ${secret.toString()}`);
       assert.ok(!String(options?.body).includes(secret.toString()));
       const body = JSON.parse(String(options?.body)); assert.equal(body.store, false); assert.equal(body.max_output_tokens, 64);
-      return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: secret.toString() }] }] });
+      return Response.json({ usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: secret.toString() }] }] });
     };
     const output = await new ProviderProxy().execute(new OpenAIAdapter('test-model', store, transport), secret.toString(), signal());
     assert.equal(calls, 1); assert.ok(!JSON.stringify(output).includes(secret.toString()));
@@ -86,7 +93,7 @@ test('M2 adapter keeps credentials in backend header; proxy redacts output, log,
       await assert.rejects(new OpenAIAdapter('test-model', store, async () => response).complete('Hi', signal()), /upstream/);
     }
   } finally {
-    globalThis.fetch = oldFetch; host.saintpetrusCredentials = previousStore; store.disconnect('openai'); secret.fill(0); runtime().mock.reset();
+    restoreTokens(); globalThis.fetch = oldFetch; host.saintpetrusCredentials = previousStore; store.disconnect('openai'); secret.fill(0); runtime().mock.reset();
     if (previousProvider === undefined) delete process.env.SAINTPETRUS_PROVIDER; else process.env.SAINTPETRUS_PROVIDER = previousProvider;
     if (previousModel === undefined) delete process.env.SAINTPETRUS_MODEL; else process.env.SAINTPETRUS_MODEL = previousModel;
     await rm(dir, { recursive: true });
@@ -95,6 +102,7 @@ test('M2 adapter keeps credentials in backend header; proxy redacts output, log,
 
 test('RF-01 same-origin UI configures memory-only credentials, tests once, and disconnects', async () => {
   await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/ui-');
+  const restoreTokens = tokenFixture();
   const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
   const { POST: configure } = await import('../app/api/credentials/route');
   const { providerStatus } = await import('../lib/providers/runtime');
@@ -112,14 +120,14 @@ test('RF-01 same-origin UI configures memory-only credentials, tests once, and d
     assert.equal(store.status('openai').remembered, false); assert.equal(providerStatus().model, 'test-model');
     globalThis.fetch = async (_url, options) => {
       calls++; assert.ok(new Headers(options?.headers).get('authorization') === `Bearer ${key}`);
-      return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] });
+      return Response.json({ usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] });
     };
     const result = await POST(request({ action: 'test' })); assert.equal(result.status, 200); assert.equal(calls, 1);
     assert.ok(!(await result.text()).includes(key));
     assert.equal((await configure(browserRequest({ action: 'disconnect', provider: 'openai' }))).status, 200);
     assert.equal(store.status('openai').connected, false);
     assert.equal((await POST(request({ action: 'test' }))).status, 409); assert.equal(calls, 1);
-  } finally { store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }
+  } finally { restoreTokens(); store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }
 });
 
 test('B proxy invokes the injected core TokenCounter on the request path', async () => {

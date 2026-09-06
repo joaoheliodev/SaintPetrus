@@ -99,7 +99,7 @@ The server owns the destination, model, output ceiling, timeout and single activ
 request limit. Browser completion requests contain only action/input, never the
 credential. OpenAI requests disable storage and redirects; errors are normalized.
 The adapter follows the [official Responses reference](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).
-Token accounting, streaming and agent-driven real execution are not implemented.
+RF-06 accounts provider usage and enforces budgets. Streaming and agent-driven real execution are not implemented.
 
 ## Validation
 
@@ -127,8 +127,9 @@ git remote set-url origin https://github.com/joaoheliodev/SaintPetrus.git
 
 ## Current scope
 
-M0–M2 scaffold and security/proxy foundation. Token budgets, health detectors,
-summarizer/reviewer agents and replacement workflows await later milestones.
+M0–M2, RF-01, core integration and RF-06 are implemented. Core health detectors
+are integrated as a library; their orchestration, summarizer/reviewer agents and
+replacement workflows await later milestones.
 Real Linux keyring encryption/decryption was verified with synthetic material.
 Windows/macOS keyring execution remains unverified; command adapters use test doubles.
 The full product README and complete accessibility audit belong to later milestones.
@@ -153,3 +154,43 @@ still be traversed by TypeScript. Removing the test exclusion reintroduces TS150
 - Repeated-question detection is lexical and can miss paraphrases.
 - Token heuristics are approximate. Displayed cost is an **estimate** using a
   dated local price table; actual provider usage is the source for billed tokens.
+
+
+## Token controls (RF-06)
+
+Open **Tokens** in the header. Set global, agent, model and current-session limits;
+Apply updates the authoritative in-memory budget on the local server. Limits are
+token counts. Warnings start at 80%. A request whose reservation would exceed any
+limit is rejected before provider I/O and pauses its agent. At 100%, further calls
+are blocked. Raising a limit does not restart work: use Resume eligible agents.
+Pause all agents cancels the active proxy request and pauses the graph demo too.
+
+Before real calls, edit `config/token-policy.json` to allow the exact provider model
+ID with its provider (`openai`), `max_tokens` and `temperature`. Add that same ID to
+`config/prices.json` with verified numeric `inputPerMillion` and `outputPerMillion`
+USD rates, and update the table date. Restart the server after file edits. Only the
+free synthetic mock is supplied; no real model or unverified price is enabled.
+No price lookup uses the network. Then configure the model/key through Connect AI.
+
+Preflight uses the core's approximate TokenCounter plus the allowed maximum output.
+The reservation is reconciled to `usage.input_tokens`, `usage.output_tokens` and
+`usage.total_tokens` from the provider. Estimates may undercount; any actual excess
+is retained in the ledger and pauses further calls, never hidden or rewritten to
+match the reservation. This is not an exact tokenizer or a guaranteed provider
+invoice cap. The actual-token columns use only reported usage. Mock estimates are
+separate. Dollar amounts are explicitly **cost estimates**, calculated from the
+dated local table, not a fetched provider invoice.
+
+If a real request fails without trustworthy usage, its reservation remains marked
+unresolved, with no fabricated billed usage. Resume is refused until billing can
+be checked outside the app; this version has no automated billing reconciliation.
+State is process-local: one server-issued session per process; restarting clears
+counters, reservations, cache and memory-only limit edits. Check outstanding
+provider billing before restarting; this is not a durable accounting ledger.
+
+The cache key hashes provider, model, complete system prompt, every message and
+role, temperature and max_tokens. Only temperature=0 is cached. TTL comes from
+`cacheTtlMs`; cache hits add saved tokens without adding billed usage. Connection
+tests bypass cache so Test connection still makes one minimal call. The graph's
+old animated mock demonstration is a separate synthetic simulation; only proxy
+calls enter this ledger.

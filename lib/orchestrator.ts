@@ -1,6 +1,6 @@
 // Adapted from the Agent Canvas reference. Shared contracts contain no runtime engine.
 export type Provider = 'Unconfigured' | 'Mock';
-export type Status = 'ready' | 'running' | 'completed' | 'blocked';
+export type Status = 'ready' | 'paused' | 'running' | 'completed' | 'blocked';
 export type ContextEnvelope = { objective: string; summary: string; artifacts: string[] };
 export type ExecutionBudget = { maxDepth: number; maxNodes: number; maxCostCents: number };
 export type Agent = { id: string; parentId: string | null; name: string; provider: Provider; depth: number; status: Status; output: string; context: ContextEnvelope; position: { x: number; y: number } };

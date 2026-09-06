@@ -71,6 +71,7 @@ export class GraphService {
     if (!agent || !Number.isFinite(position.x) || !Number.isFinite(position.y) || Math.abs(position.x) > 100000 || Math.abs(position.y) > 100000) throw new GraphError('Invalid position.');
     agent.position = { ...position }; this.emit('agent.moved', 'Agent moved.');
   }
+  pauseAll() { this.graph.agents.forEach(agent => { agent.status = 'paused'; }); this.graph.status = 'paused'; this.emit('agents.paused', 'All agents paused by kill switch.'); }
   setRunStatus(status: Graph['status']) { this.graph.status = status; this.emit('run.updated', `Run ${status}.`); }
   setAgentStatus(id: string, status: Agent['status']) {
     const agent = this.graph.agents.find(a => a.id === id);

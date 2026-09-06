@@ -1,3 +1,18 @@
+# Current completion — corrected B and RF-06
+
+- Branch: night/m0-m2. A-BIS c1e77b7 retained. B committed as 114813a.
+- C/RF-06: completed in the commit containing this summary (`feat(tokens): enforce server reservations and usage accounting`). Its resulting hash is reported in chat after creation.
+- Gates: 168 unchanged core tests within 200 total passing tests; lint, root ES2017 typecheck, independent core ES2022 typecheck and Next build passed without API key.
+- Both showConfig root-file lists were compared: 46 root and 14 core files at B, intersection empty. Root target remains ES2017; comments protect the test exclusion. Dependency traversal may still visit imported core sources.
+- RF-06: all four reservation scopes; preflight refusal; actual usage reconciliation; 80% warning/100% pause; local model allowlist and dated price config; full-payload temperature-zero TTL cache; saved tokens; global kill switch; direct API bypass rejection verified.
+- Browser: zero budget blocked test; increasing budget plus explicit resume enabled mock; actual=0 and mock estimate=55 labeled separately; price date visible; global pause verified.
+- Gitleaks: directory/history/staged passed using tracked config, cache present. One core-test public counter-name false positive is documented and suppressed only on its assertion line; hook remains active.
+- No remaining blockers or user decision required for this scope. No RF-02 work started. External core and reference directories were not modified.
+- Limits: preflight is approximate, so unexpected actual excess is recorded and pauses subsequent calls. Missing real usage retains an unresolved reservation, not fabricated billing. Counters are process-local. Real provider calls and native Windows/macOS remain unverified. Only mock prices/models are configured by default; users add verified real rates locally.
+- Remote name remains SaintPetrus. Push is restricted to night/m0-m2 and is verified after commit creation. Remote CI is not claimed by this pre-push summary.
+
+---
+
 # A/B/C run — stopped at B
 
 - CI prerequisite: remote run 34052711361 passed at 7a6160f.
@@ -67,3 +82,10 @@
 20:33 | B corrected | showConfig targets ES2017/ES2022; 46/14 root files; intersection empty | core sources unchanged except import suffixes; no integration TODO or duplicate implementation found
 20:33 | B GATE PASS | 168 core tests / 192 total; lint, both typechecks and build passed without key | proxy TokenCounter call-site test passed; C authorized after B commit
 20:34 | B secret scan blocked commit | leaks found: 1; generic-api-key tests/core/token-estimate.test.ts:18 | verified assertion equals public heuristicTokenCounter.name; line-only annotation, no credential values logged
+20:48 | B | committed 114813a | all gates passed; core logic and ES2017 target preserved
+20:48 | C tests attempt 1 | 409 != 502 and 409 != 200 in prior provider fixtures | fixtures now explicitly allow their synthetic model and supply mock usage; 198 combined tests then passed
+20:48 | C | server budgets, reservations, actual-usage reconciliation, cache and controls implemented | eight RF-06 tests passed including concurrent reservations and direct API bypass rejection; final validation pending
+20:52 | C browser | zero budget refused; increase + explicit resume allowed mock; kill switch paused graph | 0 actual / 55 estimated mock tokens; local price date visible; no live key
+20:52 | C dev attempt 1 | automatic permission review did not finish before its deadline | single retry succeeded; no permission/configuration workaround
+20:53 | C final checks | lint, both typechecks, 200 tests and build passed without API key | all eight RF-06 acceptance tests passed; no RF-02 work started; build cache retained
+20:54 | C commit preparation | all gates and three scans clean | complete scope; stop after commit and branch-only push

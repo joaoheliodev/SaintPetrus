@@ -134,3 +134,10 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
   width: 100%; min-height: 2.5rem; padding: .5rem;
   background: var(--background); color: var(--foreground); border: 1px solid var(--border);
 }
+
+.token-panel { width: min(72rem, 95vw); max-width: 95vw; max-height: 90vh; overflow-y: auto; line-height: 1.5; }
+.token-table { overflow-x: auto; }
+.token-table table { width: 100%; border-collapse: collapse; }
+.token-table th, .token-table td { padding: .5rem; border: 1px solid var(--border); text-align: left; }
+.token-table small { display: block; max-width: 18ch; overflow-wrap: anywhere; }
+.token-table input { width: 8rem; background: var(--background); color: var(--foreground); }

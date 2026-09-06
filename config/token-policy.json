@@ -1,0 +1,10 @@
+{
+  "global": 100000,
+  "perAgent": 10000,
+  "perModel": 50000,
+  "perSession": 100000,
+  "cacheTtlMs": 60000,
+  "models": {
+    "mock-v1": { "provider": "mock", "max_tokens": 64, "temperature": 0 }
+  }
+}
