@@ -1,9 +1,10 @@
 import { runtime as getRuntime, mockEnabled } from '@/lib/server/runtime';
 import { localRequest, dispatch } from '@/lib/server/http';
+import { safeJson } from '@/lib/security/redact';
 import { GraphError } from '@/lib/server/graph-service';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+const json = safeJson;
 export async function GET(request: Request) {
   if (!localRequest(request, false)) return json({ error: 'Local requests only.' }, 403);
   return json(getRuntime().graph.snapshot());

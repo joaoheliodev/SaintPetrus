@@ -63,7 +63,15 @@ this server-side flag. Tests instantiate it explicitly without API keys.
 
 ## Credentials and security
 
-Do not configure a real key in M0. .env.example contains placeholders only.
+M1 provides a terminal-only credential boundary; no browser form receives keys.
+Use `npm run key -- set openai` for hidden entry while the local server is running.
+Use `npm run key -- disconnect openai` to clear memory, `forget` to remove any
+saved ciphertext, or `restore` to explicitly load remembered ciphertext.
+`npm run key -- set openai --remember` opts into OS-keyring-backed encryption.
+Default is **not to persist**. Linux needs libsecret/secret-tool and an unlocked
+Secret Service; macOS uses Keychain; Windows uses DPAPI. Never pass a key as a
+command argument. Tests use runtime-generated synthetic material only.
+.env.example contains placeholders only.
 Never paste a key into issues, screenshots or recordings, and never commit .env.
 Read SECURITY.md for private reporting and credential revocation guidance.
 Gitleaks runs in the pre-commit hook (fail-closed when missing) and in CI.

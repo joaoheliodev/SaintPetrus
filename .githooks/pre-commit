@@ -4,4 +4,5 @@ if ! command -v gitleaks >/dev/null 2>&1; then
   echo 'Commit blocked: install gitleaks and ensure it is on PATH.' >&2
   exit 1
 fi
+node scripts/check-staged.mjs
 gitleaks git --pre-commit --staged --no-banner --redact=100
