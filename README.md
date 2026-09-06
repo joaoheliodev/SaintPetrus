@@ -2,7 +2,8 @@
 
 Local agent graph workspace built with Next.js, TypeScript, Tailwind, Zustand and React Flow.
 M0 provides manual nodes/connections validated by the local server.
-No LLM provider, API key or durable storage is required or implemented.
+M1 isolates credentials; M2 adds a local proxy with explicit mock and OpenAI adapters.
+No API key is required to build, test or use the manual canvas.
 
 ## Prerequisites
 
@@ -76,6 +77,20 @@ Never paste a key into issues, screenshots or recordings, and never commit .env.
 Read SECURITY.md for private reporting and credential revocation guidance.
 Gitleaks runs in the pre-commit hook (fail-closed when missing) and in CI.
 
+## Provider proxy (M2)
+
+With the server stopped, configure `SAINTPETRUS_PROVIDER=openai` and
+`SAINTPETRUS_MODEL=REPLACE_WITH_PROVIDER_MODEL_ID` in your ignored `.env.local`.
+Start the server and enter your key with the terminal command above. The header
+shows connection state. Test connection makes one minimal provider call and shows
+latency. Mock mode uses no network. No real API call was used for verification.
+
+The server owns the destination, model, output ceiling, timeout and single active
+request limit. Browser completion requests contain only action/input, never the
+credential. OpenAI requests disable storage and redirects; errors are normalized.
+The adapter follows the [official Responses reference](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).
+Token accounting, streaming and agent-driven real execution are not implemented.
+
 ## Validation
 
 ```sh
@@ -87,7 +102,7 @@ gitleaks dir . --no-banner --redact=100
 gitleaks detect --source . --log-opts=--all --no-banner --redact=100
 ```
 
-The suite contains six adapted server service/provider cases and four API cases.
+The suite covers graph services, local HTTP boundaries, credential security and the proxy with mock transport.
 Checks cover cycles, duplicate/self edges, limits, mock cancellation/accounting,
 mock opt-in, request bounds, origin/Host validation and fixed parse errors.
 
@@ -102,7 +117,7 @@ git remote set-url origin https://github.com/joaoheliodev/SaintPetrus.git
 
 ## Current scope
 
-M0 only. Real providers, secret storage, token budgets, health detectors,
+M0–M2 scaffold and security/proxy foundation. Token budgets, health detectors,
 summarizer/reviewer agents and replacement workflows await later milestones.
 Windows/macOS use the same Node launcher; native testing was performed on Linux.
 The full product README and complete accessibility audit belong to later milestones.

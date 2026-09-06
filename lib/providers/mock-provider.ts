@@ -53,3 +53,13 @@ export class MockProvider {
     }, 65);
   }
 }
+
+// Stateless provider contract double used by the proxy suite, distinct from the graph demo.
+export class MockLLMAdapter {
+  readonly id = 'mock' as const;
+  readonly model = 'mock-v1';
+  async complete(_input: string, signal: AbortSignal) {
+    signal.throwIfAborted();
+    return { text: 'MOCK: connection verified. No external API was called.' };
+  }
+}

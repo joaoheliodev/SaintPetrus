@@ -16,3 +16,11 @@ Final summary will be inserted here at completion.
 04:32 | M1 RS-01..RS-07 | implementation complete | default memory-only; encrypted opt-in; terminal-only key entry; restricted path hook; no browser storage/remote fonts/non-loopback bind in app scripts
 04:32 | M1 verification limit | native OS keyring and Windows/macOS execution | não verificado: would access system resources outside isolated checkout; command adapters and encryption tested with isolated doubles
 04:32 | M1 commit attempt 1 | hook failed in sandbox | ERROR: spawnSync git EPERM; retry with normal host execution; hook remains enabled
+04:35 | M1 | commit created | 46502ca on night/m0-m2; hook active; all three Gitleaks scans clean
+04:35 | M2 decision | first adapter | OpenAI Responses + mock; no model selected by default; real model must be configured server-side; no real key or live request used
+04:35 | M2 docs attempt 1 | official response reference | ERROR: Content length is too large: 4194305+; retry using official CLI schema reference
+
+05:00 | M2 | added proxy/adapter security tests and documentation | synthetic credentials only; real transport replaced by mock
+15:33 | M2 verification | 22 individual tests, lint and typecheck | passed without API key; prior 05:00 event time was a transcription error
+15:33 | M2 build attempt 1 | automatic review timeout | The automatic permission approval review did not finish before its deadline.; retry authorized and running
+15:34 | M2 | build passed; removed generated Next cache before scans | 22 tests/lint/typecheck/build passed; no real provider call

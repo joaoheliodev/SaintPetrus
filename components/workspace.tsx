@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { connectionFeedback, type Agent, type Graph } from '@/lib/orchestrator';
 import { useProjection } from '@/lib/store';
 import { useGraphTransport } from '@/lib/use-graph-transport';
+import { ProviderStatus } from './provider-status';
 import { cn } from '@/lib/utils';
 import '@xyflow/react/dist/style.css';
 type AgentNodeType = Node<{ agent: Agent }, 'agent'>;
@@ -60,7 +61,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled }: Props) {
     await command({ action: 'connect', source, target });
   }
   return <main className="app-shell">
-    <header className="topbar"><div className="brand"><Workflow /><strong>SaintPetrus</strong></div><span>{mockEnabled ? 'MOCK MODE — synthetic output' : 'No provider connected'}</span></header>
+    <header className="topbar"><div className="brand"><Workflow /><strong>SaintPetrus</strong></div><ProviderStatus /></header>
     <div className="projectbar"><h1>Agent workspace <small>M0</small></h1><div className="project-actions">
       <Button variant="outline" disabled={pending} onClick={() => command({ action: 'reset', objective })}><RotateCcw />Reset graph</Button>
       <Button disabled={pending} onClick={() => setDialog(true)}><Plus />Add agent</Button>
