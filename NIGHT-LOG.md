@@ -63,3 +63,4 @@
 15:55 | B typecheck/build | TS1501: This regular expression flag is only available when targeting es2018 or later | align target to core ES2022; tests and logic unchanged
 15:57 | B GATE FAILED | official typecheck still TS1501 after target alignment; stop | restored baseline 7a6160f through revert, not reset/rebase; no C
 15:58 | rollback verification | lint/typecheck/23 baseline tests/build passed | directory scan with explicit generated-artifact config; history/staged scans clean; cache retained
+20:28 | A-BIS | restored exact ee948ba Gitleaks config; default discovery, build cache retained | directory/history scans passed; no --config override
