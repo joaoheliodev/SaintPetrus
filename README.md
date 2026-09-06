@@ -139,3 +139,17 @@ SaintPetrus é um painel local de agentes. Execute npm ci e npm run dev e abra
 http://127.0.0.1:3000. O M0 permite criar nós e conexões manuais, com validação no
 servidor. Não exige chave de API. O mock é opcional, explícito e desligado por padrão.
 Não publique chaves em issues, prints ou commits. Consulte SECURITY.md.
+
+## Integrated core and known limitations
+
+The core is in `lib/core`, with 168 original tests in `tests/core`. The proxy
+invokes its injectable TokenCounter for preflight estimation. Next keeps ES2017;
+the independent `tsconfig.core.json` checks core and tests at ES2022 with the
+original strict flags. Root file sets are disjoint; imported dependencies may
+still be traversed by TypeScript. Removing the test exclusion reintroduces TS1501.
+
+- `evaluated:false` means **not evaluated**, never healthy.
+- Handoff `withinBudget:false` must be visible; protected items can exceed the ceiling.
+- Repeated-question detection is lexical and can miss paraphrases.
+- Token heuristics are approximate. Displayed cost is an **estimate** using a
+  dated local price table; actual provider usage is the source for billed tokens.

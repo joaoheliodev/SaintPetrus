@@ -121,3 +121,10 @@ test('RF-01 same-origin UI configures memory-only credentials, tests once, and d
     assert.equal((await POST(request({ action: 'test' }))).status, 409); assert.equal(calls, 1);
   } finally { store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }
 });
+
+test('B proxy invokes the injected core TokenCounter on the request path', async () => {
+  const { tokenCounterFrom } = await import('../lib/core/token-estimate'); let measured = '';
+  const counter = tokenCounterFrom('integration-test', text => { measured = text; return 7; }, true);
+  const result = await new ProviderProxy(100, counter).execute(new MockLLMAdapter(), 'Actual request', signal());
+  assert.equal(measured, 'Actual request'); assert.deepEqual(result.preflight, { tokens: 7, approximate: true, counterName: 'integration-test' });
+});

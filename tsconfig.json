@@ -36,6 +36,10 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    // Core tests use tsconfig.core.json (ES2022); removing this reintroduces TS1501.
+    "tests/core/**",
+    // Keep core root files owned by tsconfig.core.json, not both include sets.
+    "lib/core/**"
   ]
 }

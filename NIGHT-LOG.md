@@ -64,3 +64,6 @@
 15:57 | B GATE FAILED | official typecheck still TS1501 after target alignment; stop | restored baseline 7a6160f through revert, not reset/rebase; no C
 15:58 | rollback verification | lint/typecheck/23 baseline tests/build passed | directory scan with explicit generated-artifact config; history/staged scans clean; cache retained
 20:28 | A-BIS | restored exact ee948ba Gitleaks config; default discovery, build cache retained | directory/history scans passed; no --config override
+20:33 | B corrected | showConfig targets ES2017/ES2022; 46/14 root files; intersection empty | core sources unchanged except import suffixes; no integration TODO or duplicate implementation found
+20:33 | B GATE PASS | 168 core tests / 192 total; lint, both typechecks and build passed without key | proxy TokenCounter call-site test passed; C authorized after B commit
+20:34 | B secret scan blocked commit | leaks found: 1; generic-api-key tests/core/token-estimate.test.ts:18 | verified assertion equals public heuristicTokenCounter.name; line-only annotation, no credential values logged

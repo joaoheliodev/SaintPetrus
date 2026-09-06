@@ -11,8 +11,8 @@
     "start": "node scripts/next.mjs start",
     "build": "node scripts/next.mjs build",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.core.json",
+    "test": "node --import tsx --test tests/*.test.ts tests/core/*.test.ts",
     "setup:hooks": "git config core.hooksPath .githooks",
     "key": "node scripts/key.mjs"
   },
