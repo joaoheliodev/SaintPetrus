@@ -12,7 +12,9 @@ export class OpenAIAdapter implements ProviderAdapter {
       try {
         const response = await this.transport(endpoint, { method: 'POST', redirect: 'error', signal,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key.toString('utf8')}` },
-          body: JSON.stringify({ model: this.model, input: options?.messages ?? redactText(input), ...(options ? { instructions: options.systemPrompt, temperature: options.temperature } : {}), max_output_tokens: options?.maxTokens ?? 64, store: false, stream: false }),
+          // GPT-5 nano rejects temperature; minimal reasoning keeps the connection probe small.
+          // Other models retain their configured sampling policy. Availability needs a live test.
+          body: JSON.stringify({ model: this.model, input: options?.messages ?? redactText(input), ...(options ? { instructions: options.systemPrompt } : {}), ...(this.model === 'gpt-5-nano' ? { reasoning: { effort: 'minimal' } } : options ? { temperature: options.temperature } : {}), max_output_tokens: options?.maxTokens ?? 64, store: false, stream: false }),
         });
         if (!response.ok) { await response.body?.cancel(); throw new ProviderFailure('upstream'); }
         // Bounded response reader. No SDK logging or raw provider error passthrough.

@@ -18,6 +18,33 @@ function tokenFixture() {
   return () => { host.saintpetrusTokens = previous; };
 }
 const signal = () => new AbortController().signal;
+
+test('validation probe uses the low policy and documented nano payload without persisting credentials', async () => {
+  const { loadConfig } = await import('../lib/tokens/config');
+  const { policy, prices } = loadConfig();
+  assert.equal(policy.global, 1024);
+  assert.equal(policy.models['gpt-5-nano'].max_tokens, 128);
+  assert.equal(policy.cacheTtlMs, 0);
+  assert.equal(prices.models['gpt-5-nano'].inputPerMillion, 0.05);
+  assert.equal(prices.models['gpt-5-nano'].outputPerMillion, 0.4);
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/nano-');
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
+  const secret = Buffer.from(randomBytes(32).toString('hex')); let calls = 0;
+  try {
+    await store.configure('openai', secret);
+    assert.equal(store.status('openai').remembered, false);
+    const adapter = new OpenAIAdapter('gpt-5-nano', store, async (_url, options) => {
+      calls++; const payload = JSON.parse(String(options?.body));
+      assert.equal(Object.hasOwn(payload, 'temperature'), false);
+      assert.deepEqual(payload.reasoning, { effort: 'minimal' });
+      assert.equal(payload.max_output_tokens, 128);
+      assert.equal(payload.store, false);
+      return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }], usage: { input_tokens: 12, output_tokens: 1, total_tokens: 13 } });
+    });
+    const result = await adapter.complete('Reply OK.', signal(), { systemPrompt: '', messages: [{ role: 'user', content: 'Reply OK.' }], temperature: 1, maxTokens: 128 });
+    assert.equal(calls, 1); assert.deepEqual(result.usage, { prompt: 12, completion: 1, total: 13 });
+  } finally { store.disconnect('openai'); secret.fill(0); await rm(dir, { recursive: true }); }
+});
 const request = (body: unknown) => new Request('http://127.0.0.1:3000/api/provider', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 test('M2 proxy mock, input validation, busy, timeout and cancellation', async () => {

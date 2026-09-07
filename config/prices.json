@@ -1,8 +1,9 @@
 {
-  "date": "2026-09-06",
+  "date": "2026-09-07",
   "currency": "USD",
-  "note": "Only the free synthetic mock is configured. Add your provider model and verified rates locally before enabling real calls. No prices are fetched from the network.",
+  "note": "GPT-5 nano standard text rates checked at https://developers.openai.com/api/docs/models/gpt-5-nano on 2026-09-07. Account availability and actual usage are not yet verified. Cached-input discounts are not accounted for. No prices are fetched at runtime.",
   "models": {
-    "mock-v1": { "inputPerMillion": 0, "outputPerMillion": 0 }
+    "mock-v1": { "inputPerMillion": 0, "outputPerMillion": 0 },
+    "gpt-5-nano": { "inputPerMillion": 0.05, "outputPerMillion": 0.4 }
   }
 }

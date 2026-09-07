@@ -47,3 +47,7 @@
 20:53 | C final checks | lint, both typechecks, 200 tests and build passed without API key | all eight RF-06 acceptance tests passed; no RF-02 work started; build cache retained
 20:54 | C commit preparation | all gates and three scans clean | complete scope; stop after commit and branch-only push
 01:35 | step 0 | migrated narrative summaries to STATUS.md; retained all timestamped events in order | NIGHT-LOG.md now events only, append-only from this migration
+01:44 | STEP-0 | commit with hook active | d87996a; initial spawnSync git EPERM resolved after permission grant
+01:44 | STEP-1 | prepare low-budget model and documented payload | 1024 tokens globally; 128 output; memory only; no real call
+01:44 | STEP-1 | verification | 201 tests, lint, both typechecks and build passed; live UI limits and unchecked persistence verified
+01:44 | STEP-1 | handoff | await key entered only in RF-01; all real-provider acceptance checks pending; step 2 not started
