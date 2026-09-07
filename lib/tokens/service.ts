@@ -1,3 +1,4 @@
+import { observeArtifact, previewEnabled } from '../preview/store';
 import { eventBus } from '../events/bus';
 import { createHash, randomUUID } from 'node:crypto';
 import { heuristicTokenCounter, type TokenCounter } from '../core/token-estimate';
@@ -69,6 +70,7 @@ export class TokenService {
     if (!Number.isSafeInteger(reservation) || reservation < 1 || rows.some(row => row.used + row.reserved + reservation > row.limit)) { this.pause(agent); this.refuse(agent, 'Preflight reservation exceeds token budget.'); }
     // Synchronous reservation across all four scopes happens before any provider I/O.
     rows.forEach(row => { row.reserved += reservation; });
+    if (previewEnabled()) options.onText = text => observeArtifact(agent, this.hooks.role?.(agent) ?? agent, text);
     let reconciled = false; let notSent = false;
     try {
       const result = await proxy.execute(adapter, input, signal, options);
@@ -84,6 +86,7 @@ export class TokenService {
         totals.prompt += usage.prompt; totals.completion += usage.completion; totals.total += usage.total;
         row.costEstimateUsd += (usage.prompt * price.inputPerMillion + usage.completion * price.outputPerMillion) / 1e6;
       }
+      observeArtifact(agent, this.hooks.role?.(agent) ?? agent, result.text);
       reconciled = true;
       eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'agent.message', payload: (approximate ? '[Mock] ' : '') + result.text, tokens: { prompt: usage.prompt, completion: usage.completion } });
       if (rows.some(row => row.used >= row.limit * .8)) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'budget.warning', severity: 'warning', payload: 'Budget reached 80% or more.' });

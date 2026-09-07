@@ -54,3 +54,7 @@
 02:01 | EVENT-FEED | implement internal bus and optional feed foundation | waiting architecture approval for conditional HTTP registration; preview not started
 02:01 | EVENT-FEED | verification | 205 tests, lint, both typechecks and build passed; browser endpoint checks pending; sandbox showConfig failure resolved after permission
 02:04 | EVENT-FEED | complete approved conditional Node entrypoint | browser SSE delivery, filter and selection verified; disabled endpoint HTTP 404; 205 tests and static checks passed
+14:43 | PREVIEW | implement independent optional isolated preview | opaque nested sandbox, parent CSP navigation block, partial text and 20-version history
+14:43 | PREVIEW | browser harness corrections | initial hydration timeout and Cannot find context with specified id resolved by lifecycle-aware assertions; final Chromium checks passed
+14:43 | PREVIEW | verification | 209 tests, lint, both typechecks and build passed; Chromium fetch/navigation/storage/cookie/parent isolation plus versions/source/pause passed; no real provider calls
+14:44 | PREVIEW | final disabled-server check | main 200; events/artifacts/preview 404; preview port absent; directory and full-history Gitleaks clean

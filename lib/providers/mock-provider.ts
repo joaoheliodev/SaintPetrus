@@ -42,6 +42,22 @@ export class MockProvider {
     });
     this.tick();
   }
+  startPreview() {
+    if (this.service.snapshot().status === 'running') return;
+    this.reset(); this.service.setRunStatus('running');
+    const probe = `http://127.0.0.1:${Number(process.env.PORT ?? 3000)}/api/graph`;
+    const stages = ['<!doctype html><h1>MOCK preview</h1>', '<p>Stage two</p>', `<style>h1{font-family:monospace}</style><p id=network>Network not tested</p><button onclick=probe()>Test network isolation</button><button onclick=navigateProbe()>Test navigation isolation</button><script>document.body.dataset.generated='yes'; async function probe(){try{await fetch(${JSON.stringify(probe)});document.getElementById('network').textContent='NETWORK ALLOWED'}catch{document.getElementById('network').textContent='Network blocked'}}function navigateProbe(){location.href=${JSON.stringify(probe)}}</script>`];
+    for (const stage of stages) this.steps.push(() => { this.service.appendMockOutput('root', stage, false); });
+    this.tickPreview();
+  }
+  private tickPreview() {
+    const generation = this.generation;
+    this.timer = setTimeout(() => {
+      if (generation !== this.generation || this.service.snapshot().status !== 'running') return;
+      this.steps[this.cursor++]?.();
+      if (this.cursor >= this.steps.length) this.service.setRunStatus('completed'); else this.tickPreview();
+    }, 600);
+  }
   private tick() {
     const generation = this.generation;
     this.timer = setTimeout(() => {

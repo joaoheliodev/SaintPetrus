@@ -1,43 +1,37 @@
 # SaintPetrus — current status
 
-Branch: `night/m0-m2`. Latest application commit: `9b3a2cd` (RF-06).
-Core integration: `114813a`. Tracked Gitleaks configuration: `c1e77b7`.
-Last completed checks: 200 tests, lint, both typechecks, build and three Gitleaks scans. Remote CI for 9b3a2cd passed. These checks used synthetic credentials and mock transport, not real provider calls.
+Branch: `night/m0-m2`. Remote repository: `joaoheliodev/SaintPetrus`.
 
-## Current objective
+## Current scope
 
-New scope: item 1 event bus + optional SSE feed, then item 2 isolated visual preview. Both exposures disabled by default. Real-provider validation remains unexecuted and pending; it is not claimed complete.
+Item 1 completed in `c4c6895` after foundation WIP `87c2e47`: internal typed append-only circular event bus and optional SSE feed. Both live SSE and disabled HTTP 404 verified. The Node entrypoint change was explicitly approved by the user. Feed event selection targets the existing agent inspector; the full RF-02 panel remains pending.
 
-Item 1 complete: the authorized Node entrypoint conditionally registers SSE; disabled endpoint returned HTTP 404 in a running server. Browser verified live agent-created delivery, newest-first ordering, filtering and clicking through to the existing agent inspector. Full RF-02 remains pending. 205 tests, lint, both typechecks and build passed. Item 2 next; independent preview exposure will default off. Real-key validation remains pending.
+Item 2 implemented in this change: independent optional preview SSE, separate loopback listener, trusted wrapper with HTTP CSP, nested opaque generated-code iframe, partial Responses text integration, bounded debounced version history, pause, source and previous-version controls. Both sandboxes permit only scripts. Generated code cannot fetch the backend or navigate itself there: the outer CSP blocks child frame navigation. Storage, cookies and parent document access were denied in Chromium.
 
-## Open debts
+Both toggles default false: `SAINTPETRUS_FEED` and `SAINTPETRUS_PREVIEW`. They are read by the server at startup. Feed-off leaves the internal bus running. Preview-off registers no artifact endpoint and opens no preview port. User must explicitly enable and restart; these are not cosmetic UI toggles. No RF-03/RF-04 implementation started.
 
-- Counters, limits and cache are process-local; restarting clears accounting state.
-- Reservations without trustworthy usage do not expire and can block further execution. Expiration belongs to step 2, not this step.
-- A live Gitleaks suppression remains on tests/core/token-estimate.test.ts:18 for a verified public counter-name assertion. It is not proof against future leaks.
-- Native Windows/macOS keyrings are unverified. Linux roundtrip was tested with synthetic material only.
-- No real provider call has been executed. Mock success does not establish real-provider security or schema compatibility.
-- Previously mock-only defaults: GPT-5 nano is now explicitly allowlisted with published standard rates (input USD 0.05/M, output USD 0.40/M). Account availability remains unverified. Cached-input discounts are not accounted for.
+## Verification
 
-## Real validation results
+- 209 unit/integration tests passed without API keys, including event-to-SSE redaction and HTML text escaping, bounded histories, disabled route registries and streaming usage/partial text.
+- Gitleaks directory and full-history scans passed with build cache present; staged scan is enforced before commit.
+- Lint, root ES2017 typecheck, separate core ES2022 typecheck and production build passed.
+- Feed live browser verification: creation arrives via SSE, newest first, type filter and selecting corresponding inspector; disabled endpoint HTTP 404.
+- Independent disposable Chromium check: HTML/JS rendering, incremental versions, source, previous version, paused historical view retained while new versions arrive, fetch denied by connect-src, self-navigation denied by parent frame-src, storage/cookies/parent inaccessible, allow-scripts only.
+- Preview-only and both-enabled server configurations tested independently of feed. With preview disabled, artifact route and preview route return 404 and its port does not listen.
+- Browser check is reproducible with `npm run test:browser`, an installed Chromium and the documented disposable mock server. No real key, user browser profile, external provider or live fixture used.
 
-Not executed: awaiting preparation and a key entered by the user in the local RF-01 UI, with persistence unchecked. Never paste a key into chat, documentation, fixtures or source.
-No real response fixtures captured. No real-vs-mock divergence claimed yet.
+## Open debts and limits
 
-## Records
+- Counters, budgets, graph, events and artifacts are process-local; restarting clears them.
+- Reservations without trustworthy provider usage do not expire; resolving this remains a separate pending step.
+- Existing Gitleaks suppression in tests/core/token-estimate.test.ts remains for the verified public counter name.
+- Native Windows/macOS keyrings are not verified. Prior Linux keyring test used synthetic material.
+- No real provider call has been executed. Real usage/cost reconciliation, error/fragment handling and the new Responses streaming path remain unverified against the live provider.
+- Previously mock-only defaults now additionally allow GPT-5 nano with published standard rates. Account availability and cached-input discounts remain unverified/unaccounted for. Configured global budget is 1024 tokens, not an independent cash ceiling.
+- Configured credential fragments of 12+ characters are redacted. Arbitrary shorter substrings are not reliably distinguishable from normal text.
+- Generated code can consume excessive CPU/memory; iframe sandboxing is not a resource quota. Browser checks cover the documented HTTP fetch/navigation, origin and storage boundaries, not every browser engine or every possible network subsystem.
+- RF-02 full panel and all later milestones are pending. The earlier real-key validation gate is still open, not silently approved.
 
-NIGHT-LOG.md contains timestamped events only. Historical narrative summaries remain in Git history. This file is rewritten as verification state changes.
+## Execution notes
 
-## Step 1 preparation — 2026-09-07
-
-Global, agent, model and session limits: 1,024 tokens each. GPT-5 nano output cap: 128 tokens. Cache disabled. These are process-local token limits with approximate reservations, not an independent dollar spending ceiling.
-Provider credentials remain memory-only by default; the live UI checkbox was verified unchecked. Server runs exclusively at http://127.0.0.1:3100, mock disabled, GPT-5 nano preselected. No key was entered by the agent.
-Documentation-based mismatch corrected: GPT-5 nano rejects temperature, which the adapter previously always sent. The adapter now omits it for this model and requests minimal reasoning. This is not a captured real-provider divergence. Sources: https://developers.openai.com/api/docs/models/gpt-5-nano and https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.2 .
-Checks executed: 201 tests passed, lint passed, both typechecks passed, production build passed without an API key. The new test uses synthetic transport, never a real fixture. Its first run failed with `Invalid credential.` because random binary test material contained prohibited bytes; corrected to generated hexadecimal text and rerun successfully.
-Remaining step 1: user enters key through RF-01 with Remember unchecked and presses Connect only; execute one successful minimal real call; compare raw usage/reconciliation/cost/schema; force and inspect a real provider error including credential fragments; test 429/timeout if feasible; scan export; capture only sanitized regression fixtures for observed divergences. No real tests have run. Do not proceed to step 2.
-The first step-0 commit attempt failed with `spawnSync git EPERM`; after the granted permission, the hook remained active and the commit succeeded.
-
-## Optional feed verification in progress
-
-205 tests pass, including redaction reaching an SSE response, fragment redaction, HTML rendered as escaped text, bounded immutable-to-consumers history, cumulative tokens and disabled route registry with internal bus recording. Lint, both typechecks and build passed. No API key used. Initial sandbox build failed with `Could not parse output from TypeScript's --showConfig.`; it passed after permission was granted. Browser SSE delivery, type filtering and agent selection are now verified after the approved entrypoint integration.
-Known redaction boundary: configured credential fragments of 12+ characters are masked; arbitrary shorter substrings cannot reliably be distinguished from ordinary text. No claim of universal fragment detection.
+The sandbox initially denied binding (`listen EPERM`) and a later build could not parse `tsc --showConfig`; granted turn-scoped network permission resolved those execution restrictions. Initial browser harness attempts needed hydration waiting, out-of-process frame attachment and moving storage assertions before deliberately invalidating a document through blocked navigation. These were test-harness corrections; final assertions passed. NIGHT-LOG.md remains append-only.

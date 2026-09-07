@@ -1,3 +1,4 @@
+import { observeArtifact } from '../preview/store';
 import { eventBus } from '../events/bus';
 // Server authority. Node imports prevent accidental use in the browser bundle.
 import { randomUUID } from 'node:crypto';
@@ -103,6 +104,6 @@ export class GraphService {
       this.emit('budget.exhausted', 'Mock budget exhausted.'); return false;
     }
     if (charge) this.graph.costCents++;
-    agent.output += character; this.record('agent.message', id, agent.output); this.emit('mock.delta', 'Mock output updated.'); return true;
+    agent.output += character; observeArtifact(id, agent.name, agent.output); this.record('agent.message', id, agent.output); this.emit('mock.delta', 'Mock output updated.'); return true;
   }
 }

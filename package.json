@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.core.json",
     "test": "node --import tsx --test tests/*.test.ts tests/core/*.test.ts",
     "setup:hooks": "git config core.hooksPath .githooks",
-    "key": "node scripts/key.mjs"
+    "key": "node scripts/key.mjs",
+    "test:browser": "node scripts/check-preview-browser.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     text += decoder.decode();
     const { graph, mock } = getRuntime();
     const command = JSON.parse(text);
-    if (['reset','start','resume','add'].includes(command?.action) && tokenService().isStopped()) return json({ error: 'Global kill switch is active.' }, 409);
+    if (['reset','start','resume','add','preview-mock'].includes(command?.action) && tokenService().isStopped()) return json({ error: 'Global kill switch is active.' }, 409);
     return json(dispatch(graph, mock, mockEnabled(), command));
   } catch (error) {
     // Never echo request contents, provider credentials or raw stack traces.
