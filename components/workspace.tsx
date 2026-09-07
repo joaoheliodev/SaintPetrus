@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { connectionFeedback, type Agent, type Graph } from '@/lib/orchestrator';
 import { useProjection } from '@/lib/store';
 import { useGraphTransport } from '@/lib/use-graph-transport';
+import { EventFeed } from './event-feed';
 import { TokenPanel } from './token-panel';
 import { ProviderStatus } from './provider-status';
 import { cn } from '@/lib/utils';
@@ -27,8 +28,8 @@ function AgentNode({ data, selected }: NodeProps<AgentNodeType>) {
   </article>;
 }
 const nodeTypes = { agent: AgentNode };
-type Props = { initialGraph: Graph; mockEnabled: boolean };
-function CanvasWorkspace({ initialGraph, mockEnabled }: Props) {
+type Props = { initialGraph: Graph; mockEnabled: boolean; feedEnabled?: boolean };
+function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false }: Props) {
   const { graph, selectedId, notice, events, select } = useProjection();
   const { command, pending } = useGraphTransport(initialGraph);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
@@ -85,6 +86,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled }: Props) {
     </div><aside className="inspector"><div className="panel-title">Agent inspector</div><div className="inspector-profile"><Bot /><h2>{selected.name}</h2></div><p className="status"><Check size={15} />{statusLabels[selected.status]} · {selected.provider}</p>
       <Tabs defaultValue="context"><TabsList><TabsTrigger value="context">Context</TabsTrigger><TabsTrigger value="output">Output</TabsTrigger></TabsList><TabsContent value="context"><h3>Objective</h3><p>{selected.context.objective}</p><h3>Executive summary</h3><p>{selected.context.summary}</p><div className="context-note"><ShieldCheck /><span>Isolated context envelope. Parent transcript is not inherited.</span></div></TabsContent><TabsContent value="output"><pre>{selected.output || 'No provider output.'}</pre></TabsContent></Tabs>
     </aside></div>
+    {feedEnabled ? <EventFeed /> : <p className="helper">Live feed disabled on server. Enable SAINTPETRUS_FEED and restart.</p>}
     <footer className="statusbar">Local server · 127.0.0.1 <span>{mockEnabled ? `Mock: ${graph.status}` : 'Mock disabled'}</span></footer>
     {notice && <div role="alert" className="notice"><ShieldCheck /><span>{notice}</span><Button variant="ghost" size="icon" aria-label="Dismiss notice" onClick={() => useProjection.setState({ notice: '' })}><X /></Button></div>}
     <Dialog open={dialog} onOpenChange={setDialog}><DialogContent><DialogTitle>Add agent</DialogTitle><DialogDescription>Create a disconnected agent, then connect its handles on the canvas.</DialogDescription><label>Name<input value={name} maxLength={70} onChange={e => setName(e.target.value)} /></label><label>Objective<textarea value={goal} maxLength={2000} onChange={e => setGoal(e.target.value)} /></label>{notice && <p role="alert">{notice}</p>}<Button disabled={pending || !name.trim() || !goal.trim()} onClick={add}><Plus />Create agent</Button></DialogContent></Dialog>

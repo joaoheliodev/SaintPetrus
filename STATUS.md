@@ -6,8 +6,11 @@ Last completed checks: 200 tests, lint, both typechecks, build and three Gitleak
 
 ## Current objective
 
-Step 0 completed in d87996a: this rewritable status is separate from the pure append-only NIGHT-LOG.md.
-Step 1: prepare a low-budget real-key test, then validate actual usage, cost estimate, response shape, provider errors, timeout/429 when feasible, and context export. Stop and report after step 1. No later step authorized before this gate closes.
+New scope: item 1 event bus + optional SSE feed, then item 2 isolated visual preview. Both exposures disabled by default. Real-provider validation remains unexecuted and pending; it is not claimed complete.
+
+Item 1 in progress: typed process-local circular bus, sanitization before storage, bounded history and replay, token totals, producer integration, SSE handler/conditional route registry, React text-only feed with filters and selection of the existing agent inspector. RF-02's full panel is not implemented by this change.
+Pending user decision (required by the earlier architecture rule): authorize a minimal Node entrypoint wrapping Next so the optional SSE endpoint is genuinely not registered when disabled, or accept Next's registered endpoint returning 404. No entrypoint change has been made. The SSE handler is not yet wired to a listening endpoint. Do not enable SAINTPETRUS_FEED before that integration.
+Remaining item 1: conditional endpoint integration after approval; browser SSE live delivery, filters/scroll/agent selection; disabled endpoint verification against a running server. Item 2 has not started, preserving the requested order. No preview route exists.
 
 ## Open debts
 
@@ -35,3 +38,8 @@ Documentation-based mismatch corrected: GPT-5 nano rejects temperature, which th
 Checks executed: 201 tests passed, lint passed, both typechecks passed, production build passed without an API key. The new test uses synthetic transport, never a real fixture. Its first run failed with `Invalid credential.` because random binary test material contained prohibited bytes; corrected to generated hexadecimal text and rerun successfully.
 Remaining step 1: user enters key through RF-01 with Remember unchecked and presses Connect only; execute one successful minimal real call; compare raw usage/reconciliation/cost/schema; force and inspect a real provider error including credential fragments; test 429/timeout if feasible; scan export; capture only sanitized regression fixtures for observed divergences. No real tests have run. Do not proceed to step 2.
 The first step-0 commit attempt failed with `spawnSync git EPERM`; after the granted permission, the hook remained active and the commit succeeded.
+
+## Optional feed verification in progress
+
+205 tests pass, including redaction reaching an SSE response, fragment redaction, HTML rendered as escaped text, bounded immutable-to-consumers history, cumulative tokens and disabled route registry with internal bus recording. Lint, both typechecks and build passed. No API key used. Initial sandbox build failed with `Could not parse output from TypeScript's --showConfig.`; it passed after permission was granted. Browser acceptance remains NOT VERIFIED because endpoint integration awaits the architecture decision.
+Known redaction boundary: configured credential fragments of 12+ characters are masked; arbitrary shorter substrings cannot reliably be distinguished from ordinary text. No claim of universal fragment detection.

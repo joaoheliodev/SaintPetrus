@@ -51,3 +51,5 @@
 01:44 | STEP-1 | prepare low-budget model and documented payload | 1024 tokens globally; 128 output; memory only; no real call
 01:44 | STEP-1 | verification | 201 tests, lint, both typechecks and build passed; live UI limits and unchecked persistence verified
 01:44 | STEP-1 | handoff | await key entered only in RF-01; all real-provider acceptance checks pending; step 2 not started
+02:01 | EVENT-FEED | implement internal bus and optional feed foundation | waiting architecture approval for conditional HTTP registration; preview not started
+02:01 | EVENT-FEED | verification | 205 tests, lint, both typechecks and build passed; browser endpoint checks pending; sandbox showConfig failure resolved after permission

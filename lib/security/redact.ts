@@ -1,5 +1,6 @@
 // Shared sanitizer for server logs, errors, serialized responses, summaries and exports.
-const activeSecrets = new Set<Buffer>();
+const secretState = globalThis as typeof globalThis & { saintpetrusRedactionSecrets?: Set<Buffer> };
+const activeSecrets = secretState.saintpetrusRedactionSecrets ??= new Set<Buffer>();
 export function registerSecret(secret: Buffer) {
   activeSecrets.add(secret);
   return () => { activeSecrets.delete(secret); };
@@ -9,6 +10,11 @@ export function redactText(input: string): string {
   for (const secret of activeSecrets) {
     const value = secret.toString('utf8');
     if (value) text = text.split(value).join('[REDACTED]');
+    // Mask recognizable fragments of a configured key (12+ characters), including provider error excerpts.
+    // Shorter arbitrary substrings cannot be distinguished reliably from ordinary text.
+    const fragments = new Set<string>();
+    for (let i = 0; i + 12 <= value.length; i++) fragments.add(value.slice(i, i + 12));
+    for (const fragment of fragments) text = text.split(fragment).join('[REDACTED]');
   }
   return text.replace(/\bBearer\s+[^\s"'<>]+/gi, 'Bearer [REDACTED]')
     .replace(/\bsk-[A-Za-z0-9_-]+/g, '[REDACTED]')

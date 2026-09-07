@@ -1,9 +1,14 @@
+import { eventBus } from '../events/bus';
 // Server authority. Node imports prevent accidental use in the browser bundle.
 import { randomUUID } from 'node:crypto';
 import { createGraph, type Graph, type GraphEvent, type ExecutionBudget, type SpawnRequest, type Agent } from '../orchestrator';
 export class GraphError extends Error {}
 export class GraphService {
   private graph = createGraph();
+  constructor() { this.record('agent.created', 'root', 'Coordinator created.'); }
+  private record(type: import('../events/types').EventType, id: string, payload: string, extra: Partial<import('../events/types').EventInput> = {}) {
+    eventBus().publish({ agent_id: id, role: this.graph.agents.find(a => a.id === id)?.name ?? 'Unknown', type, payload, ...extra });
+  }
   private listeners = new Set<(event: GraphEvent) => void>();
   snapshot(): Graph { return structuredClone(this.graph); }
   subscribe(listener: (event: GraphEvent) => void) {
@@ -49,6 +54,8 @@ export class GraphService {
     // Synchronous node + edge mutation is atomic within this single local process.
     this.graph.agents.push(agent);
     if (parent) this.graph.edges.push({ id: randomUUID(), source: parent.id, target: id, kind: 'delegation' });
+    this.record('agent.created', id, 'Agent created.');
+    if (parent) this.record('connection.created', parent.id, 'Delegation connection created.', { source: parent.id, destination: id });
     this.emit('agent.created', 'Agent created.'); return id;
   }
   connect(source: string, target: string) {
@@ -64,19 +71,29 @@ export class GraphService {
     };
     if (reaches(target)) throw new GraphError('Connection would create a cycle.');
     this.graph.edges.push({ id: randomUUID(), source, target, kind: 'context' });
+    this.record('connection.created', source, 'Connection created.', { source, destination: target });
     this.emit('edge.created', 'Connection created.');
+  }
+  disconnect(id: string) {
+    const edge = this.graph.edges.find(e => e.id === id);
+    if (!edge) throw new GraphError('Connection not found.');
+    this.graph.edges = this.graph.edges.filter(e => e.id !== id);
+    this.record('connection.removed', edge.source, 'Connection removed.', { source: edge.source, destination: edge.target });
+    this.emit('edge.removed', 'Connection removed.');
   }
   move(id: string, position: { x: number; y: number }) {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent || !Number.isFinite(position.x) || !Number.isFinite(position.y) || Math.abs(position.x) > 100000 || Math.abs(position.y) > 100000) throw new GraphError('Invalid position.');
     agent.position = { ...position }; this.emit('agent.moved', 'Agent moved.');
   }
-  pauseAll() { this.graph.agents.forEach(agent => { agent.status = 'paused'; }); this.graph.status = 'paused'; this.emit('agents.paused', 'All agents paused by kill switch.'); }
+  pauseAll() { this.graph.agents.forEach(agent => this.setAgentStatus(agent.id, 'paused')); this.graph.status = 'paused'; this.emit('agents.paused', 'All agents paused by kill switch.'); }
   setRunStatus(status: Graph['status']) { this.graph.status = status; this.emit('run.updated', `Run ${status}.`); }
   setAgentStatus(id: string, status: Agent['status']) {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) throw new GraphError('Agent not found.');
-    agent.status = status; this.emit('agent.updated', 'Agent status updated.');
+    const from = agent.status; agent.status = status;
+    if (from !== status) this.record(status === 'paused' ? 'agent.paused' : 'agent.status_changed', id, 'Agent status changed.', { status: { from, to: status } });
+    this.emit('agent.updated', 'Agent status updated.');
   }
   appendMockOutput(id: string, character: string, charge: boolean): boolean {
     const agent = this.graph.agents.find(a => a.id === id);
@@ -86,6 +103,6 @@ export class GraphService {
       this.emit('budget.exhausted', 'Mock budget exhausted.'); return false;
     }
     if (charge) this.graph.costCents++;
-    agent.output += character; this.emit('mock.delta', 'Mock output updated.'); return true;
+    agent.output += character; this.record('agent.message', id, agent.output); this.emit('mock.delta', 'Mock output updated.'); return true;
   }
 }

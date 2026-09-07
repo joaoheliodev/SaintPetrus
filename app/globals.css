@@ -141,3 +141,8 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 .token-table th, .token-table td { padding: .5rem; border: 1px solid var(--border); text-align: left; }
 .token-table small { display: block; max-width: 18ch; overflow-wrap: anywhere; }
 .token-table input { width: 8rem; background: var(--background); color: var(--foreground); }
+
+.event-feed { padding: 1rem; border-top: 1px solid var(--border); }
+.event-feed label { display: inline-flex; gap: .5rem; margin-right: 1rem; }
+.feed-list { max-height: 16rem; overflow: auto; overflow-anchor: none; }
+.feed-row { display: block; width: 100%; text-align: left; padding: .5rem; overflow-wrap: anywhere; border-bottom: 1px solid var(--border); }

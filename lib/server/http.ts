@@ -19,6 +19,7 @@ export function dispatch(graph: GraphService, mock: MockProvider, enabled: boole
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new GraphError('Invalid command.');
   const data = input as Record<string, unknown>;
   switch (data.action) {
+    case 'disconnect': graph.disconnect(string(data.id, 100)); break;
     case 'connect': graph.connect(string(data.source, 100), string(data.target, 100)); break;
     case 'add': graph.add({ name: string(data.name, 70), provider: 'Unconfigured', context: {
       objective: string(data.objective), summary: 'Manually configured agent. No provider connected.', artifacts: [],
