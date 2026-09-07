@@ -8,9 +8,7 @@ Last completed checks: 200 tests, lint, both typechecks, build and three Gitleak
 
 New scope: item 1 event bus + optional SSE feed, then item 2 isolated visual preview. Both exposures disabled by default. Real-provider validation remains unexecuted and pending; it is not claimed complete.
 
-Item 1 in progress: typed process-local circular bus, sanitization before storage, bounded history and replay, token totals, producer integration, SSE handler/conditional route registry, React text-only feed with filters and selection of the existing agent inspector. RF-02's full panel is not implemented by this change.
-Pending user decision (required by the earlier architecture rule): authorize a minimal Node entrypoint wrapping Next so the optional SSE endpoint is genuinely not registered when disabled, or accept Next's registered endpoint returning 404. No entrypoint change has been made. The SSE handler is not yet wired to a listening endpoint. Do not enable SAINTPETRUS_FEED before that integration.
-Remaining item 1: conditional endpoint integration after approval; browser SSE live delivery, filters/scroll/agent selection; disabled endpoint verification against a running server. Item 2 has not started, preserving the requested order. No preview route exists.
+Item 1 complete: the authorized Node entrypoint conditionally registers SSE; disabled endpoint returned HTTP 404 in a running server. Browser verified live agent-created delivery, newest-first ordering, filtering and clicking through to the existing agent inspector. Full RF-02 remains pending. 205 tests, lint, both typechecks and build passed. Item 2 next; independent preview exposure will default off. Real-key validation remains pending.
 
 ## Open debts
 
@@ -41,5 +39,5 @@ The first step-0 commit attempt failed with `spawnSync git EPERM`; after the gra
 
 ## Optional feed verification in progress
 
-205 tests pass, including redaction reaching an SSE response, fragment redaction, HTML rendered as escaped text, bounded immutable-to-consumers history, cumulative tokens and disabled route registry with internal bus recording. Lint, both typechecks and build passed. No API key used. Initial sandbox build failed with `Could not parse output from TypeScript's --showConfig.`; it passed after permission was granted. Browser acceptance remains NOT VERIFIED because endpoint integration awaits the architecture decision.
+205 tests pass, including redaction reaching an SSE response, fragment redaction, HTML rendered as escaped text, bounded immutable-to-consumers history, cumulative tokens and disabled route registry with internal bus recording. Lint, both typechecks and build passed. No API key used. Initial sandbox build failed with `Could not parse output from TypeScript's --showConfig.`; it passed after permission was granted. Browser SSE delivery, type filtering and agent selection are now verified after the approved entrypoint integration.
 Known redaction boundary: configured credential fragments of 12+ characters are masked; arbitrary shorter substrings cannot reliably be distinguished from ordinary text. No claim of universal fragment detection.

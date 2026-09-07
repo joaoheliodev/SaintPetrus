@@ -53,3 +53,4 @@
 01:44 | STEP-1 | handoff | await key entered only in RF-01; all real-provider acceptance checks pending; step 2 not started
 02:01 | EVENT-FEED | implement internal bus and optional feed foundation | waiting architecture approval for conditional HTTP registration; preview not started
 02:01 | EVENT-FEED | verification | 205 tests, lint, both typechecks and build passed; browser endpoint checks pending; sandbox showConfig failure resolved after permission
+02:04 | EVENT-FEED | complete approved conditional Node entrypoint | browser SSE delivery, filter and selection verified; disabled endpoint HTTP 404; 205 tests and static checks passed

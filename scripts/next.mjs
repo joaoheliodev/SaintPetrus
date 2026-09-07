@@ -11,8 +11,8 @@ if (!/^\d+$/.test(port) || Number(port) < 1024 || Number(port) > 65535) {
   console.error('PORT must be an integer from 1024 to 65535.');
   process.exit(1);
 }
-const args = [mode, ...(mode === 'build' ? ['--webpack'] : ['--hostname', '127.0.0.1', '--port', port])];
-const child = spawn(process.execPath, [require.resolve('next/dist/bin/next'), ...args], {
+const args = mode === 'build' ? [require.resolve('next/dist/bin/next'), 'build', '--webpack'] : ['--import', 'tsx', 'scripts/server.ts', mode];
+const child = spawn(process.execPath, args, {
   stdio: 'inherit', env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
 });
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));

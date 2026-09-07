@@ -194,3 +194,9 @@ role, temperature and max_tokens. Only temperature=0 is cached. TTL comes from
 tests bypass cache so Test connection still makes one minimal call. The graph's
 old animated mock demonstration is a separate synthetic simulation; only proxy
 calls enter this ledger.
+
+### Optional live event feed
+
+The internal process-local event bus always runs. Its circular history defaults to 500 entries (`SAINTPETRUS_EVENT_CAPACITY`, range 1–10000); restart loses events and accumulated token totals. Consumer snapshots cannot modify stored events.
+
+Client exposure defaults off. Start with `SAINTPETRUS_FEED=true npm run dev` to enable the SSE feed. The Node entrypoint registers `/api/events` only when this switch is true; otherwise Next has no such route and returns 404. Restart to change it. This uses the existing `tsx` installation; install development dependencies for local server operation. Feed replay uses Last-Event-ID and reports evicted history. Slow consumers disconnect and reconnect instead of accumulating an unbounded queue. Tokens include explicitly labeled mock estimates. Clicking an event selects the existing agent inspector; the full RF-02 panel is still pending.
