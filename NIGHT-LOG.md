@@ -58,3 +58,5 @@
 14:43 | PREVIEW | browser harness corrections | initial hydration timeout and Cannot find context with specified id resolved by lifecycle-aware assertions; final Chromium checks passed
 14:43 | PREVIEW | verification | 209 tests, lint, both typechecks and build passed; Chromium fetch/navigation/storage/cookie/parent isolation plus versions/source/pause passed; no real provider calls
 14:44 | PREVIEW | final disabled-server check | main 200; events/artifacts/preview 404; preview port absent; directory and full-history Gitleaks clean
+23:13 | GEMINI-1A | official API/pricing/model research and implementation | same proxy; thinking counted as output; retired 1.5/2.0 models documented; OpenAI unchanged
+23:13 | GEMINI-1A | verification | 212 tests, lint, both typechecks and build passed; fixture and API path synthetic; real validation pending key in UI

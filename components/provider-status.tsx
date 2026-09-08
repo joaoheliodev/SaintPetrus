@@ -28,7 +28,7 @@ export function ProviderStatus() {
   function toggle(value: boolean) {
     if (keyField.current) keyField.current.value = '';
     setShow(false); setRemember(false); setOpen(value);
-    if (value) { setProvider(status.mocked ? 'mock' : 'openai'); setModel(status.provider === 'openai' ? status.model : ''); setResult(''); }
+    if (value) { setProvider(status.mocked ? 'mock' : status.provider === 'gemini' ? 'gemini' : 'openai'); setModel(['openai', 'gemini'].includes(status.provider) ? status.model : ''); setResult(''); }
   }
   async function configure(action: 'set' | 'disconnect') {
     const selected = action === 'disconnect' ? status.provider : provider;
@@ -67,12 +67,12 @@ export function ProviderStatus() {
       <DialogContent className="provider-panel">
         <DialogTitle>Connect AI</DialogTitle>
         <DialogDescription>Keys go only to this local backend. Testing makes one minimal call and can incur provider charges. Memory only by default.</DialogDescription>
-        <label>Provider<select value={provider} disabled={pending} onChange={event => { setProvider(event.target.value); if (keyField.current) keyField.current.value = ''; setShow(false); }}>
-          <option value="openai">OpenAI</option>{status.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
+        <label>Provider<select value={provider} disabled={pending} onChange={event => { setProvider(event.target.value); setModel(''); setCustom(''); if (keyField.current) keyField.current.value = ''; setShow(false); }}>
+          <option value="openai">OpenAI</option><option value="gemini">Google Gemini</option>{status.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
         </select></label>
         <p>Additional providers are not available in this adapter yet.</p>
         <label>Default model<select value={provider === 'mock' ? 'mock-v1' : model} disabled={pending || provider === 'mock'} onChange={event => setModel(event.target.value)}>
-          {provider === 'mock' ? <option value="mock-v1">mock-v1</option> : <><option value="">Enter model ID…</option>{status.provider === 'openai' && status.model && <option value={status.model}>{status.model}</option>}</>}
+          {provider === 'mock' ? <option value="mock-v1">mock-v1</option> : <><option value="">Enter model ID…</option>{status.provider === provider && status.model && <option value={status.model}>{status.model}</option>}</>}
         </select></label>
         {provider !== 'mock' && !model && <label>Model ID<input value={custom} onChange={event => setCustom(event.target.value)} maxLength={100} placeholder="Provider model ID" disabled={pending} /></label>}
         {provider !== 'mock' && <>

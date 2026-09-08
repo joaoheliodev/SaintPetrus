@@ -2,6 +2,20 @@
 
 Branch: `night/m0-m2`. Remote repository: `joaoheliodev/SaintPetrus`.
 
+## Gemini step 1A / 1B
+
+Step 1A implemented: GeminiAdapter uses the existing ProviderProxy and RF-06 TokenService, with UI and terminal credential configuration. OpenAI adapter unchanged (verified by git diff). Endpoint: fixed Google generateContent API; key only in x-goog-api-key backend header; no query credential, redirects or raw error passthrough.
+
+Documented mapping: promptTokenCount → prompt; candidatesTokenCount + thoughtsTokenCount → completion; totalTokenCount → total. Required numeric counts and exact equality checked. Nonzero cached/tool usage is rejected rather than mispriced. Valid zero-text responses retain usage. Gemini uses non-streaming generateContent in this step; preview gets the completed output.
+
+Prepared model: gemini-2.5-flash-lite, global 1024 tokens, maxOutputTokens 64, thinkingBudget 0, cache off, persistence off by default. Gemini 1.5 models and 2.0 Flash requested initially are retired according to official changelog/deprecation pages; they are not exposed as working allowlisted models. Model/account availability remains unverified.
+
+Prices checked 2026-09-07 at https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite : standard paid text input USD 0.10/M, output including thinking USD 0.40/M. Free tier can cost zero if eligible; usageMetadata does not prove the billing tier. UI cost is a configured-rate estimate based on reported usage, not an invoice.
+
+212 tests passed, lint passed, both typechecks passed and build passed without real API calls. Synthetic fixture proves 17 prompt + 2 candidate + 5 thinking = 24 total, completion 7, estimated paid-rate cost USD 0.0000045; full configure/execute/disconnect API path also tested. Fixture is explicitly labeled synthetic, with official schema source. No live response has been captured.
+
+Step 1B NOT EXECUTED: awaiting Gemini key entered via RF-01 with Remember unchecked and Connect only. Pending: one successful minimal real call; usage/reconciliation/cost/schema comparison; forced real provider error and fragment checks; 429/timeout if feasible; context export and enabled-feed scans; sanitized real fixtures and regression fixes for each observed divergence. Do not mark any real-key acceptance approved yet.
+
 ## Current scope
 
 Item 1 completed in `c4c6895` after foundation WIP `87c2e47`: internal typed append-only circular event bus and optional SSE feed. Both live SSE and disabled HTTP 404 verified. The Node entrypoint change was explicitly approved by the user. Feed event selection targets the existing agent inspector; the full RF-02 panel remains pending.

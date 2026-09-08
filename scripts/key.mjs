@@ -1,8 +1,8 @@
 // Terminal-only credential entry: no browser form, argv secret or shell-history secret.
 import { stdin, stdout } from 'node:process';
 const [action, provider, flag] = process.argv.slice(2);
-if (!['set', 'disconnect', 'forget', 'restore'].includes(action) || !['openai', 'anthropic', 'openrouter'].includes(provider) || (flag && flag !== '--remember') || (flag && action !== 'set')) {
-  console.error('Usage: npm run key -- set|disconnect|forget|restore openai|anthropic|openrouter [--remember]'); process.exit(1);
+if (!['set', 'disconnect', 'forget', 'restore'].includes(action) || !['gemini', 'openai', 'anthropic', 'openrouter'].includes(provider) || (flag && flag !== '--remember') || (flag && action !== 'set')) {
+  console.error('Usage: npm run key -- set|disconnect|forget|restore gemini|openai|anthropic|openrouter [--remember]'); process.exit(1);
 }
 const port = process.env.PORT || '3000';
 if (!/^\d+$/.test(port) || +port < 1024 || +port > 65535) { console.error('Invalid PORT.'); process.exit(1); }
