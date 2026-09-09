@@ -99,7 +99,11 @@ export class TokenService {
       return { ...result, usage, approximate, cached: false };
     } catch (error) {
       eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'error', severity: 'error', payload: 'Provider execution failed.' });
-      notSent = error instanceof ProviderFailure && error.code === 'busy';
+      // Codes the provider rejected before any generation: nothing was billed, so the reservation is
+      // released cleanly. Treating these as unresolved would pause the agent and require a server
+      // restart after a single typo in an API key. Timeouts and 5xx stay unresolved: those can mean
+      // the call was processed and the answer was lost.
+      notSent = error instanceof ProviderFailure && ['busy', 'unconfigured', 'invalid_request', 'unauthorized', 'not_found'].includes(error.code);
       throw error;
     } finally {
       if (!reconciled) {

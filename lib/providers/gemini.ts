@@ -1,6 +1,6 @@
 import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
-import { ProviderFailure, type ProviderAdapter, type RequestOptions, type Usage } from './adapter';
+import { ProviderFailure, upstreamCode, type ProviderAdapter, type RequestOptions, type Usage } from './adapter';
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 export function geminiUsage(value: unknown): Usage {
   if (!value || typeof value !== 'object') throw new ProviderFailure('upstream');
@@ -35,7 +35,7 @@ export class GeminiAdapter implements ProviderAdapter {
             ...(this.model === 'gemini-2.5-flash-lite' ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
           } }),
         });
-        if (!response.ok) { await response.body?.cancel(); throw new ProviderFailure('upstream'); }
+        if (!response.ok) { await response.body?.cancel(); throw new ProviderFailure(upstreamCode(response.status)); }
         const reader = response.body?.getReader(); if (!reader) throw new ProviderFailure('upstream');
         let body = ''; let bytes = 0; const decoder = new TextDecoder();
         try {

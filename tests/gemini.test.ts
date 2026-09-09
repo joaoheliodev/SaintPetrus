@@ -39,7 +39,8 @@ test('Gemini fixture reconciles reported input, candidates plus thinking, total 
     let error: unknown; try { await new ProviderProxy().execute(failed, 'Hi', new AbortController().signal); } catch (caught) { error = caught; }
     let log = ''; safeLog(error, text => { log = text; });
     assert.ok(!log.includes(secret.toString().slice(0, 12))); assert.ok(!safeStringify(error).includes(secret.toString().slice(0, 12)));
-    assert.match(String(error), /upstream/);
+    // A 429 must stay distinguishable from an outage so the UI does not blame the user's key.
+    assert.match(String(error), /rate_limited/);
   } finally { store.disconnect('gemini'); secret.fill(0); await rm(dir, { recursive: true }); }
 });
 test('Gemini usage mapping fails closed on inconsistencies, missing required counts, unsupported cache/tool pricing', () => {

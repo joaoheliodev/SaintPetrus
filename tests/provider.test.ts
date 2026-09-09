@@ -116,8 +116,13 @@ test('M2 adapter keeps credentials in backend header; proxy redacts output, log,
     globalThis.fetch = failing; process.env.SAINTPETRUS_PROVIDER = 'openai'; process.env.SAINTPETRUS_MODEL = 'test-model';
     const errorResponse = await POST(request({ action: 'test' }));
     assert.equal(errorResponse.status, 502); assert.ok(!(await errorResponse.text()).includes(secret.toString()));
-    for (const response of [Response.json({ error: secret.toString() }, { status: 401 }), Response.json({ unexpected: true }), new Response('x'.repeat(262145))]) {
-      await assert.rejects(new OpenAIAdapter('test-model', store, async () => response).complete('Hi', signal()), /upstream/);
+    // Status class is mapped, body is never read: a rejected credential is reported as such,
+    // while malformed or oversized successful bodies stay generic.
+    for (const [response, code] of [[Response.json({ error: secret.toString() }, { status: 401 }), /unauthorized/], [Response.json({ unexpected: true }), /upstream/], [new Response('x'.repeat(262145)), /upstream/]] as const) {
+      await assert.rejects(new OpenAIAdapter('test-model', store, async () => response).complete('Hi', signal()), code);
+    }
+    for (const [status, code] of [[400, /unauthorized/], [403, /unauthorized/], [404, /not_found/], [429, /rate_limited/], [500, /upstream/]] as const) {
+      await assert.rejects(new OpenAIAdapter('test-model', store, async () => Response.json({ error: secret.toString() }, { status })).complete('Hi', signal()), code);
     }
   } finally {
     restoreTokens(); globalThis.fetch = oldFetch; host.saintpetrusCredentials = previousStore; store.disconnect('openai'); secret.fill(0); runtime().mock.reset();

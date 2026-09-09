@@ -1,7 +1,7 @@
 import { readResponseStream } from './response-stream';
 import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
-import { ProviderFailure, type ProviderAdapter, type RequestOptions } from './adapter';
+import { ProviderFailure, upstreamCode, type ProviderAdapter, type RequestOptions } from './adapter';
 const endpoint = 'https://api.openai.com/v1/responses';
 export class OpenAIAdapter implements ProviderAdapter {
   readonly id = 'openai' as const;
@@ -17,7 +17,7 @@ export class OpenAIAdapter implements ProviderAdapter {
           // Other models retain their configured sampling policy. Availability needs a live test.
           body: JSON.stringify({ model: this.model, input: options?.messages ?? redactText(input), ...(options ? { instructions: options.systemPrompt } : {}), ...(this.model === 'gpt-5-nano' ? { reasoning: { effort: 'minimal' } } : options ? { temperature: options.temperature } : {}), max_output_tokens: options?.maxTokens ?? 64, store: false, stream: !!options?.onText }),
         });
-        if (!response.ok) { await response.body?.cancel(); throw new ProviderFailure('upstream'); }
+        if (!response.ok) { await response.body?.cancel(); throw new ProviderFailure(upstreamCode(response.status)); }
         if (response.headers.get('content-type')?.includes('text/event-stream') && options?.onText) return await readResponseStream(response, options.onText);
         // Bounded response reader. No SDK logging or raw provider error passthrough.
         const reader = response.body?.getReader(); if (!reader) throw new ProviderFailure('upstream');
