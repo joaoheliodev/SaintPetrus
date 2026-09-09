@@ -89,16 +89,29 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 .setup-panel { width: 240px; flex-shrink: 0; overflow-y: auto; border-right: 1px solid var(--border); background: var(--card); }
 .panel-title { display: flex; align-items: center; gap: 9px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
 .setup-section { padding: 18px 16px; } .helper { color: var(--muted-foreground); font-size: 14px; line-height: 1.6; }
-.agent-list { padding: 0 10px 12px; } .agent-list-item { width: 100%; display: flex; gap: 10px; align-items: center; padding: 11px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; text-align: left; }
+.agent-list { padding: 0 10px 12px; } .agent-list-item { width: 100%; display: flex; gap: 4px; align-items: center; border: 1px solid transparent; border-radius: 6px; background: transparent; }
+.agent-list-open { flex: 1; min-width: 0; display: flex; gap: 10px; align-items: center; padding: 11px 8px; border: 0; background: transparent; color: inherit; text-align: left; }
+.agent-list-open span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-list-add { flex-shrink: 0; display: grid; place-items: center; width: 30px; height: 30px; margin-right: 4px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted-foreground); opacity: 0; }
+.agent-list-item:hover .agent-list-add, .agent-list-item.active .agent-list-add, .agent-list-add:focus-visible { opacity: 1; }
+.agent-list-add:hover { color: var(--foreground); background: var(--accent); }
 .agent-list-item.active { border-color: var(--border); background: var(--accent); }
+/* Optional panels are additive: they get their own scroll instead of squeezing the canvas out of the shell. */
+.aux-panels { flex-shrink: 0; max-height: 38vh; overflow-y: auto; }
+.canvas-hint { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 5; display: grid; gap: 6px; max-width: min(460px, 90%); padding: 14px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--muted-foreground); pointer-events: none; }
+.canvas-hint strong { color: var(--foreground); }
+.provider-badge { padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; white-space: nowrap; }
+.provider-badge.is-verified { color: var(--primary); border-color: var(--primary); }
+.provider-badge.is-rejected { color: var(--destructive); border-color: var(--destructive); }
+.provider-badge.is-configured { color: var(--muted-foreground); }
 .budget-card { margin: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
 .budget-card h2, .budget-card p { margin-bottom: 12px; } .budget-card label { display: block; margin-top: 12px; }
-.center-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.center-panel { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .canvas-toolbar { min-height: 50px; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border); }
-.canvas-area { flex: 1; position: relative; min-height: 220px; }
+.canvas-area { flex: 1; position: relative; min-height: 220px; overflow: hidden; }
 .react-flow { --xy-background-color: var(--background); --xy-background-color-default: var(--background); --xy-background-pattern-dots-color: var(--dots); --xy-edge-stroke: var(--edge); --xy-edge-stroke-default: var(--edge); --xy-edge-label-color: var(--foreground); --xy-edge-label-background-color: var(--card); --xy-controls-button-background-color: var(--card); --xy-controls-button-color: var(--foreground); --xy-controls-button-background-color-hover: var(--accent); --xy-controls-button-border-color: var(--border); --xy-minimap-background-color: var(--card); --xy-minimap-node-background-color: var(--border); --xy-minimap-mask-background-color: var(--background); }
 .react-flow__controls { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-.react-flow__minimap { width: 120px; height: 80px; border: 1px solid var(--border); }
+.react-flow__minimap { border: 1px solid var(--border); }
 .agent-card { width: 290px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
 .agent-card.is-selected { border: 2px solid var(--primary); }
 .agent-card-head { display: flex; align-items: center; gap: 10px; padding: 15px; border-bottom: 1px solid var(--border); }

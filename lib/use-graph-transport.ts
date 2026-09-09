@@ -35,13 +35,13 @@ export function useGraphTransport(initialGraph: Graph) {
       const result = await response.json();
       if (!response.ok) {
         useProjection.setState({ notice: typeof result.error === 'string' ? result.error : 'Command rejected.' });
-        return false;
+        return null;
       }
       const snapshot = result as Graph;
       useProjection.getState().apply({ id: snapshot.revision, type: `command.${input.action}`, message: 'Server accepted command.', snapshot });
-      useProjection.setState({ notice: '' }); return true;
+      useProjection.setState({ notice: '' }); return snapshot;
     } catch {
-      useProjection.setState({ notice: 'Local server unavailable. Command not confirmed.' }); return false;
+      useProjection.setState({ notice: 'Local server unavailable. Command not confirmed.' }); return null;
     } finally { setPending(false); }
   }, []);
   return { command, pending };

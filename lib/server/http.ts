@@ -25,9 +25,16 @@ export function dispatch(graph: GraphService, mock: MockProvider, enabled: boole
       mock.startPreview(); break;
     case 'disconnect': graph.disconnect(string(data.id, 100)); break;
     case 'connect': graph.connect(string(data.source, 100), string(data.target, 100)); break;
-    case 'add': graph.add({ name: string(data.name, 70), provider: 'Unconfigured', context: {
-      objective: string(data.objective), summary: 'Manually configured agent. No provider connected.', artifacts: [],
-    } }); break;
+    case 'add': {
+      const parentId = data.parentId === undefined || data.parentId === null ? null : string(data.parentId, 100);
+      if ((data.x === undefined) !== (data.y === undefined)) throw new GraphError('Invalid position.');
+      if (data.x !== undefined && (typeof data.x !== 'number' || typeof data.y !== 'number')) throw new GraphError('Invalid position.');
+      const position = typeof data.x === 'number' && typeof data.y === 'number' ? { x: data.x, y: data.y } : undefined;
+      graph.add({ name: string(data.name, 70), provider: 'Unconfigured', context: {
+        objective: string(data.objective), summary: parentId ? 'Subagent created from the canvas. No provider connected.' : 'Manually configured agent. No provider connected.', artifacts: [],
+      } }, { parentId, position });
+      break;
+    }
     case 'move':
       if (typeof data.x !== 'number' || typeof data.y !== 'number') throw new GraphError('Invalid position.');
       graph.move(string(data.id, 100), { x: data.x, y: data.y }); break;

@@ -47,3 +47,50 @@ test('Host validation supports Next URL normalization and rejects rebinding', as
   const bad = await GET(new Request(url, { headers: { host: 'attacker.invalid', 'x-forwarded-host': '127.0.0.1:3000' } }));
   assert.equal(bad.status, 403);
 });
+
+test('add attaches to a parent, honours a drop position and still fails closed on limits', async () => {
+  runtime().mock.reset();
+  const root = runtime().graph.snapshot().agents[0];
+  // A subagent created from a handle drag is a delegation edge, one level deeper, server-side.
+  assert.equal((await post({ action: 'add', name: 'Child', objective: 'Attached', parentId: root.id })).status, 200);
+  const withChild = runtime().graph.snapshot();
+  const child = withChild.agents.find(a => a.name === 'Child')!;
+  assert.equal(child.parentId, root.id);
+  assert.equal(child.depth, root.depth + 1);
+  assert.equal(withChild.edges.filter(e => e.source === root.id && e.target === child.id && e.kind === 'delegation').length, 1);
+  // An explicit drop position is used verbatim, so the node appears where the pointer released.
+  assert.equal((await post({ action: 'add', name: 'Dropped', objective: 'At pointer', x: 1234.6, y: -87.2 })).status, 200);
+  const dropped = runtime().graph.snapshot().agents.find(a => a.name === 'Dropped')!;
+  assert.deepEqual(dropped.position, { x: 1235, y: -87 });
+  assert.equal(dropped.parentId, null);
+  // Automatic placement never stacks a new agent on top of an existing one.
+  assert.equal((await post({ action: 'add', name: 'Sibling', objective: 'Auto placed', parentId: root.id })).status, 200);
+  const agents = runtime().graph.snapshot().agents;
+  for (const a of agents) for (const b of agents) if (a.id !== b.id) assert.ok(Math.abs(a.position.x - b.position.x) >= 320 || Math.abs(a.position.y - b.position.y) >= 240);
+  const before = runtime().graph.snapshot();
+  // Position and parent are validated on the server; a client cannot bypass any of it.
+  for (const body of [
+    { action: 'add', name: 'X', objective: 'Unknown parent', parentId: 'not-an-agent' },
+    { action: 'add', name: 'X', objective: 'Half a position', x: 10 },
+    { action: 'add', name: 'X', objective: 'Non numeric', x: '10', y: '10' },
+    { action: 'add', name: 'X', objective: 'Out of range', x: 100001, y: 0 },
+    { action: 'add', name: 'X', objective: 'Not finite', x: null, y: null },
+    { action: 'add', name: '', objective: 'Empty name', parentId: root.id },
+  ]) assert.equal((await post(body)).status, 400, JSON.stringify(body));
+  assert.deepEqual(runtime().graph.snapshot(), before);
+});
+
+test('depth limit cannot be bypassed by supplying a parent from the client', async () => {
+  runtime().mock.reset();
+  let parent = runtime().graph.snapshot().agents[0].id;
+  const depth = runtime().graph.snapshot().budget.maxDepth;
+  for (let level = 1; level <= depth; level++) {
+    assert.equal((await post({ action: 'add', name: `L${level}`, objective: 'Chain', parentId: parent })).status, 200);
+    const created = runtime().graph.snapshot().agents.find(a => a.name === `L${level}`)!;
+    assert.equal(created.depth, level);
+    parent = created.id;
+  }
+  const before = runtime().graph.snapshot();
+  assert.equal((await post({ action: 'add', name: 'TooDeep', objective: 'Chain', parentId: parent })).status, 400);
+  assert.deepEqual(runtime().graph.snapshot(), before);
+});

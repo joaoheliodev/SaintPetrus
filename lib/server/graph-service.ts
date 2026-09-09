@@ -34,9 +34,23 @@ export class GraphService {
       this.graph.agents.some(a => a.depth > budget.maxDepth)) throw new GraphError('Invalid limits.');
     this.graph.budget = { ...budget }; this.emit('budget.updated', 'Limits updated.');
   }
-  add(request: SpawnRequest) { return this.createAgent(null, request); }
+  add(request: SpawnRequest, options: { parentId?: string | null; position?: { x: number; y: number } } = {}) {
+    return this.createAgent(options.parentId ?? null, request, options.position);
+  }
   spawn(callerId: string, request: SpawnRequest) { return this.createAgent(callerId, request); }
-  private createAgent(callerId: string | null, request: SpawnRequest) {
+  // Placement is server-side so two clients cannot stack agents on the same spot.
+  private freePosition(parent: Agent | undefined, requested?: { x: number; y: number }) {
+    if (requested) {
+      if (!Number.isFinite(requested.x) || !Number.isFinite(requested.y) || Math.abs(requested.x) > 100000 || Math.abs(requested.y) > 100000) throw new GraphError('Invalid position.');
+      return { x: Math.round(requested.x), y: Math.round(requested.y) };
+    }
+    const row = this.graph.agents.length;
+    let candidate = parent ? { x: parent.position.x + 360, y: parent.position.y } : { x: 40 + (row % 3) * 360, y: 180 + Math.floor(row / 3) * 280 };
+    const taken = (spot: { x: number; y: number }) => this.graph.agents.some(a => Math.abs(a.position.x - spot.x) < 320 && Math.abs(a.position.y - spot.y) < 240);
+    for (let step = 0; step < 64 && taken(candidate); step++) candidate = { x: candidate.x, y: candidate.y + 260 };
+    return candidate;
+  }
+  private createAgent(callerId: string | null, request: SpawnRequest, requested?: { x: number; y: number }) {
     const parent = this.graph.agents.find(a => a.id === callerId);
     if (callerId && !parent) throw new GraphError('Parent not found.');
     if (!request.name.trim() || request.name.length > 70 || !request.context.objective.trim() ||
@@ -48,10 +62,9 @@ export class GraphService {
     if (this.graph.costCents >= this.graph.budget.maxCostCents) throw new GraphError('Mock budget exhausted.');
     const id = randomUUID();
     const depth = parent ? parent.depth + 1 : 0;
-    const row = this.graph.agents.length;
     const agent: Agent = { id, parentId: parent?.id ?? null, name: request.name.trim(), provider: request.provider,
       depth, status: 'ready', output: '', context: structuredClone(request.context),
-      position: { x: 40 + (row % 3) * 360, y: 180 + Math.floor(row / 3) * 280 } };
+      position: this.freePosition(parent, requested) };
     // Synchronous node + edge mutation is atomic within this single local process.
     this.graph.agents.push(agent);
     if (parent) this.graph.edges.push({ id: randomUUID(), source: parent.id, target: id, kind: 'delegation' });
