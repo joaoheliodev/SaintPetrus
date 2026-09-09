@@ -5,13 +5,28 @@ import { MockLLMAdapter } from './mock-provider';
 import { OpenAIAdapter } from './openai';
 import { ProviderFailure, type ProviderAdapter } from './adapter';
 import { ProviderProxy } from './proxy';
-const state = globalThis as typeof globalThis & { saintpetrusProxy?: ProviderProxy; saintpetrusSelection?: { provider: string; model: string } };
+// A verification is a fact about one (provider, model) pair that was proved by a real call.
+// It is never inferred from the presence of a credential and never survives a credential change.
+type Verification = { provider: string; model: string; ok: boolean; at: number; code?: string };
+const state = globalThis as typeof globalThis & { saintpetrusProxy?: ProviderProxy; saintpetrusSelection?: { provider: string; model: string }; saintpetrusVerification?: Verification };
 export const providerProxy = () => state.saintpetrusProxy ??= new ProviderProxy();
+export function clearVerification() { state.saintpetrusVerification = undefined; }
+export function recordVerification(ok: boolean, code?: string) {
+  const { provider, model } = providerStatus();
+  state.saintpetrusVerification = { provider, model, ok, at: Date.now(), code };
+}
 export function providerStatus() {
   const selected = state.saintpetrusSelection?.provider ?? process.env.SAINTPETRUS_PROVIDER ?? (mockEnabled() ? 'mock' : 'none');
-  if (selected === 'mock') return { provider: 'mock', model: 'mock-v1', connected: mockEnabled(), mocked: true };
-  if (selected === 'openai' || selected === 'gemini') { const model = state.saintpetrusSelection?.model ?? process.env.SAINTPETRUS_MODEL ?? ''; return { provider: selected, model, connected: credentials().status(selected).connected && !!model, mocked: false }; }
-  return { provider: 'none', model: '', connected: false, mocked: false };
+  const base = (() => {
+    if (selected === 'mock') return { provider: 'mock', model: 'mock-v1', connected: mockEnabled(), mocked: true };
+    if (selected === 'openai' || selected === 'gemini') { const model = state.saintpetrusSelection?.model ?? process.env.SAINTPETRUS_MODEL ?? ''; return { provider: selected, model, connected: credentials().status(selected).connected && !!model, mocked: false }; }
+    return { provider: 'none', model: '', connected: false, mocked: false };
+  })();
+  // A stale verification must never be shown as current: it only counts for the exact pair it proved.
+  const proof = state.saintpetrusVerification;
+  const current = proof && proof.provider === base.provider && proof.model === base.model ? proof : undefined;
+  const state_ = !base.connected ? 'disconnected' : current?.ok ? 'verified' : current ? 'rejected' : 'configured';
+  return { ...base, verified: current?.ok === true, verifiedAt: current?.ok ? current.at : undefined, failureCode: current && !current.ok ? current.code : undefined, state: state_ };
 }
 export function configuredAdapter(): ProviderAdapter {
   const status = providerStatus();
@@ -26,5 +41,5 @@ export function validateSelection(provider: unknown, model: unknown) {
   if (provider === 'mock' && mockEnabled() && model === 'mock-v1') return;
   if ((provider !== 'openai' && provider !== 'gemini') || typeof model !== 'string' || !/^[A-Za-z0-9._-]{1,100}$/.test(model)) throw new ProviderFailure('invalid_request');
 }
-export function selectProvider(provider: string, model: string) { validateSelection(provider, model); state.saintpetrusSelection = { provider, model }; }
-export function clearSelection() { state.saintpetrusSelection = { provider: 'none', model: '' }; }
+export function selectProvider(provider: string, model: string) { validateSelection(provider, model); clearVerification(); state.saintpetrusSelection = { provider, model }; }
+export function clearSelection() { clearVerification(); state.saintpetrusSelection = { provider: 'none', model: '' }; }

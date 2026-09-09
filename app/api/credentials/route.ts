@@ -2,7 +2,7 @@ import { localRequest } from '@/lib/server/http';
 import { readJson } from '@/lib/server/read-json';
 import { credentials } from '@/lib/security/runtime';
 import { providerId, providers } from '@/lib/security/encrypted-vault';
-import { validateSelection, selectProvider, clearSelection, providerProxy } from '@/lib/providers/runtime';
+import { validateSelection, selectProvider, clearSelection, providerProxy, clearVerification } from '@/lib/providers/runtime';
 import { safeJson } from '@/lib/security/redact';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       if (browser && data.action === 'set') validateSelection(data.provider, data.model);
       if (browser && data.provider === 'mock') {
         if (data.key || data.remember) throw new Error();
-        providerProxy().cancel();
+        providerProxy().cancel(); clearVerification();
         if (data.action === 'set') selectProvider('mock', 'mock-v1');
         else if (data.action === 'disconnect') clearSelection(); else throw new Error();
         return safeJson({ provider: 'mock', connected: data.action === 'set', remembered: false });
@@ -36,12 +36,12 @@ export async function POST(request: Request) {
       if (data.action === 'set') {
         if (typeof data.key !== 'string' || (data.remember !== undefined && typeof data.remember !== 'boolean')) throw new Error();
         secret = Buffer.from(data.key); delete data.key;
-        providerProxy().cancel();
+        providerProxy().cancel(); clearVerification();
         await store.configure(provider, secret, data.remember === true);
         if (browser) selectProvider(provider, data.model as string);
-      } else if (data.action === 'disconnect') { providerProxy().cancel(); store.disconnect(provider); }
-      else if (data.action === 'forget') await store.forget(provider);
-      else if (data.action === 'restore') await store.restore(provider);
+      } else if (data.action === 'disconnect') { providerProxy().cancel(); clearVerification(); store.disconnect(provider); }
+      else if (data.action === 'forget') { clearVerification(); await store.forget(provider); }
+      else if (data.action === 'restore') { clearVerification(); await store.restore(provider); }
       else throw new Error();
       return safeJson(store.status(provider));
     } catch { return safeJson({ error: 'Credential operation failed. For persistence, verify that the OS keyring is available and unlocked.' }, 400); }

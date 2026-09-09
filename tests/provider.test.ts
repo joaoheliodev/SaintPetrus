@@ -168,3 +168,51 @@ test('B proxy invokes the injected core TokenCounter on the request path', async
   const result = await new ProviderProxy(100, counter).execute(new MockLLMAdapter(), 'Actual request', signal());
   assert.equal(measured, 'Actual request'); assert.deepEqual(result.preflight, { tokens: 7, approximate: true, counterName: 'integration-test' });
 });
+
+test('connection state is proved by a live call, never by a stored credential, and dies with it', async () => {
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/verify-');
+  const restoreTokens = tokenFixture();
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
+  const { POST: configure } = await import('../app/api/credentials/route');
+  const { providerStatus, clearVerification } = await import('../lib/providers/runtime');
+  const host = globalThis as typeof globalThis & { saintpetrusCredentials?: Credentials; saintpetrusSelection?: { provider: string; model: string }; saintpetrusVerification?: unknown };
+  const previous = host.saintpetrusCredentials, selection = host.saintpetrusSelection, transport = globalThis.fetch;
+  host.saintpetrusCredentials = store; clearVerification();
+  const key = randomBytes(32).toString('hex');
+  const browserRequest = (body: unknown) => new Request('http://127.0.0.1:3000/api/credentials', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json', 'X-SaintPetrus-Client': 'browser', 'Sec-Fetch-Site': 'same-origin' }, body: JSON.stringify(body) });
+  const ok = async () => Response.json({ usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] });
+  try {
+    await configure(browserRequest({ action: 'set', provider: 'openai', model: 'test-model', key }));
+    // A stored key is only "configured": nothing has proved it works.
+    assert.equal(providerStatus().state, 'configured'); assert.equal(providerStatus().verified, false);
+    globalThis.fetch = async () => Response.json({ error: 'nope' }, { status: 401 });
+    assert.equal((await POST(request({ action: 'test' }))).status, 401);
+    assert.equal(providerStatus().state, 'rejected'); assert.equal(providerStatus().verified, false);
+    globalThis.fetch = ok;
+    assert.equal((await POST(request({ action: 'test' }))).status, 200);
+    assert.equal(providerStatus().state, 'verified'); assert.equal(providerStatus().verified, true);
+    // A wrong key must not jam the workspace: nothing was billed, so no reservation is left dangling
+    // and the agent stays runnable for the retry.
+    const rows = () => (globalThis as typeof globalThis & { saintpetrusTokens?: TokenService }).saintpetrusTokens!.snapshot().rows;
+    assert.ok(rows().every(row => row.reserved === 0 && row.unresolved === 0));
+    // Replacing the credential retracts the proof: the new key has proved nothing.
+    globalThis.fetch = ok;
+    await configure(browserRequest({ action: 'set', provider: 'openai', model: 'test-model', key: randomBytes(32).toString('hex') }));
+    assert.equal(providerStatus().state, 'configured');
+    assert.equal((await POST(request({ action: 'test' }))).status, 200);
+    assert.equal(providerStatus().state, 'verified');
+    // So does switching the model under the same key.
+    await configure(browserRequest({ action: 'set', provider: 'openai', model: 'other-model', key }));
+    assert.equal(providerStatus().state, 'configured');
+    await configure(browserRequest({ action: 'set', provider: 'openai', model: 'test-model', key }));
+    assert.equal((await POST(request({ action: 'test' }))).status, 200);
+    // An outage must not retract a proof that already succeeded, and it does stay unresolved:
+    // a lost answer may still have been billed.
+    globalThis.fetch = async () => Response.json({ error: 'down' }, { status: 500 });
+    assert.equal((await POST(request({ action: 'test' }))).status, 502);
+    assert.equal(providerStatus().state, 'verified');
+    assert.ok(rows().some(row => row.unresolved > 0));
+    await configure(browserRequest({ action: 'disconnect', provider: 'openai' }));
+    assert.equal(providerStatus().state, 'disconnected');
+  } finally { restoreTokens(); clearVerification(); store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }
+});
