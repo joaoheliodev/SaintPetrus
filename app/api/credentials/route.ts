@@ -4,6 +4,8 @@ import { credentials } from '@/lib/security/runtime';
 import { providerId, providers } from '@/lib/security/encrypted-vault';
 import { validateSelection, selectProvider, clearSelection, providerProxy, clearVerification } from '@/lib/providers/runtime';
 import { safeJson } from '@/lib/security/redact';
+import { ProviderFailure } from '@/lib/providers/adapter';
+import { tokenService } from '@/lib/tokens/runtime';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 let tail: Promise<unknown> = Promise.resolve();
@@ -23,11 +25,15 @@ export async function POST(request: Request) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error();
       const data = input as Record<string, unknown>;
       if (Object.keys(data).some(key => !['action', 'provider', 'model', 'key', 'remember'].includes(key))) throw new Error();
-      if (browser && data.action === 'set') validateSelection(data.provider, data.model);
+      // Resolve format and the active server allowlist before the supplied key is copied or stored.
+      const selection = browser && data.action === 'set' ? validateSelection(data.provider, data.model, tokenService().policy.models) : undefined;
       if (browser && data.provider === 'mock') {
         if (data.key || data.remember) throw new Error();
         providerProxy().cancel(); clearVerification();
-        if (data.action === 'set') selectProvider('mock', 'mock-v1');
+        if (data.action === 'set') {
+          if (!selection) throw new Error();
+          selectProvider(selection);
+        }
         else if (data.action === 'disconnect') clearSelection(); else throw new Error();
         return safeJson({ provider: 'mock', connected: data.action === 'set', remembered: false });
       }
@@ -38,13 +44,19 @@ export async function POST(request: Request) {
         secret = Buffer.from(data.key); delete data.key;
         providerProxy().cancel(); clearVerification();
         await store.configure(provider, secret, data.remember === true);
-        if (browser) selectProvider(provider, data.model as string);
+        if (browser) {
+          if ((provider !== 'openai' && provider !== 'gemini') || !selection || selection.provider !== provider) throw new Error();
+          selectProvider(selection);
+        }
       } else if (data.action === 'disconnect') { providerProxy().cancel(); clearVerification(); store.disconnect(provider); }
       else if (data.action === 'forget') { clearVerification(); await store.forget(provider); }
       else if (data.action === 'restore') { clearVerification(); await store.restore(provider); }
       else throw new Error();
       return safeJson(store.status(provider));
-    } catch { return safeJson({ error: 'Credential operation failed. For persistence, verify that the OS keyring is available and unlocked.' }, 400); }
+    } catch (error) {
+      if (error instanceof ProviderFailure && (error.code === 'invalid_model_format' || error.code === 'model_not_allowlisted')) return safeJson({ error: error.code }, 400);
+      return safeJson({ error: 'Credential operation failed. For persistence, verify that the OS keyring is available and unlocked.' }, 400);
+    }
     finally { secret?.fill(0); }
   });
   tail = task.catch(() => undefined); return task;

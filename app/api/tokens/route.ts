@@ -13,10 +13,12 @@ export async function POST(request: Request) {
   if (!localRequest(request, true)) return safeJson({ error: 'Same-origin requests only.' }, 403);
   try {
     const data = await readJson(request) as Record<string, unknown>;
-    if (!data || Object.keys(data).some(key => !['action','scope','id','limit'].includes(key))) throw new Error();
+    if (!data || Object.keys(data).some(key => !['action','scope','id','limit','reservationId','prompt','completion','costUsd'].includes(key))) throw new Error();
     const service = tokenService();
     if (data.action === 'kill') service.kill();
     else if (data.action === 'limit') service.setLimit(String(data.scope), String(data.id), data.limit);
+    else if (data.action === 'cost-limit') service.setCostLimit(String(data.scope), String(data.id), data.limit);
+    else if (data.action === 'reconcile') service.reconcileReservation(String(data.reservationId), data.prompt, data.completion, data.costUsd);
     else if (data.action === 'resume') {
       service.resume();
       for (const agent of graphRuntime().graph.snapshot().agents) if (agent.status === 'paused' && !service.snapshot().paused.includes(agent.id)) graphRuntime().graph.setAgentStatus(agent.id, 'ready');

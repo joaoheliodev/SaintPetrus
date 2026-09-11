@@ -1,23 +1,31 @@
 import { readResponseStream } from './response-stream';
 import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
-import { ProviderFailure, upstreamCode, type ProviderAdapter, type RequestOptions } from './adapter';
+import { ProviderFailure, type ProviderAdapter, type RequestOptions } from './adapter';
+import { ModelIdError, normalizeModelId } from './model-id';
 const endpoint = 'https://api.openai.com/v1/responses';
+export function openAIErrorCode(status: number): ProviderFailure['code'] {
+  if (status === 400 || status === 401 || status === 403) return 'unauthorized';
+  if (status === 404) return 'not_found';
+  if (status === 429) return 'rate_limited';
+  return 'upstream';
+}
 export class OpenAIAdapter implements ProviderAdapter {
   readonly id = 'openai' as const;
-  constructor(readonly model: string, private readonly credentials: Credentials, private readonly transport: typeof fetch = fetch) {
-    if (!/^[A-Za-z0-9._-]{1,100}$/.test(model)) throw new ProviderFailure('unconfigured');
+  readonly model: string;
+  constructor(model: string, private readonly credentials: Credentials, private readonly transport: typeof fetch = fetch) {
+    try { this.model = normalizeModelId('openai', model); }
+    catch (error) { if (error instanceof ModelIdError) throw new ProviderFailure('invalid_model_format'); throw error; }
   }
   async complete(input: string, signal: AbortSignal, options?: RequestOptions) {
     return this.credentials.use('openai', async key => {
       try {
+        const generation = options?.thinking?.mode === 'enabled' ? { reasoning: { effort: options.thinking.effort } } : options ? { temperature: options.temperature } : {};
         const response = await this.transport(endpoint, { method: 'POST', redirect: 'error', signal,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key.toString('utf8')}` },
-          // GPT-5 nano rejects temperature; minimal reasoning keeps the connection probe small.
-          // Other models retain their configured sampling policy. Availability needs a live test.
-          body: JSON.stringify({ model: this.model, input: options?.messages ?? redactText(input), ...(options ? { instructions: options.systemPrompt } : {}), ...(this.model === 'gpt-5-nano' ? { reasoning: { effort: 'minimal' } } : options ? { temperature: options.temperature } : {}), max_output_tokens: options?.maxTokens ?? 64, store: false, stream: !!options?.onText }),
+          body: JSON.stringify({ model: this.model, input: options?.messages ?? redactText(input), ...(options ? { instructions: options.systemPrompt } : {}), ...generation, max_output_tokens: options?.maxTokens ?? 64, store: false, stream: !!options?.onText }),
         });
-        if (!response.ok) { await response.body?.cancel(); throw new ProviderFailure(upstreamCode(response.status)); }
+        if (!response.ok) { await response.body?.cancel(); throw new ProviderFailure(openAIErrorCode(response.status)); }
         if (response.headers.get('content-type')?.includes('text/event-stream') && options?.onText) return await readResponseStream(response, options.onText);
         // Bounded response reader. No SDK logging or raw provider error passthrough.
         const reader = response.body?.getReader(); if (!reader) throw new ProviderFailure('upstream');

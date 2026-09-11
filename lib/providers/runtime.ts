@@ -5,6 +5,9 @@ import { MockLLMAdapter } from './mock-provider';
 import { OpenAIAdapter } from './openai';
 import { ProviderFailure, type ProviderAdapter } from './adapter';
 import { ProviderProxy } from './proxy';
+import { ModelIdError, normalizeModelId, type ModelProvider } from './model-id';
+type ModelAllowlist = Readonly<Record<string, { provider: ModelProvider }>>;
+export type ValidatedSelection = { provider: ModelProvider; model: string };
 // A verification is a fact about one (provider, model) pair that was proved by a real call.
 // It is never inferred from the presence of a credential and never survives a credential change.
 type Verification = { provider: string; model: string; ok: boolean; at: number; code?: string };
@@ -25,7 +28,7 @@ export function providerStatus() {
   // A stale verification must never be shown as current: it only counts for the exact pair it proved.
   const proof = state.saintpetrusVerification;
   const current = proof && proof.provider === base.provider && proof.model === base.model ? proof : undefined;
-  const state_ = !base.connected ? 'disconnected' : current?.ok ? 'verified' : current ? 'rejected' : 'configured';
+  const state_ = !base.connected ? 'disconnected' : current?.code === 'output_limit' ? 'incomplete' : current?.ok ? 'verified' : current ? 'rejected' : 'configured';
   return { ...base, verified: current?.ok === true, verifiedAt: current?.ok ? current.at : undefined, failureCode: current && !current.ok ? current.code : undefined, state: state_ };
 }
 export function configuredAdapter(): ProviderAdapter {
@@ -37,9 +40,15 @@ export function configuredAdapter(): ProviderAdapter {
   throw new ProviderFailure('disabled');
 }
 
-export function validateSelection(provider: unknown, model: unknown) {
-  if (provider === 'mock' && mockEnabled() && model === 'mock-v1') return;
-  if ((provider !== 'openai' && provider !== 'gemini') || typeof model !== 'string' || !/^[A-Za-z0-9._-]{1,100}$/.test(model)) throw new ProviderFailure('invalid_request');
+export function validateSelection(provider: unknown, model: unknown, models: ModelAllowlist): ValidatedSelection {
+  if (provider === 'mock' && mockEnabled() && model === 'mock-v1') return { provider, model };
+  if (provider !== 'openai' && provider !== 'gemini') throw new ProviderFailure('invalid_request');
+  let normalized: string;
+  try { normalized = normalizeModelId(provider, model); }
+  catch (error) { if (error instanceof ModelIdError) throw new ProviderFailure('invalid_model_format'); throw error; }
+  const configured = models[normalized];
+  if (!configured || configured.provider !== provider) throw new ProviderFailure('model_not_allowlisted');
+  return { provider, model: normalized };
 }
-export function selectProvider(provider: string, model: string) { validateSelection(provider, model); clearVerification(); state.saintpetrusSelection = { provider, model }; }
+export function selectProvider(selection: ValidatedSelection) { clearVerification(); state.saintpetrusSelection = selection; }
 export function clearSelection() { clearVerification(); state.saintpetrusSelection = { provider: 'none', model: '' }; }

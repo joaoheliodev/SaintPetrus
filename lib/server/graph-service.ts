@@ -17,8 +17,12 @@ export class GraphService {
   }
   private emit(type: string, message: string) {
     this.graph.revision++;
-    const event = { id: this.graph.revision, type, message, snapshot: this.snapshot() };
-    this.listeners.forEach(listener => listener(event));
+    const event: GraphEvent = { id: this.graph.revision, type, message, snapshot: this.snapshot() };
+    // A transport consumer cannot mutate another consumer's event or turn a committed mutation
+    // into an apparent command failure by throwing from its listener.
+    for (const listener of this.listeners) {
+      try { listener(structuredClone(event)); } catch { /* Listener isolation is intentional. */ }
+    }
   }
   reset(objective = this.graph.agents[0].context.objective) {
     if (!objective.trim() || objective.length > 2000) throw new GraphError('Invalid objective.');
@@ -66,7 +70,7 @@ export class GraphService {
       depth, status: 'ready', output: '', context: structuredClone(request.context),
       position: this.freePosition(parent, requested) };
     // Synchronous node + edge mutation is atomic within this single local process.
-    this.graph.agents.push(agent);
+    this.graph.agents = [...this.graph.agents, agent];
     if (parent) this.graph.edges.push({ id: randomUUID(), source: parent.id, target: id, kind: 'delegation' });
     this.record('agent.created', id, 'Agent created.');
     if (parent) this.record('connection.created', parent.id, 'Delegation connection created.', { source: parent.id, destination: id });

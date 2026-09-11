@@ -2,23 +2,31 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './ui/dialog';
-type ConnectionState = 'disconnected' | 'configured' | 'verified' | 'rejected';
+type ConnectionState = 'disconnected' | 'configured' | 'verified' | 'rejected' | 'incomplete';
 type Status = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable?: boolean; verified?: boolean; failureCode?: string; state?: ConnectionState };
 // "Connected" must mean a real call succeeded. A stored credential alone only earns "configured".
 const badges: Record<ConnectionState, (status: Status) => string> = {
-  verified: s => `● Agente conectado · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
-  rejected: s => `▲ Chave recusada · ${s.provider}`,
-  configured: s => `◐ Chave salva, não verificada · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
-  disconnected: () => '○ Desconectado',
+  verified: s => `● Connected · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
+  rejected: s => `▲ Connection rejected · ${s.provider}`,
+  configured: s => `◐ Configured, not verified · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
+  incomplete: s => `△ Output budget exhausted · ${s.provider} · ${s.model}`,
+  disconnected: () => '○ Disconnected',
 };
+export const connectionLabel = (state: ConnectionState, status: Status) => badges[state](status);
 const failures: Record<number, string> = {
-  401: 'Chave ou modelo recusado pelo provedor. Confira a chave e o ID do modelo.',
-  404: 'Modelo não encontrado nesse provedor. Confira o ID do modelo.',
-  409: 'Execução pausada ou recusada pela política de orçamento/modelo. Abra Tokens.',
-  429: 'Provedor limitou a requisição (rate limit). Tente de novo em instantes.',
-  502: 'Falha na comunicação com o provedor. A chave não foi confirmada nem recusada.',
-  504: 'Tempo esgotado ao falar com o provedor. A chave não foi confirmada nem recusada.',
+  401: 'The provider rejected the credential or model. Check the API key and model ID.',
+  404: 'The provider did not find this model. Check the model ID.',
+  409: 'Execution was paused or refused by the budget/model policy. Open Tokens.',
+  422: 'The provider spent the output budget without returning visible text. Usage was charged; increase the allowed output only after reviewing the model policy.',
+  429: 'The provider rate limited the request. Try again shortly.',
+  502: 'Provider communication failed. The credential was neither verified nor rejected.',
+  504: 'The provider request timed out. The credential was neither verified nor rejected.',
 };
+const configurationFailures: Record<string, string> = {
+  invalid_model_format: 'Invalid model ID format. Gemini accepts either gemini-… or models/gemini-….',
+  model_not_allowlisted: 'This model is not in the server token-policy allowlist.',
+};
+class ConfigurationFailure extends Error {}
 export function ProviderStatus() {
   const [status, setStatus] = useState<Status>({ provider: 'none', model: '', connected: false, mocked: false, state: 'disconnected' });
   const [result, setResult] = useState(''); const [pending, setPending] = useState(false);
@@ -57,7 +65,10 @@ export function ProviderStatus() {
     if (keyField.current) keyField.current.value = ''; setShow(false);
     // Only this local configuration request may carry a key; never provider execution.
     const response = await fetch('/api/credentials', { method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', 'X-SaintPetrus-Client': 'browser' }, body: payload });
-    if (!response.ok) throw new Error('Configuration failed. Check model/key; remembering requires an unlocked OS keyring.');
+    if (!response.ok) {
+      const data = await response.json();
+      throw new ConfigurationFailure(configurationFailures[data?.error] ?? 'Configuration failed. Check model/key; remembering requires an unlocked OS keyring.');
+    }
     await refresh();
   }
   // One minimal live call. Its outcome, not the presence of a key, is what the badge reports.
@@ -66,23 +77,23 @@ export function ProviderStatus() {
     const data = await response.json();
     await refresh();
     setResult(response.ok
-      ? `${mocked ? 'Mock verificado' : 'Agente conectado'} · ${data.latencyMs} ms`
-      : failures[response.status] ?? 'Falha ao verificar a conexão.');
+      ? `${mocked ? 'Mock verified' : 'Connection verified'} · ${data.latencyMs} ms`
+      : failures[response.status] ?? 'Connection verification failed.');
   }
   async function run(action: 'connect' | 'test' | 'disconnect') {
     setPending(true); setResult('');
     try {
-      if (action === 'disconnect') { await configure('disconnect'); setResult('Desconectado. Credencial removida do backend.'); return; }
+      if (action === 'disconnect') { await configure('disconnect'); setResult('Disconnected. Credential removed from the backend.'); return; }
       const selectedModel = provider === 'mock' ? 'mock-v1' : model || custom.trim();
-      if (provider !== 'mock' && !keyField.current?.value && !status.connected) { setResult('Informe a chave de API antes de conectar.'); return; }
+      if (provider !== 'mock' && !keyField.current?.value && !status.connected) { setResult('Enter an API key before connecting.'); return; }
       if (action === 'connect' || keyField.current?.value || !status.connected || status.provider !== provider || status.model !== selectedModel) await configure('set');
       await verify(provider === 'mock');
-    } catch { setResult('Operação falhou. Confira modelo/chave e o servidor local; lembrar a chave exige um keyring do SO destravado.'); }
+    } catch (error) { setResult(error instanceof ConfigurationFailure ? error.message : 'Operation failed. Check the model, key, and local server; remembering a key requires an unlocked OS keyring.'); }
     finally { setPending(false); }
   }
   const state: ConnectionState = status.state ?? (status.connected ? 'configured' : 'disconnected');
   return <div className="project-actions">
-    <span role="status" className={`provider-badge is-${state}`}>{badges[state](status)}</span>
+    <span role="status" className={`provider-badge is-${state}`}>{connectionLabel(state, status)}</span>
     <Dialog open={open} onOpenChange={toggle}>
       <DialogTrigger render={<Button variant="outline" />}>Connect AI</DialogTrigger>
       <DialogContent className="provider-panel">
@@ -95,15 +106,15 @@ export function ProviderStatus() {
         <label>Default model<select value={provider === 'mock' ? 'mock-v1' : model} disabled={pending || provider === 'mock'} onChange={event => setModel(event.target.value)}>
           {provider === 'mock' ? <option value="mock-v1">mock-v1</option> : <><option value="">Enter model ID…</option>{status.provider === provider && status.model && <option value={status.model}>{status.model}</option>}</>}
         </select></label>
-        {provider !== 'mock' && !model && <label>Model ID<input value={custom} onChange={event => setCustom(event.target.value)} maxLength={100} placeholder="Provider model ID" disabled={pending} /></label>}
+        {provider !== 'mock' && !model && <label>Model ID<input value={custom} onChange={event => setCustom(event.target.value)} maxLength={107} placeholder="Provider model ID" disabled={pending} /></label>}
         {provider !== 'mock' && <>
           <label>API key<input ref={keyField} type={show ? 'text' : 'password'} autoComplete="off" spellCheck={false} maxLength={4096} disabled={pending} /></label>
           <Button variant="outline" aria-pressed={show} disabled={pending} onClick={() => setShow(!show)}>{show ? 'Hide key' : 'Show key'}</Button>
           <label><input type="checkbox" checked={remember} disabled={pending} onChange={event => setRemember(event.target.checked)} /> Remember key using encrypted OS keyring storage</label>
           <p>Closing or submitting clears this field. Terminal entry remains available with npm run key.</p>
         </>}
-        <Button disabled={pending} onClick={() => run('connect')}>{pending ? 'Verificando…' : 'Conectar e verificar (1 chamada)'}</Button>
-        <Button variant="outline" disabled={pending || !status.connected} onClick={() => run('test')}>Testar novamente</Button>
+        <Button disabled={pending} onClick={() => run('connect')}>{pending ? 'Verifying…' : 'Connect and verify (1 call)'}</Button>
+        <Button variant="outline" disabled={pending || !status.connected} onClick={() => run('test')}>Test again</Button>
         <Button variant="outline" disabled={pending || !status.connected} onClick={() => run('disconnect')}>Disconnect</Button>
         <p role="status">{result}</p>
       </DialogContent>

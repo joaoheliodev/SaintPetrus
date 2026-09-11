@@ -1,5 +1,5 @@
 import { redact } from '../security/redact';
-import { eventTypes, type EventInput, type BusEvent, type EventBatch } from './types';
+import { eventTypes, isEventInput, type EventInput, type BusEvent, type EventBatch } from './types';
 // Process-local, append-only sequence. Eviction removes old entries, never edits them.
 export class EventBus {
   private entries: BusEvent[] = [];
@@ -14,7 +14,7 @@ export class EventBus {
     if (!eventTypes.includes(input.type)) throw new Error('Invalid event type.');
     if (input.tokens && ![input.tokens.prompt, input.tokens.completion].every(n => Number.isSafeInteger(n) && n >= 0)) throw new Error('Invalid event tokens.');
     // Redact BEFORE truncation and storage: truncation must not turn a full key into a leaking fragment.
-    const clean = redact(input) as EventInput;
+    const clean = redact(input, isEventInput);
     const event: BusEvent = { ...clean, payload: clean.payload.slice(0, 500), role: clean.role.slice(0, 100), id: ++this.cursor, timestamp: new Date().toISOString(), severity: clean.severity ?? 'info' };
     this.entries[(event.id - 1) % this.capacity] = structuredClone(event);
     this.prompt += event.tokens?.prompt ?? 0; this.completion += event.tokens?.completion ?? 0;

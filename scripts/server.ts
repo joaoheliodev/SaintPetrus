@@ -4,13 +4,15 @@ import next from 'next';
 import { optionalPreviewRoutes, previewDocument } from '../lib/preview/http';
 import { previewEnabled } from '../lib/preview/store';
 import { optionalEventRoutes } from '../lib/events/http';
+import { graphRoutes } from '../lib/server/graph-http';
+import { runtime } from '../lib/server/runtime';
 const port = Number(process.env.PORT ?? 3000);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid local port.');
 const app = next({ dev: process.argv[2] === 'dev', hostname: '127.0.0.1', port });
 await app.prepare();
 const handle = app.getRequestHandler();
 // No Next route file exists for optional endpoints. Disabled means absent from this registry.
-const routes = new Map([...optionalEventRoutes(), ...optionalPreviewRoutes()]);
+const routes = new Map([...graphRoutes(runtime().graph), ...optionalEventRoutes(), ...optionalPreviewRoutes()]);
 const previewPort = Number(process.env.SAINTPETRUS_PREVIEW_PORT ?? port + 1);
 if (previewEnabled() && (!Number.isInteger(previewPort) || previewPort < 1024 || previewPort > 65535 || previewPort === port)) throw new Error('Invalid isolated preview port.');
 const previewServer = previewEnabled() ? createServer(async (req, res) => {

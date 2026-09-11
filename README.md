@@ -159,20 +159,27 @@ still be traversed by TypeScript. Removing the test exclusion reintroduces TS150
 ## Token controls (RF-06)
 
 Open **Tokens** in the header. Set global, agent, model and current-session limits;
-Apply updates the authoritative in-memory budget on the local server. Limits are
-token counts. Warnings start at 80%. A request whose reservation would exceed any
-limit is rejected before provider I/O and pauses its agent. At 100%, further calls
-are blocked. Raising a limit does not restart work: use Resume eligible agents.
+Apply updates the authoritative in-memory budget on the local server. Token and USD
+limits use the same four scopes. Either dimension warns at 80%. A request whose
+reservation would exceed any limit is rejected before provider I/O and pauses its
+agent. At 100%, further calls are blocked. Raising a limit does not restart work:
+use Resume eligible agents.
 Pause all agents cancels the active proxy request and pauses the graph demo too.
 
 Before real calls, edit `config/token-policy.json` to allow the exact provider model
 ID with its provider (`openai`), `max_tokens` and `temperature`. Add that same ID to
-`config/prices.json` with verified numeric `inputPerMillion` and `outputPerMillion`
-USD rates, and update the table date. Restart the server after file edits. Only the
-free synthetic mock is supplied; no real model or unverified price is enabled.
+`config/prices.json` with `effectiveAt`, `verifiedAt`, UTC peak windows and verified
+USD rates for cache hit, cache miss and output in both `offPeak` and `peak` bands.
+Restart the server after file edits. An allowlisted model without an effective price
+is refused before provider I/O. No default DeepSeek model or DeepSeek price is
+supplied; the operator must enter the exact model ID and browser-verified table.
 No price lookup uses the network. Then configure the model/key through Connect AI.
 
 Preflight uses the core's approximate TokenCounter plus the allowed maximum output.
+It reserves both tokens and USD synchronously across all four scopes, using peak
+rates and 100% cache miss. Concurrent requests therefore cannot pass the same cash
+ceiling independently. Reconciliation uses provider-reported cache split and the
+rate at response time; if a request touches a peak boundary, peak rates apply.
 The reservation is reconciled to `usage.input_tokens`, `usage.output_tokens` and
 `usage.total_tokens` from the provider. Estimates may undercount; any actual excess
 is retained in the ledger and pauses further calls, never hidden or rewritten to
@@ -181,12 +188,13 @@ invoice cap. The actual-token columns use only reported usage. Mock estimates ar
 separate. Dollar amounts are explicitly **cost estimates**, calculated from the
 dated local table, not a fetched provider invoice.
 
-If a real request fails without trustworthy usage, its reservation remains marked
-unresolved, with no fabricated billed usage. Resume is refused until billing can
-be checked outside the app; this version has no automated billing reconciliation.
-State is process-local: one server-issued session per process; restarting clears
-counters, reservations, cache and memory-only limit edits. Check outstanding
-provider billing before restarting; this is not a durable accounting ledger.
+If a real request fails without trustworthy usage, its token and USD reservations
+remain marked unresolved. After `reservationTtlMs`, both full reserved amounts become
+conservative usage, so expiry never frees either budget. Check provider billing and
+use the manual controls to replace that estimate with exact prompt/completion usage
+and confirmed invoice cost. Active calls and clean provider rejections do not expire.
+State is process-local: restarting clears counters, reservations, cache and
+memory-only limit edits. This is not a durable accounting ledger.
 
 The cache key hashes provider, model, complete system prompt, every message and
 role, temperature and max_tokens. Only temperature=0 is cached. TTL comes from
@@ -213,11 +221,11 @@ For a reproducible browser check, start a disposable test instance: `PORT=3210 S
 
 ### Gemini provider (step 1A)
 
-Choose **Google Gemini** in Connect AI. The prepared model is `gemini-2.5-flash-lite`, with a 64-token output cap, thinking disabled, a 1024-token global budget and persistence unchecked by default. The proxy and RF-06 reconciliation path are shared with OpenAI; the OpenAI adapter is unchanged. Terminal configuration also accepts `gemini`.
+Choose **Google Gemini** in Connect AI. The prepared model is `gemini-2.5-flash-lite`, with a 64-token output cap, a policy-declared zero thinking budget, a 1024-token global budget and persistence unchecked by default. Gemini models must explicitly support a zero thinking budget; models with mandatory thinking are rejected before allocation in this milestone. An empty response stopped by `MAX_TOKENS` is reported as incomplete, keeps its charged usage and does not verify the connection. The proxy and RF-06 reconciliation path are shared with OpenAI; the OpenAI adapter is unchanged. Terminal configuration also accepts `gemini`.
 
 The adapter uses the documented `v1beta/models/{model}:generateContent` endpoint, keeps the key only in the backend `x-goog-api-key` header, disables redirects and bounds responses to 256 KiB. It supports text generation; Gemini preview updates currently arrive at completion, not token-by-token. No tools, explicit caching or multimodal input are requested.
 
-Accounting contract: `usageMetadata.promptTokenCount` → `usage.prompt`; `candidatesTokenCount + thoughtsTokenCount` → `usage.completion`; `totalTokenCount` → `usage.total`. The total must equal input plus output; missing required counts, invalid numbers and discrepancies fail closed. Cached content is already part of the prompt count and must not be added twice. Nonzero cache/tool usage is currently rejected because the existing two-rate price contract cannot reconcile those cases accurately. A valid no-text response still retains its reported usage. Unknown usage retains the reservation, as before.
+Accounting contract: `usageMetadata.promptTokenCount` → `usage.prompt`; `candidatesTokenCount + thoughtsTokenCount` → `usage.completion`; `totalTokenCount` → `usage.total`. The total must equal input plus output; missing required counts, invalid numbers and discrepancies fail closed. Cached content is already part of the prompt count and must not be added twice; `cachedContentTokenCount` supplies the cache-hit split to dimensional pricing. Nonzero tool usage remains rejected. A valid no-text response still retains its reported usage. Unknown usage retains the reservation, as before.
 
 Sources checked on 2026-09-07: [generateContent/UsageMetadata](https://ai.google.dev/api/generate-content#UsageMetadata), [API authentication](https://ai.google.dev/gemini-api/docs/api-key), [thinking](https://ai.google.dev/gemini-api/docs/generate-content/thinking), [standard pricing](https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite). Config uses published paid text rates, USD 0.10/M input and USD 0.40/M output including thinking. This is a usage-based cost estimate, not an invoice: eligible free-tier requests can cost zero, which usageMetadata does not establish.
 

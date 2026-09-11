@@ -3,7 +3,14 @@
   "perAgent": 1024,
   "perModel": 1024,
   "perSession": 1024,
+  "costLimitsUsd": {
+    "global": 0.0004096,
+    "perAgent": 0.0004096,
+    "perModel": 0.0004096,
+    "perSession": 0.0004096
+  },
   "cacheTtlMs": 0,
+  "reservationTtlMs": 300000,
   "models": {
     "mock-v1": {
       "provider": "mock",
@@ -13,12 +20,19 @@
     "gpt-5-nano": {
       "provider": "openai",
       "max_tokens": 128,
-      "temperature": 1
+      "temperature": 1,
+      "thinking": {
+        "mode": "enabled",
+        "effort": "minimal"
+      }
     },
     "gemini-2.5-flash-lite": {
       "provider": "gemini",
       "max_tokens": 64,
-      "temperature": 0
+      "temperature": 0,
+      "thinking": {
+        "mode": "disabled"
+      }
     }
   }
 }

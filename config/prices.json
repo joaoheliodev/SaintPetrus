@@ -1,19 +1,29 @@
 {
   "date": "2026-09-07",
   "currency": "USD",
-  "note": "GPT-5 nano standard text rates checked at https://developers.openai.com/api/docs/models/gpt-5-nano on 2026-09-07. Account availability and actual usage are not yet verified. Cached-input discounts are not accounted for. No prices are fetched at runtime.",
+  "note": "Existing entries preserve the previously configured flat rates in the dimensional schema. DeepSeek is intentionally absent until the operator enters browser-verified rates and verifiedAt. No prices are fetched at runtime.",
   "models": {
     "mock-v1": {
-      "inputPerMillion": 0,
-      "outputPerMillion": 0
+      "effectiveAt": "2026-09-07",
+      "verifiedAt": "2026-09-07",
+      "peakWindowsUtc": [],
+      "offPeak": { "inputCacheHitPerMillion": 0, "inputCacheMissPerMillion": 0, "outputPerMillion": 0 },
+      "peak": { "inputCacheHitPerMillion": 0, "inputCacheMissPerMillion": 0, "outputPerMillion": 0 }
     },
     "gpt-5-nano": {
-      "inputPerMillion": 0.05,
-      "outputPerMillion": 0.4
+      "effectiveAt": "2026-09-07",
+      "verifiedAt": "2026-09-07",
+      "peakWindowsUtc": [],
+      "offPeak": { "inputCacheHitPerMillion": 0.05, "inputCacheMissPerMillion": 0.05, "outputPerMillion": 0.4 },
+      "peak": { "inputCacheHitPerMillion": 0.05, "inputCacheMissPerMillion": 0.05, "outputPerMillion": 0.4 }
     },
     "gemini-2.5-flash-lite": {
-      "inputPerMillion": 0.1,
-      "outputPerMillion": 0.4
+      "effectiveAt": "2026-09-07",
+      "verifiedAt": "2026-09-07",
+      "peakWindowsUtc": [],
+      "offPeak": { "inputCacheHitPerMillion": 0.1, "inputCacheMissPerMillion": 0.1, "outputPerMillion": 0.4 },
+      "peak": { "inputCacheHitPerMillion": 0.1, "inputCacheMissPerMillion": 0.1, "outputPerMillion": 0.4 },
+      "note": "cachedContentTokenCount is included in promptTokenCount and is reconciled with the configured cache-hit rate."
     }
   },
   "geminiSource": {

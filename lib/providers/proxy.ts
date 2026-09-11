@@ -21,7 +21,7 @@ export class ProviderProxy {
       const preflight = { tokens: this.tokenCounter.count(sanitized), approximate: this.tokenCounter.approximate, counterName: this.tokenCounter.name };
       const result = await adapter.complete(sanitized, controller.signal, options);
       controller.signal.throwIfAborted();
-      return { usage: result.usage, preflight, provider: adapter.id, model: adapter.model, mocked: adapter.id === 'mock', text: redactText(result.text), latencyMs: Math.round(performance.now() - started) };
+      return { usage: result.usage, preflight, provider: adapter.id, model: adapter.model, mocked: adapter.id === 'mock', text: redactText(result.text), latencyMs: Math.round(performance.now() - started), ...(result.outcome ? { outcome: result.outcome } : {}) };
     } catch (error) {
       if (timedOut) throw new ProviderFailure('timeout');
       if (controller.signal.aborted) throw new ProviderFailure('cancelled');

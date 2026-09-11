@@ -19,6 +19,19 @@ test('HTTP graph guard rejects invalid edges even with no client validation', as
   assert.deepEqual(runtime().graph.snapshot(), before);
 });
 
+test('edge deletion dispatch removes only the requested connection and node deletion stays unavailable', async () => {
+  runtime().mock.reset();
+  assert.equal((await post({ action: 'add', name: 'Child', objective: 'Deletion guard', parentId: 'root' })).status, 200);
+  const connected = runtime().graph.snapshot(); const edge = connected.edges[0];
+  assert.ok(edge);
+  assert.equal((await post({ action: 'disconnect', id: edge.id })).status, 200);
+  const disconnected = runtime().graph.snapshot();
+  assert.equal(disconnected.edges.length, 0); assert.deepEqual(disconnected.agents, connected.agents);
+  const beforeRejectedNodeDelete = runtime().graph.snapshot();
+  assert.equal((await post({ action: 'remove-agent', id: connected.agents[1].id })).status, 400);
+  assert.deepEqual(runtime().graph.snapshot(), beforeRejectedNodeDelete);
+});
+
 test('mock flag, origin and payload boundaries fail closed', async () => {
   const previous = process.env.SAINTPETRUS_MOCK; delete process.env.SAINTPETRUS_MOCK;
   try {
@@ -82,7 +95,7 @@ test('add attaches to a parent, honours a drop position and still fails closed o
 
 test('depth limit cannot be bypassed by supplying a parent from the client', async () => {
   runtime().mock.reset();
-  let parent = runtime().graph.snapshot().agents[0].id;
+  let parent: string = runtime().graph.snapshot().agents[0].id;
   const depth = runtime().graph.snapshot().budget.maxDepth;
   for (let level = 1; level <= depth; level++) {
     assert.equal((await post({ action: 'add', name: `L${level}`, objective: 'Chain', parentId: parent })).status, 200);

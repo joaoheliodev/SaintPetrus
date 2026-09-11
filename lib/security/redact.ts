@@ -20,18 +20,25 @@ export function redactText(input: string): string {
     .replace(/\bsk-[A-Za-z0-9_-]+/g, '[REDACTED]')
     .replace(/\bAIza[A-Za-z0-9_-]+/g, '[REDACTED]');
 }
-export function redact(value: unknown, seen = new WeakSet<object>()): unknown {
+function redactValue(value: unknown, seen: WeakSet<object>): unknown {
   if (typeof value === 'string') return redactText(value);
   if (value === null || typeof value !== 'object') return value;
   if (seen.has(value)) return '[Circular]';
   seen.add(value);
   if (value instanceof Error) return { name: redactText(value.name), message: redactText(value.message), stack: redactText(value.stack ?? '') };
-  if (Array.isArray(value)) return value.map(item => redact(item, seen));
+  if (Array.isArray(value)) return value.map(item => redactValue(item, seen));
   const result: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value)) {
-    Object.defineProperty(result, redactText(key), { value: /api[_-]?key|authorization|password|secret|credential|cookie/i.test(key) ? '[REDACTED]' : redact(item, seen), enumerable: true });
+    Object.defineProperty(result, redactText(key), { value: /api[_-]?key|authorization|password|secret|credential|cookie/i.test(key) ? '[REDACTED]' : redactValue(item, seen), enumerable: true });
   }
   return result;
+}
+export function redact(value: unknown): unknown;
+export function redact<T>(value: unknown, guard: (candidate: unknown) => candidate is T): T;
+export function redact<T>(value: unknown, guard?: (candidate: unknown) => candidate is T): unknown {
+  const clean = redactValue(value, new WeakSet<object>());
+  if (guard && !guard(clean)) throw new Error('Redacted value failed schema validation.');
+  return clean;
 }
 export const safeStringify = (value: unknown) => JSON.stringify(redact(value));
 export const safeJson = (body: unknown, status = 200) => new Response(safeStringify(body), {

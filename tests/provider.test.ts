@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { mkdir, mkdtemp, rm, readFile } from 'node:fs/promises';
 import { ProviderProxy } from '../lib/providers/proxy';
-import { OpenAIAdapter } from '../lib/providers/openai';
+import { OpenAIAdapter, openAIErrorCode } from '../lib/providers/openai';
 import { MockLLMAdapter } from '../lib/providers/mock-provider';
 import { Credentials } from '../lib/security/credentials';
 import { EncryptedVault } from '../lib/security/encrypted-vault';
@@ -12,9 +12,11 @@ import { safeLog, safeStringify } from '../lib/security/redact';
 import { POST } from '../app/api/provider/route';
 import { GET as exportGraph } from '../app/api/graph/export/route';
 import { runtime } from '../lib/server/runtime';
+const freePrice = { effectiveAt: '1970-01-01', verifiedAt: '1970-01-01', peakWindowsUtc: [], offPeak: { inputCacheHitPerMillion: 0, inputCacheMissPerMillion: 0, outputPerMillion: 0 }, peak: { inputCacheHitPerMillion: 0, inputCacheMissPerMillion: 0, outputPerMillion: 0 } };
+const costLimitsUsd = { global: 1, perAgent: 1, perModel: 1, perSession: 1 };
 function tokenFixture() {
   const host = globalThis as typeof globalThis & { saintpetrusTokens?: TokenService }; const previous = host.saintpetrusTokens;
-  host.saintpetrusTokens = new TokenService({ global: 10000, perAgent: 10000, perModel: 10000, perSession: 10000, cacheTtlMs: 0, models: { 'test-model': { provider: 'openai', max_tokens: 64, temperature: 0 } } }, { date: '2026-09-06', currency: 'USD', models: { 'test-model': { inputPerMillion: 0, outputPerMillion: 0 } } }, { ids: () => runtime().graph.snapshot().agents.map(a => a.id), pause: id => runtime().graph.setAgentStatus(id, 'paused'), pauseAll: () => runtime().graph.pauseAll() });
+  host.saintpetrusTokens = new TokenService({ global: 10000, perAgent: 10000, perModel: 10000, perSession: 10000, costLimitsUsd, cacheTtlMs: 0, reservationTtlMs: 300000, models: { 'test-model': { provider: 'openai', max_tokens: 64, temperature: 0 }, 'other-model': { provider: 'openai', max_tokens: 64, temperature: 0 } } }, { date: '2026-09-06', currency: 'USD', models: { 'test-model': freePrice, 'other-model': freePrice } }, { ids: () => runtime().graph.snapshot().agents.map(a => a.id), pause: id => runtime().graph.setAgentStatus(id, 'paused'), pauseAll: () => runtime().graph.pauseAll() });
   return () => { host.saintpetrusTokens = previous; };
 }
 const signal = () => new AbortController().signal;
@@ -24,9 +26,10 @@ test('validation probe uses the low policy and documented nano payload without p
   const { policy, prices } = loadConfig();
   assert.equal(policy.global, 1024);
   assert.equal(policy.models['gpt-5-nano'].max_tokens, 128);
+  assert.deepEqual(policy.models['gpt-5-nano'].thinking, { mode: 'enabled', effort: 'minimal' });
   assert.equal(policy.cacheTtlMs, 0);
-  assert.equal(prices.models['gpt-5-nano'].inputPerMillion, 0.05);
-  assert.equal(prices.models['gpt-5-nano'].outputPerMillion, 0.4);
+  assert.equal(prices.models['gpt-5-nano'].peak.inputCacheMissPerMillion, 0.05);
+  assert.equal(prices.models['gpt-5-nano'].peak.outputPerMillion, 0.4);
   await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/nano-');
   const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
   const secret = Buffer.from(randomBytes(32).toString('hex')); let calls = 0;
@@ -41,9 +44,21 @@ test('validation probe uses the low policy and documented nano payload without p
       assert.equal(payload.store, false);
       return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }], usage: { input_tokens: 12, output_tokens: 1, total_tokens: 13 } });
     });
-    const result = await adapter.complete('Reply OK.', signal(), { systemPrompt: '', messages: [{ role: 'user', content: 'Reply OK.' }], temperature: 1, maxTokens: 128 });
+    const result = await adapter.complete('Reply OK.', signal(), { systemPrompt: '', messages: [{ role: 'user', content: 'Reply OK.' }], temperature: 1, maxTokens: 128, thinking: policy.models['gpt-5-nano'].thinking });
     assert.equal(calls, 1); assert.deepEqual(result.usage, { prompt: 12, completion: 1, total: 13 });
   } finally { store.disconnect('openai'); secret.fill(0); await rm(dir, { recursive: true }); }
+});
+
+test('D1 keeps provider error semantics local and removes model-specific adapter branches', async () => {
+  assert.equal(openAIErrorCode(400), 'unauthorized');
+  assert.equal(openAIErrorCode(401), 'unauthorized');
+  assert.equal(openAIErrorCode(404), 'not_found');
+  assert.equal(openAIErrorCode(429), 'rate_limited');
+  assert.equal(openAIErrorCode(500), 'upstream');
+  const shared = await readFile('lib/providers/adapter.ts', 'utf8');
+  const adapters = `${await readFile('lib/providers/openai.ts', 'utf8')}\n${await readFile('lib/providers/gemini.ts', 'utf8')}`;
+  assert.doesNotMatch(shared, /upstreamCode/);
+  assert.doesNotMatch(adapters, /if\s*\(\s*this\.model\s*===/);
 });
 const request = (body: unknown) => new Request('http://127.0.0.1:3000/api/provider', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
@@ -146,7 +161,10 @@ test('RF-01 same-origin UI configures memory-only credentials, tests once, and d
   try {
     const body = { action: 'set', provider: 'openai', model: 'test-model', key };
     assert.equal((await configure(browserRequest(body, 'https://example.invalid'))).status, 403);
-    assert.equal((await configure(browserRequest({ ...body, model: 'invalid model' }))).status, 400);
+    const malformed = await configure(browserRequest({ ...body, model: 'invalid model' }));
+    assert.equal(malformed.status, 400); assert.deepEqual(await malformed.json(), { error: 'invalid_model_format' });
+    const outsidePolicy = await configure(browserRequest({ ...body, model: 'valid-but-missing' }));
+    assert.equal(outsidePolicy.status, 400); assert.deepEqual(await outsidePolicy.json(), { error: 'model_not_allowlisted' });
     assert.equal(store.status('openai').connected, false);
     const saved = await configure(browserRequest(body)); assert.equal(saved.status, 200); assert.ok(!(await saved.text()).includes(key));
     assert.equal(store.status('openai').remembered, false); assert.equal(providerStatus().model, 'test-model');

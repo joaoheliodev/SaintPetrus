@@ -18,7 +18,7 @@ test('server atomically publishes node + delegation and isolates context', () =>
   const graph = service.snapshot();
   assert.equal(graph.agents[1].id, id); assert.equal(graph.agents[1].parentId, 'root');
   assert.equal(graph.agents[1].context.artifacts.length, 0);
-  graph.agents.pop(); assert.equal(service.snapshot().agents.length, 2);
+  graph.agents[0].name = 'Mutated snapshot'; assert.equal(service.snapshot().agents[0].name, 'Coordinator');
 });
 
 test('server rejects depth/node overflow without partial mutations', () => {

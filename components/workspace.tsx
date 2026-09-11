@@ -1,7 +1,7 @@
 'use client';
 // Adapted canvas geometry and interactions; all mutations go to the local server.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Position, MarkerType, useNodesState, useReactFlow, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Position, MarkerType, useEdgesState, useNodesState, useReactFlow, type Edge, type EdgeChange, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
 import { Bot, Check, CornerDownRight, GitBranch, Maximize, Pause, Play, Plus, RotateCcw, ShieldCheck, Workflow, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -14,9 +14,11 @@ import { ArtifactPreview } from './artifact-preview';
 import { EventFeed } from './event-feed';
 import { TokenPanel } from './token-panel';
 import { ProviderStatus } from './provider-status';
+import { allowSelectedEdgesOnly } from '@/lib/graph-deletion';
 import { cn } from '@/lib/utils';
 import '@xyflow/react/dist/style.css';
 type AgentNodeType = Node<{ agent: Agent }, 'agent'>;
+type AgentEdgeType = Edge;
 const statusLabels = { paused: 'Paused', ready: 'Ready', running: 'Running', completed: 'Completed', blocked: 'Blocked' };
 const MINIMAP = { width: 120, height: 80 };
 // Compared without position: position is reconciled separately so an in-flight drag is not overwritten.
@@ -38,6 +40,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   const { graph, selectedId, notice, events, select } = useProjection();
   const { command, pending } = useGraphTransport(initialGraph);
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentNodeType>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<AgentEdgeType>([]);
   const [objective, setObjective] = useState(initialGraph.agents[0].context.objective);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [name, setName] = useState('');
@@ -67,11 +70,32 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       return changed ? next : current;
     });
   }, [graph.agents, setNodes]);
-  const edges = useMemo(() => graph.edges.map(edge => ({ ...edge, sourceHandle: 'output', targetHandle: 'input', type: 'smoothstep', animated: false, markerEnd: { type: MarkerType.ArrowClosed }, label: edge.kind })), [graph.edges]);
+  // Edge selection is local UX state. Server snapshots remain authoritative for existence and shape.
+  useEffect(() => {
+    setEdges(current => {
+      const byId = new Map(current.map(edge => [edge.id, edge]));
+      let changed = current.length !== graph.edges.length;
+      const next = graph.edges.map((edge, index) => {
+        const previous = byId.get(edge.id);
+        const identical = previous && previous.source === edge.source && previous.target === edge.target && previous.label === edge.kind;
+        if (identical) { changed ||= current[index] !== previous; return previous; }
+        changed = true;
+        return { ...edge, sourceHandle: 'output', targetHandle: 'input', type: 'smoothstep', animated: false, markerEnd: { type: MarkerType.ArrowClosed }, label: edge.kind, ...(previous?.selected ? { selected: true } : {}) };
+      });
+      return changed ? next : current;
+    });
+  }, [graph.edges, setEdges]);
   const changes = useCallback((items: NodeChange<AgentNodeType>[]) => {
     onNodesChange(items);
     for (const change of items) if (change.type === 'select' && change.selected) select(change.id);
   }, [onNodesChange, select]);
+  const edgeChanges = useCallback((items: EdgeChange<AgentEdgeType>[]) => {
+    // A remove change is only a request; deletion must be accepted and reflected by the server.
+    onEdgesChange(items.filter(item => item.type === 'select'));
+  }, [onEdgesChange]);
+  async function deleteEdges(items: AgentEdgeType[]) {
+    for (const edge of items) await command({ action: 'disconnect', id: edge.id });
+  }
   async function move(id: string, position: { x: number; y: number }) {
     unconfirmed.current.set(id, position);
     if (!await command({ action: 'move', id, ...position })) unconfirmed.current.delete(id);
@@ -141,7 +165,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       <Button variant="ghost" disabled={pending} onClick={() => openDraft({ parentId: null })}><Plus />Add agent</Button>
       <Button variant="ghost" onClick={() => flow.fitView({ padding: .2, maxZoom: 1, duration: 300 })}><Maximize />Fit all</Button>
     </div></div>
-      <div className="canvas-area"><ReactFlow<AgentNodeType> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={changes} onNodeClick={(_, n) => select(n.id)} onNodeDragStop={(_, n) => move(n.id, n.position)} onConnect={c => connect(c.source, c.target)} onConnectEnd={connectEnd} onPaneClick={() => useProjection.setState({ notice: '' })} onDoubleClick={paneDoubleClick} zoomOnDoubleClick={false} minZoom={.25} maxZoom={1.5} deleteKeyCode={null} colorMode="dark" fitView fitViewOptions={{ maxZoom: 1, padding: .25 }} aria-label="Agent graph"><Background /><Controls showInteractive={false} /><MiniMap pannable zoomable style={MINIMAP} /></ReactFlow>
+      <div className="canvas-area"><ReactFlow<AgentNodeType, AgentEdgeType> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={changes} onEdgesChange={edgeChanges} onBeforeDelete={allowSelectedEdgesOnly} onEdgesDelete={deleteEdges} onNodeClick={(_, n) => select(n.id)} onNodeDragStop={(_, n) => move(n.id, n.position)} onConnect={c => connect(c.source, c.target)} onConnectEnd={connectEnd} onPaneClick={() => useProjection.setState({ notice: '' })} onDoubleClick={paneDoubleClick} zoomOnDoubleClick={false} minZoom={.25} maxZoom={1.5} deleteKeyCode={['Backspace', 'Delete']} colorMode="dark" fitView fitViewOptions={{ maxZoom: 1, padding: .25 }} aria-label="Agent graph"><Background /><Controls showInteractive={false} /><MiniMap pannable zoomable style={MINIMAP} /></ReactFlow>
         {lonely && <div className="canvas-hint"><p><strong>Two ways to grow the graph</strong></p><p>Drag from the dot on the right edge of a card and release on empty canvas — that creates a subagent already connected.</p><p>Or double-click anywhere empty to drop a standalone agent there.</p></div>}
       </div>
       <section className="event-panel" aria-label="Graph events"><div className="panel-title">Server events · revision {graph.revision}</div><div className="event-list">{events.length ? events.slice(-5).reverse().map(event => <p key={event.id}>{event.type} — {event.message}</p>) : <p>Ready. Add an agent to create your first connection.</p>}</div></section>
