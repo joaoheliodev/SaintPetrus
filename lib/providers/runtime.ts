@@ -1,11 +1,17 @@
 import { GeminiAdapter } from './gemini';
+import { DeepSeekAdapter } from './deepseek';
 import { credentials } from '../security/runtime';
 import { mockEnabled } from '../server/runtime';
 import { MockLLMAdapter } from './mock-provider';
 import { OpenAIAdapter } from './openai';
 import { ProviderFailure, type ProviderAdapter } from './adapter';
 import { ProviderProxy } from './proxy';
-import { ModelIdError, normalizeModelId, type ModelProvider } from './model-id';
+import { isModelProvider, ModelIdError, normalizeModelId, type ModelProvider } from './model-id';
+import type { Credentials } from '../security/credentials';
+// Every provider except the synthetic one authenticates with a stored credential.
+export type KeyedProvider = Exclude<ModelProvider, 'mock'>;
+const keyedProvider = (value: unknown): value is KeyedProvider => isModelProvider(value) && value !== 'mock';
+const adapters: Record<KeyedProvider, new (model: string, credentials: Credentials) => ProviderAdapter> = { gemini: GeminiAdapter, openai: OpenAIAdapter, deepseek: DeepSeekAdapter };
 type ModelAllowlist = Readonly<Record<string, { provider: ModelProvider }>>;
 export type ValidatedSelection = { provider: ModelProvider; model: string };
 // A verification is a fact about one (provider, model) pair that was proved by a real call.
@@ -22,7 +28,7 @@ export function providerStatus() {
   const selected = state.saintpetrusSelection?.provider ?? process.env.SAINTPETRUS_PROVIDER ?? (mockEnabled() ? 'mock' : 'none');
   const base = (() => {
     if (selected === 'mock') return { provider: 'mock', model: 'mock-v1', connected: mockEnabled(), mocked: true };
-    if (selected === 'openai' || selected === 'gemini') { const model = state.saintpetrusSelection?.model ?? process.env.SAINTPETRUS_MODEL ?? ''; return { provider: selected, model, connected: credentials().status(selected).connected && !!model, mocked: false }; }
+    if (keyedProvider(selected)) { const model = state.saintpetrusSelection?.model ?? process.env.SAINTPETRUS_MODEL ?? ''; return { provider: selected, model, connected: credentials().status(selected).connected && !!model, mocked: false }; }
     return { provider: 'none', model: '', connected: false, mocked: false };
   })();
   // A stale verification must never be shown as current: it only counts for the exact pair it proved.
@@ -35,14 +41,13 @@ export function configuredAdapter(): ProviderAdapter {
   const status = providerStatus();
   if (!status.connected) throw new ProviderFailure('unconfigured');
   if (status.provider === 'mock') return new MockLLMAdapter();
-  if (status.provider === 'gemini') return new GeminiAdapter(status.model, credentials());
-  if (status.provider === 'openai') return new OpenAIAdapter(status.model, credentials());
+  if (keyedProvider(status.provider)) return new adapters[status.provider](status.model, credentials());
   throw new ProviderFailure('disabled');
 }
 
 export function validateSelection(provider: unknown, model: unknown, models: ModelAllowlist): ValidatedSelection {
   if (provider === 'mock' && mockEnabled() && model === 'mock-v1') return { provider, model };
-  if (provider !== 'openai' && provider !== 'gemini') throw new ProviderFailure('invalid_request');
+  if (!keyedProvider(provider)) throw new ProviderFailure('invalid_request');
   let normalized: string;
   try { normalized = normalizeModelId(provider, model); }
   catch (error) { if (error instanceof ModelIdError) throw new ProviderFailure('invalid_model_format'); throw error; }

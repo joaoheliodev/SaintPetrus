@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './ui/dialog';
 type ConnectionState = 'disconnected' | 'configured' | 'verified' | 'rejected' | 'incomplete';
+const keyedProviders = ['openai', 'gemini', 'deepseek'];
 type Status = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable?: boolean; verified?: boolean; failureCode?: string; state?: ConnectionState };
 // "Connected" must mean a real call succeeded. A stored credential alone only earns "configured".
 const badges: Record<ConnectionState, (status: Status) => string> = {
@@ -13,8 +14,11 @@ const badges: Record<ConnectionState, (status: Status) => string> = {
   disconnected: () => '○ Disconnected',
 };
 export const connectionLabel = (state: ConnectionState, status: Status) => badges[state](status);
+// Exported so the distinct meaning of each failure is pinned by a test, not only by the panel.
+export const verificationMessage = (status: number) => failures[status] ?? 'Connection verification failed.';
 const failures: Record<number, string> = {
   401: 'The provider rejected the credential or model. Check the API key and model ID.',
+  402: 'The provider account has no balance left. The key is valid and the service is up, so the connection is not rejected: top up the account and test again.',
   404: 'The provider did not find this model. Check the model ID.',
   409: 'Execution was paused or refused by the budget/model policy. Open Tokens.',
   422: 'The provider spent the output budget without returning visible text. Usage was charged; increase the allowed output only after reviewing the model policy.',
@@ -23,7 +27,7 @@ const failures: Record<number, string> = {
   504: 'The provider request timed out. The credential was neither verified nor rejected.',
 };
 const configurationFailures: Record<string, string> = {
-  invalid_model_format: 'Invalid model ID format. Gemini accepts either gemini-… or models/gemini-….',
+  invalid_model_format: 'Invalid model ID format. Use the provider model ID; Gemini also accepts the models/… prefix.',
   model_not_allowlisted: 'This model is not in the server token-policy allowlist.',
 };
 class ConfigurationFailure extends Error {}
@@ -52,7 +56,7 @@ export function ProviderStatus() {
   function toggle(value: boolean) {
     if (keyField.current) keyField.current.value = '';
     setShow(false); setRemember(false); setOpen(value);
-    if (value) { setProvider(status.mocked ? 'mock' : status.provider === 'gemini' ? 'gemini' : 'openai'); setModel(['openai', 'gemini'].includes(status.provider) ? status.model : ''); setResult(''); }
+    if (value) { setProvider(status.mocked ? 'mock' : keyedProviders.includes(status.provider) ? status.provider : 'openai'); setModel(keyedProviders.includes(status.provider) ? status.model : ''); setResult(''); }
   }
   async function configure(action: 'set' | 'disconnect') {
     const selected = action === 'disconnect' ? status.provider : provider;
@@ -78,7 +82,7 @@ export function ProviderStatus() {
     await refresh();
     setResult(response.ok
       ? `${mocked ? 'Mock verified' : 'Connection verified'} · ${data.latencyMs} ms`
-      : failures[response.status] ?? 'Connection verification failed.');
+      : verificationMessage(response.status));
   }
   async function run(action: 'connect' | 'test' | 'disconnect') {
     setPending(true); setResult('');
@@ -100,7 +104,7 @@ export function ProviderStatus() {
         <DialogTitle>Connect AI</DialogTitle>
         <DialogDescription>Keys go only to this local backend. Connecting makes one minimal call to prove the key works, and can incur provider charges. Memory only by default.</DialogDescription>
         <label>Provider<select value={provider} disabled={pending} onChange={event => { setProvider(event.target.value); setModel(''); setCustom(''); if (keyField.current) keyField.current.value = ''; setShow(false); }}>
-          <option value="openai">OpenAI</option><option value="gemini">Google Gemini</option>{status.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
+          <option value="openai">OpenAI</option><option value="gemini">Google Gemini</option><option value="deepseek">DeepSeek</option>{status.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
         </select></label>
         <p>Additional providers are not available in this adapter yet.</p>
         <label>Default model<select value={provider === 'mock' ? 'mock-v1' : model} disabled={pending || provider === 'mock'} onChange={event => setModel(event.target.value)}>

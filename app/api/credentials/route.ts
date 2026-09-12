@@ -45,7 +45,7 @@ export async function POST(request: Request) {
         providerProxy().cancel(); clearVerification();
         await store.configure(provider, secret, data.remember === true);
         if (browser) {
-          if ((provider !== 'openai' && provider !== 'gemini') || !selection || selection.provider !== provider) throw new Error();
+          if (!selection || selection.provider !== provider) throw new Error();
           selectProvider(selection);
         }
       } else if (data.action === 'disconnect') { providerProxy().cancel(); clearVerification(); store.disconnect(provider); }

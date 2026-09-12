@@ -262,6 +262,64 @@ test('RT-04 reuses an answer only when the policy claims determinism and the req
   assert.throws(() => new TokenService(cachingPolicy('deepseek', model, { mode: 'disabled' }, 'yes' as unknown as boolean), priced(model), hooks), /Invalid local model policy/);
 });
 
+test('D6 DeepSeek is selectable end to end and an exhausted balance never rejects the credential', async () => {
+  const { POST: configure } = await import('../app/api/credentials/route');
+  const { POST: execute } = await import('../app/api/provider/route');
+  const { providerStatus, validateSelection } = await import('../lib/providers/runtime');
+  const { verificationMessage } = await import('../components/provider-status');
+  const allowlist = policyFor({ mode: 'disabled' }).models;
+  assert.deepEqual(validateSelection('deepseek', model, allowlist), { provider: 'deepseek', model });
+  assert.throws(() => validateSelection('deepseek', 'deepseek-not-configured', allowlist), /model_not_allowlisted/);
+  assert.throws(() => validateSelection('anthropic', model, allowlist), /invalid_request/);
+  // An empty balance is neither a bad key nor an outage, and the panel has to say so in its own words.
+  assert.notEqual(verificationMessage(402), verificationMessage(401));
+  assert.notEqual(verificationMessage(402), verificationMessage(502));
+  assert.match(verificationMessage(402), /balance/i);
+  await withCredentials(async (store, secret) => {
+    const host = globalThis as typeof globalThis & { saintpetrusCredentials?: Credentials; saintpetrusSelection?: { provider: string; model: string }; saintpetrusTokens?: TokenService };
+    const old = { credentials: host.saintpetrusCredentials, selection: host.saintpetrusSelection, tokens: host.saintpetrusTokens, fetch: globalThis.fetch };
+    let reply: () => Response = () => Response.json(completion);
+    let calls = 0;
+    const request = (path: string, body: unknown) => new Request(`http://127.0.0.1:3100/api/${path}`, { method: 'POST', headers: { Origin: 'http://127.0.0.1:3100', 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'same-origin', 'X-SaintPetrus-Client': 'browser' }, body: JSON.stringify(body) });
+    try {
+      host.saintpetrusCredentials = store;
+      host.saintpetrusTokens = new TokenService(policyFor({ mode: 'disabled' }), pricesFor(), { ids: () => ['root'], pause: () => {}, pauseAll: () => {} }, undefined, () => offPeakAt);
+      globalThis.fetch = async (url, init) => {
+        calls++;
+        assert.equal(String(url), 'https://api.deepseek.com/chat/completions');
+        assert.ok(!String(init?.body).includes(secret.toString()));
+        return reply();
+      };
+      assert.equal((await configure(request('credentials', { action: 'set', provider: 'deepseek', model, key: secret.toString() }))).status, 200);
+      assert.equal(providerStatus().provider, 'deepseek');
+      assert.equal(providerStatus().model, model);
+      assert.equal(providerStatus().state, 'configured');
+      reply = () => Response.json({ error: { message: 'Insufficient Balance' } }, { status: 402 });
+      const empty = await execute(request('provider', { action: 'test' }));
+      assert.equal(empty.status, 402);
+      assert.equal((await empty.json()).error, 'insufficient_balance');
+      assert.equal(calls, 1);
+      assert.equal(providerStatus().state, 'configured', 'an empty balance must not move the credential out of configured');
+      assert.equal(providerStatus().verified, false);
+      assert.equal(providerStatus().failureCode, undefined, 'an empty balance is not a verification failure');
+      reply = () => Response.json(completion);
+      const ok = await execute(request('provider', { action: 'test' }));
+      assert.equal(ok.status, 200);
+      const body = await ok.json();
+      assert.equal(body.provider, 'deepseek');
+      assert.deepEqual(body.usage, { prompt: 24, completion: 12, total: 36, inputBreakdown: { cacheHit: 16, cacheMiss: 8 } });
+      assert.equal(providerStatus().state, 'verified');
+      // A refused credential still has to be reported as refused.
+      reply = () => Response.json({ error: { message: 'Authentication Fails' } }, { status: 401 });
+      assert.equal((await execute(request('provider', { action: 'test' }))).status, 401);
+      assert.equal(providerStatus().state, 'rejected');
+      assert.equal(providerStatus().failureCode, 'unauthorized');
+    } finally {
+      host.saintpetrusCredentials = old.credentials; host.saintpetrusSelection = old.selection; host.saintpetrusTokens = old.tokens; globalThis.fetch = old.fetch;
+    }
+  });
+});
+
 test('C5 the connection probe switches reasoning off even when the policy asks for it', async () => {
   await withCredentials(async store => {
     const bodies: Record<string, unknown>[] = [];
