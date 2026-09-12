@@ -8,7 +8,8 @@
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": "OK"
+        "content": "OK",
+        "reasoning_content": "CHAIN-OF-THOUGHT-MARKER restating the operator prompt in full: <div>CHAIN-OF-THOUGHT-MARKER</div>"
       },
       "finish_reason": "stop"
     }

@@ -188,3 +188,40 @@ test('A DeepSeek model policy must declare its thinking mode and cannot ask for 
   assert.doesNotThrow(() => new TokenService(policyFor({ mode: 'enabled', effort: 'max' }), pricesFor(), hooks));
   assert.doesNotThrow(() => new TokenService(policyFor({ mode: 'disabled' }), pricesFor(), hooks));
 });
+
+test('A populated reasoning_content leaves no trace in the result, the bus, the preview or the cache', async () => {
+  const marker = 'CHAIN-OF-THOUGHT-MARKER';
+  const reasoning = { ...completion, choices: [{ ...completion.choices[0], message: { ...completion.choices[0].message, content: '<div>OK</div>' } }] };
+  // Without this the test proves nothing: the leak has to be present in the response to be caught.
+  assert.ok(JSON.stringify(reasoning).includes(marker));
+  assert.ok(reasoning.choices[0].message.reasoning_content.includes(marker));
+  const { eventBus } = await import('../lib/events/bus');
+  const { artifacts } = await import('../lib/preview/store');
+  const preview = process.env.SAINTPETRUS_PREVIEW;
+  process.env.SAINTPETRUS_PREVIEW = 'true';
+  const before = eventBus().snapshot().cursor;
+  try {
+    await withCredentials(async store => {
+      const policy = policyFor({ mode: 'disabled' }); policy.cacheTtlMs = 60000;
+      const service = new TokenService(policy, pricesFor(), hooks, undefined, () => offPeakAt);
+      const adapter = new DeepSeekAdapter(model, store, async () => Response.json(reasoning));
+      const result = await service.execute(new ProviderProxy(), adapter, 'Reply OK.', signal(), 'a', 'System');
+      assert.equal(result.text, '<div>OK</div>');
+      assert.ok(!JSON.stringify(result).includes(marker), 'the completion envelope must not carry the chain of thought');
+      artifacts().flush();
+      const stored = artifacts().snapshot();
+      assert.ok(stored.length > 0, 'the preview must have observed the visible answer');
+      assert.ok(!JSON.stringify(stored).includes(marker), 'the preview must not carry the chain of thought');
+      assert.ok(JSON.stringify(stored).includes('<div>OK</div>'));
+      const published = eventBus().snapshot(before).events;
+      assert.ok(published.some(event => event.type === 'agent.message'), 'the visible answer must still reach the bus');
+      assert.ok(!JSON.stringify(published).includes(marker), 'the bus must not carry the chain of thought');
+      // A second identical call is served from the cache; the stored entry must be just as clean.
+      const cached = await service.execute(new ProviderProxy(), adapter, 'Reply OK.', signal(), 'a', 'System');
+      assert.equal(cached.cached, true);
+      assert.ok(!JSON.stringify(cached).includes(marker), 'the cache must not carry the chain of thought');
+    });
+  } finally {
+    if (preview === undefined) delete process.env.SAINTPETRUS_PREVIEW; else process.env.SAINTPETRUS_PREVIEW = preview;
+  }
+});
