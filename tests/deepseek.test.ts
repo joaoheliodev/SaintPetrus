@@ -28,7 +28,7 @@ const costLimitsUsd = { global: 1, perAgent: 1, perModel: 1, perSession: 1 };
 // `thinking` is required here on purpose: a default would hide the "policy did not declare it" case.
 const policyFor = (thinking: unknown, models = [model]): TokenPolicy => JSON.parse(JSON.stringify({
   global: 4096, perAgent: 4096, perModel: 4096, perSession: 4096, costLimitsUsd, cacheTtlMs: 0, reservationTtlMs: 300000,
-  models: Object.fromEntries(models.map(id => [id, { provider: 'deepseek', max_tokens: 128, temperature: 0, thinking }])),
+  models: Object.fromEntries(models.map(id => [id, { provider: 'deepseek', max_tokens: 128, temperature: 0, deterministic: true, thinking }])),
 }));
 const pricesFor = (models = [model]): Prices => ({ date: '2026-09-10', currency: 'USD', models: Object.fromEntries(models.map(id => [id, price()])) });
 const hooks = { ids: () => ['a'], pause: () => {}, pauseAll: () => {} };
@@ -224,4 +224,40 @@ test('A populated reasoning_content leaves no trace in the result, the bus, the 
   } finally {
     if (preview === undefined) delete process.env.SAINTPETRUS_PREVIEW; else process.env.SAINTPETRUS_PREVIEW = preview;
   }
+});
+
+test('RT-04 reuses an answer only when the policy claims determinism and the request switched reasoning off', async () => {
+  const cachingPolicy = (provider: string, id: string, thinking?: unknown, deterministic = true): TokenPolicy => JSON.parse(JSON.stringify({
+    global: 4096, perAgent: 4096, perModel: 4096, perSession: 4096, costLimitsUsd, cacheTtlMs: 60000, reservationTtlMs: 300000,
+    models: { [id]: { provider, max_tokens: 128, temperature: 0, deterministic, ...(thinking ? { thinking } : {}) } },
+  }));
+  const priced = (id: string): Prices => ({ date: '2026-09-10', currency: 'USD', models: { [id]: price() } });
+  const twice = async (policy: TokenPolicy, id: string, provider: 'deepseek' | 'openai' | 'mock') => {
+    let calls = 0;
+    const service = new TokenService(policy, priced(id), hooks, undefined, () => offPeakAt);
+    const adapter = { id: provider, model: id, complete: async () => { calls++; return { text: 'Answer', usage: { prompt: 10, completion: 10, total: 20 } }; } };
+    await service.execute(new ProviderProxy(), adapter, 'Question', signal(), 'a', 'System');
+    const second = await service.execute(new ProviderProxy(), adapter, 'Question', signal(), 'a', 'System');
+    return { calls, service, secondCached: second.cached };
+  };
+  // Both halves present: the policy vouches for the model and the request turned reasoning off.
+  const reusable = await twice(cachingPolicy('deepseek', model, { mode: 'disabled' }), model, 'deepseek');
+  assert.equal(reusable.calls, 1); assert.equal(reusable.secondCached, true);
+  // Reasoning on: the provider may ignore temperature while it reasons, so nothing may be reused.
+  const reasoning = await twice(cachingPolicy('deepseek', model, { mode: 'enabled', effort: 'high' }), model, 'deepseek');
+  assert.equal(reasoning.calls, 2); assert.equal(reasoning.secondCached, false);
+  assert.equal(reasoning.service.snapshot().rows.find(row => row.scope === 'global')!.saved, 0);
+  // Reasoning off but nobody vouched for the model: the claim is per model and absent means no.
+  const unclaimed = await twice(cachingPolicy('deepseek', model, { mode: 'disabled' }, false), model, 'deepseek');
+  assert.equal(unclaimed.calls, 2); assert.equal(unclaimed.secondCached, false);
+  // Same criterion applied to the provider that was already here: an undeclared mode is not a disabled one.
+  const undeclared = await twice(cachingPolicy('openai', 'gpt-test-model', undefined), 'gpt-test-model', 'openai');
+  assert.equal(undeclared.calls, 2); assert.equal(undeclared.secondCached, false);
+  // A model that cannot reason still has to say both things: neither half is inferred.
+  const mockUndeclared = await twice(cachingPolicy('mock', 'mock-v1', undefined), 'mock-v1', 'mock');
+  assert.equal(mockUndeclared.calls, 2); assert.equal(mockUndeclared.secondCached, false);
+  const mockDeclared = await twice(cachingPolicy('mock', 'mock-v1', { mode: 'disabled' }), 'mock-v1', 'mock');
+  assert.equal(mockDeclared.calls, 1); assert.equal(mockDeclared.secondCached, true);
+  // The claim is validated as a claim, not coerced from whatever the operator typed.
+  assert.throws(() => new TokenService(cachingPolicy('deepseek', model, { mode: 'disabled' }, 'yes' as unknown as boolean), priced(model), hooks), /Invalid local model policy/);
 });

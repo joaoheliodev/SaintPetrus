@@ -5,7 +5,10 @@ import { thinkingPolicyValid } from '../providers/thinking-policy';
 import type { ThinkingControl } from '../providers/adapter';
 import { validateModelPrice, type ModelPrice } from './pricing';
 export type ThinkingPolicy = ThinkingControl;
-export type ModelPolicy = { provider: ModelProvider; max_tokens: number; temperature: number; thinking?: ThinkingPolicy };
+// `deterministic` is the operator's claim that this model can produce a reproducible answer at all.
+// It is declared per model, like price, because the capability belongs to the model and not to the
+// provider. Absent means no, so a model nobody vouched for is never reused.
+export type ModelPolicy = { provider: ModelProvider; max_tokens: number; temperature: number; deterministic?: boolean; thinking?: ThinkingPolicy };
 export type CostLimitsUsd = { global: number; perAgent: number; perModel: number; perSession: number };
 export type TokenPolicy = { global: number; perAgent: number; perModel: number; perSession: number; costLimitsUsd: CostLimitsUsd; cacheTtlMs: number; reservationTtlMs: number; models: Record<string, ModelPolicy> };
 export type Prices = { date: string; currency: 'USD'; models: Record<string, ModelPrice> };
@@ -24,9 +27,13 @@ export function validateConfig(policy: TokenPolicy, prices: Prices) {
     try { canonicalModel = normalizeModelId(item.provider, model) === model; } catch { /* Invalid config is rejected below. */ }
     const thinking = item.thinking;
     const validThinking = (thinking === undefined || validThinkingControl(thinking)) && isModelProvider(item.provider) && thinkingPolicyValid(item.provider, thinking);
-    if (!canonicalModel || !isModelProvider(item.provider) || !validLimit(item.max_tokens) || item.max_tokens < 1 || item.max_tokens > 32768 || !Number.isFinite(item.temperature) || item.temperature < 0 || item.temperature > 2 || !validThinking) throw new Error('Invalid local model policy.');
+    if (!canonicalModel || (item.deterministic !== undefined && typeof item.deterministic !== 'boolean') || !isModelProvider(item.provider) || !validLimit(item.max_tokens) || item.max_tokens < 1 || item.max_tokens > 32768 || !Number.isFinite(item.temperature) || item.temperature < 0 || item.temperature > 2 || !validThinking) throw new Error('Invalid local model policy.');
   }
 }
+// Reuse needs both halves: the policy says the model can be reproducible, and this particular
+// request actually turned reasoning off. A declaration alone is not evidence about the call made.
+export const reproducible = (model: ModelPolicy, thinking: ThinkingPolicy | undefined) =>
+  model.deterministic === true && model.temperature === 0 && thinking?.mode === 'disabled';
 export function loadConfig() {
   const policy = JSON.parse(readFileSync(join(process.cwd(), 'config/token-policy.json'), 'utf8')) as TokenPolicy;
   const prices = JSON.parse(readFileSync(join(process.cwd(), 'config/prices.json'), 'utf8')) as Prices;

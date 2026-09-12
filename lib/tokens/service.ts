@@ -5,7 +5,7 @@ import { heuristicTokenCounter, type TokenCounter } from '../core/token-estimate
 import { ProviderFailure, type ProviderAdapter, type RequestOptions, type Usage } from '../providers/adapter';
 import type { ProviderProxy } from '../providers/proxy';
 import { redactText } from '../security/redact';
-import { validateConfig, validCostLimit, validLimit, type TokenPolicy, type Prices } from './config';
+import { reproducible, validateConfig, validCostLimit, validLimit, type TokenPolicy, type Prices } from './config';
 import { preflightCostUsd, reconciledCostUsd } from './pricing';
 export class TokenFailure extends Error {}
 type Totals = { prompt: number; completion: number; total: number };
@@ -116,14 +116,17 @@ export class TokenService {
     const rows = this.scopes(agent, adapter.model);
     if (rows.some(row => this.blocked(row))) { this.pause(agent); this.refuse(agent, 'Token or monetary budget exhausted.'); }
     const options: RequestOptions = { systemPrompt: redactText(systemPrompt), messages: (messages ?? [{ role: 'user', content: input }]).map(m => ({ role: m.role, content: redactText(m.content) })), temperature: model.temperature, maxTokens: model.max_tokens, ...(model.thinking ? { thinking: model.thinking } : {}) };
-    const payload = JSON.stringify({ provider: adapter.id, model: adapter.model, ...options });
+    // The thinking state is part of the key, so a cached answer can never be served to a request
+    // that would have been allowed to reason.
+    const payload = JSON.stringify({ provider: adapter.id, model: adapter.model, systemPrompt: options.systemPrompt, messages: options.messages, temperature: options.temperature, maxTokens: options.maxTokens, thinking: options.thinking ?? null });
     const hash = createHash('sha256').update(payload).digest('hex');
     const createdAt = this.now();
     const inputEstimate = this.counter.count(JSON.stringify({ systemPrompt: options.systemPrompt, messages: options.messages }));
     let reservedCostUsd: number;
     try { reservedCostUsd = preflightCostUsd(price, inputEstimate, options.maxTokens, createdAt); }
     catch { this.refuse(agent, 'Model price unavailable or not yet effective.'); }
-    const cached = !bypassCache && model.temperature === 0 ? this.cache.get(hash) : undefined;
+    const reusable = reproducible(model, model.thinking);
+    const cached = !bypassCache && reusable ? this.cache.get(hash) : undefined;
     if (cached && cached.expires > this.now()) { rows.forEach(row => { row.saved += cached.usage.total; }); return { provider: adapter.id, model: adapter.model, billingModel: cached.billingModel, mocked: adapter.id === 'mock', text: redactText(cached.text), latencyMs: 0, cached: true, usage: cached.usage, approximate: cached.approximate }; }
     const reservedTokens = inputEstimate + options.maxTokens;
     if (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costEstimateUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd)) { this.pause(agent); this.refuse(agent, 'Preflight reservation exceeds token or monetary budget.'); }
@@ -162,7 +165,7 @@ export class TokenService {
       if (!result.outcome) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'agent.message', payload: (approximate ? '[Mock] ' : '') + result.text, tokens: { prompt: usage.prompt, completion: usage.completion } });
       if (rows.some(row => this.warning(row))) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'budget.warning', severity: 'warning', payload: 'Token or monetary budget reached 80% or more.' });
       if (rows.some(row => this.blocked(row))) this.pause(agent);
-      if (!result.outcome && !bypassCache && model.temperature === 0 && this.policy.cacheTtlMs > 0) {
+      if (!result.outcome && !bypassCache && reusable && this.policy.cacheTtlMs > 0) {
         for (const [key, entry] of this.cache) if (entry.expires <= this.now()) this.cache.delete(key);
         if (this.cache.size >= 256) this.cache.delete(this.cache.keys().next().value!);
         this.cache.set(hash, { expires: this.now() + this.policy.cacheTtlMs, text: result.text, usage: { ...usage }, approximate, billingModel });

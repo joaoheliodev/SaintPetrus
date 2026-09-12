@@ -17,7 +17,7 @@ const modelPrice = (inputCacheHitPerMillion: number, inputCacheMissPerMillion: n
   peak: { inputCacheHitPerMillion, inputCacheMissPerMillion, outputPerMillion },
 });
 function fixture(limit = 1000, temperature = 0) {
-  const policy: TokenPolicy = { global: limit, perAgent: limit, perModel: limit, perSession: limit, costLimitsUsd: costLimits(), cacheTtlMs: 50, reservationTtlMs: 100, models: { 'test-model': { provider: 'openai', max_tokens: 64, temperature }, 'mock-v1': { provider: 'mock', max_tokens: 64, temperature } } };
+  const policy: TokenPolicy = { global: limit, perAgent: limit, perModel: limit, perSession: limit, costLimitsUsd: costLimits(), cacheTtlMs: 50, reservationTtlMs: 100, models: { 'test-model': { provider: 'openai', max_tokens: 64, temperature, deterministic: true, thinking: { mode: 'disabled' as const } }, 'mock-v1': { provider: 'mock', max_tokens: 64, temperature, deterministic: true, thinking: { mode: 'disabled' as const } } } };
   const prices: Prices = { date: '2026-09-06', currency: 'USD', models: { 'test-model': modelPrice(2, 2, 4), 'mock-v1': modelPrice(0, 0, 0) } };
   const paused = new Set<string>(); let now = 0, calls = 0; const ids = ['a', 'b'];
   const service = new TokenService(policy, prices, { ids: () => ids, pause: id => { paused.add(id); }, pauseAll: () => ids.forEach(id => paused.add(id)) }, fixedRatioTokenCounter(1000), () => now);

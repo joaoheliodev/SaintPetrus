@@ -15,7 +15,11 @@
     "mock-v1": {
       "provider": "mock",
       "max_tokens": 64,
-      "temperature": 0
+      "temperature": 0,
+      "deterministic": true,
+      "thinking": {
+        "mode": "disabled"
+      }
     },
     "gpt-5-nano": {
       "provider": "openai",
@@ -24,7 +28,8 @@
       "thinking": {
         "mode": "enabled",
         "effort": "minimal"
-      }
+      },
+      "deterministic": false
     },
     "gemini-2.5-flash-lite": {
       "provider": "gemini",
@@ -32,7 +37,8 @@
       "temperature": 0,
       "thinking": {
         "mode": "disabled"
-      }
+      },
+      "deterministic": true
     }
   }
 }
