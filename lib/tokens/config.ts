@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { normalizeModelId } from '../providers/model-id';
+import { isModelProvider, normalizeModelId, type ModelProvider } from '../providers/model-id';
+import { thinkingPolicyValid } from '../providers/thinking-policy';
 import type { ThinkingControl } from '../providers/adapter';
 import { validateModelPrice, type ModelPrice } from './pricing';
 export type ThinkingPolicy = ThinkingControl;
-export type ModelPolicy = { provider: 'mock' | 'openai' | 'gemini'; max_tokens: number; temperature: number; thinking?: ThinkingPolicy };
+export type ModelPolicy = { provider: ModelProvider; max_tokens: number; temperature: number; thinking?: ThinkingPolicy };
 export type CostLimitsUsd = { global: number; perAgent: number; perModel: number; perSession: number };
 export type TokenPolicy = { global: number; perAgent: number; perModel: number; perSession: number; costLimitsUsd: CostLimitsUsd; cacheTtlMs: number; reservationTtlMs: number; models: Record<string, ModelPolicy> };
 export type Prices = { date: string; currency: 'USD'; models: Record<string, ModelPrice> };
@@ -22,9 +23,8 @@ export function validateConfig(policy: TokenPolicy, prices: Prices) {
     let canonicalModel = false;
     try { canonicalModel = normalizeModelId(item.provider, model) === model; } catch { /* Invalid config is rejected below. */ }
     const thinking = item.thinking;
-    const validThinkingShape = thinking === undefined || validThinkingControl(thinking);
-    const validThinking = validThinkingShape && (item.provider !== 'gemini' || (validThinkingControl(thinking) && thinking.mode === 'disabled'));
-    if (!canonicalModel || !['mock', 'openai', 'gemini'].includes(item.provider) || !validLimit(item.max_tokens) || item.max_tokens < 1 || item.max_tokens > 32768 || !Number.isFinite(item.temperature) || item.temperature < 0 || item.temperature > 2 || !validThinking) throw new Error('Invalid local model policy.');
+    const validThinking = (thinking === undefined || validThinkingControl(thinking)) && isModelProvider(item.provider) && thinkingPolicyValid(item.provider, thinking);
+    if (!canonicalModel || !isModelProvider(item.provider) || !validLimit(item.max_tokens) || item.max_tokens < 1 || item.max_tokens > 32768 || !Number.isFinite(item.temperature) || item.temperature < 0 || item.temperature > 2 || !validThinking) throw new Error('Invalid local model policy.');
   }
 }
 export function loadConfig() {

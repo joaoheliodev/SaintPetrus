@@ -1,0 +1,29 @@
+{
+  "id": "synthetic-partial-cache-hit",
+  "object": "chat.completion",
+  "created": 1788000000,
+  "model": "deepseek-test-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "OK"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 24,
+    "completion_tokens": 12,
+    "total_tokens": 36,
+    "prompt_cache_hit_tokens": 16,
+    "prompt_cache_miss_tokens": 8,
+    "prompt_tokens_details": {
+      "cached_tokens": 16
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  }
+}

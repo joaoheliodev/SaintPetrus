@@ -3,6 +3,7 @@ import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
 import { ProviderFailure, type ProviderAdapter, type RequestOptions } from './adapter';
 import { ModelIdError, normalizeModelId } from './model-id';
+import { thinkingCallValid } from './thinking-policy';
 const endpoint = 'https://api.openai.com/v1/responses';
 export function openAIErrorCode(status: number): ProviderFailure['code'] {
   if (status === 400 || status === 401 || status === 403) return 'unauthorized';
@@ -18,6 +19,7 @@ export class OpenAIAdapter implements ProviderAdapter {
     catch (error) { if (error instanceof ModelIdError) throw new ProviderFailure('invalid_model_format'); throw error; }
   }
   async complete(input: string, signal: AbortSignal, options?: RequestOptions) {
+    if (!thinkingCallValid(this.id, options?.thinking)) throw new ProviderFailure('invalid_request');
     return this.credentials.use('openai', async key => {
       try {
         const generation = options?.thinking?.mode === 'enabled' ? { reasoning: { effort: options.thinking.effort } } : options ? { temperature: options.temperature } : {};

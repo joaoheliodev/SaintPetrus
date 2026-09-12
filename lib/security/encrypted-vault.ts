@@ -2,8 +2,8 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:cr
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 export interface Keyring { loadOrCreate(): Promise<Buffer>; }
-export type ProviderId = 'gemini' | 'openai' | 'anthropic' | 'openrouter';
-export const providers: ProviderId[] = ['gemini', 'openai', 'anthropic', 'openrouter'];
+export type ProviderId = 'gemini' | 'openai' | 'deepseek' | 'anthropic' | 'openrouter';
+export const providers: ProviderId[] = ['gemini', 'openai', 'deepseek', 'anthropic', 'openrouter'];
 export function providerId(value: unknown): ProviderId {
   if (typeof value !== 'string' || !providers.includes(value as ProviderId)) throw new Error('Unsupported provider.');
   return value as ProviderId;

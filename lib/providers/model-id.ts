@@ -1,4 +1,6 @@
-export type ModelProvider = 'mock' | 'openai' | 'gemini';
+export const modelProviders = ['mock', 'openai', 'gemini', 'deepseek'] as const;
+export type ModelProvider = typeof modelProviders[number];
+export const isModelProvider = (value: unknown): value is ModelProvider => modelProviders.some(provider => provider === value);
 const MODEL_ID = /^[A-Za-z0-9._-]{1,100}$/;
 
 export class ModelIdError extends Error {}

@@ -21,7 +21,7 @@ export class TokenService {
   private stopped = false;
   private paused = new Set<string>();
   private agentModels = new Map<string, Set<string>>();
-  private cache = new Map<string, { expires: number; text: string; usage: Usage; approximate: boolean }>();
+  private cache = new Map<string, { expires: number; text: string; usage: Usage; approximate: boolean; billingModel: string }>();
   private reservations = new Map<string, Reservation>();
   private reservationSequence = 0;
   constructor(readonly policy: TokenPolicy, readonly prices: Prices, private readonly hooks: Hooks, private readonly counter: TokenCounter = heuristicTokenCounter, private readonly now = Date.now) { validateConfig(policy, prices); }
@@ -124,7 +124,7 @@ export class TokenService {
     try { reservedCostUsd = preflightCostUsd(price, inputEstimate, options.maxTokens, createdAt); }
     catch { this.refuse(agent, 'Model price unavailable or not yet effective.'); }
     const cached = !bypassCache && model.temperature === 0 ? this.cache.get(hash) : undefined;
-    if (cached && cached.expires > this.now()) { rows.forEach(row => { row.saved += cached.usage.total; }); return { provider: adapter.id, model: adapter.model, mocked: adapter.id === 'mock', text: redactText(cached.text), latencyMs: 0, cached: true, usage: cached.usage, approximate: cached.approximate }; }
+    if (cached && cached.expires > this.now()) { rows.forEach(row => { row.saved += cached.usage.total; }); return { provider: adapter.id, model: adapter.model, billingModel: cached.billingModel, mocked: adapter.id === 'mock', text: redactText(cached.text), latencyMs: 0, cached: true, usage: cached.usage, approximate: cached.approximate }; }
     const reservedTokens = inputEstimate + options.maxTokens;
     if (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costEstimateUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd)) { this.pause(agent); this.refuse(agent, 'Preflight reservation exceeds token or monetary budget.'); }
     // Synchronous reservation across all four scopes happens before any provider I/O.
@@ -142,7 +142,14 @@ export class TokenService {
       const split = usage.inputBreakdown;
       if (![usage.prompt, usage.completion, usage.total].every(validLimit) || usage.total !== usage.prompt + usage.completion || (split !== undefined && (![split.cacheHit, split.cacheMiss].every(validLimit) || split.cacheHit + split.cacheMiss !== usage.prompt))) this.refuse(agent, 'Provider usage invalid.');
       const responseAt = this.now();
-      const actualCostUsd = reconciledCostUsd(price, usage, createdAt, responseAt);
+      // The invoice names the model that answered, not the one that was asked for: providers reroute
+      // and bill at the served model's rate. A served model with no operator-verified price cannot be
+      // reconciled, and a call that already happened must not be released as if it were free.
+      const billingModel = result.billingModel ?? adapter.model;
+      if (billingModel !== adapter.model) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.rerouted', severity: 'warning', payload: `Request for ${adapter.model} was served by ${billingModel}; reconciled at the served model price.` });
+      const billingPrice = Object.hasOwn(this.prices.models, billingModel) ? this.prices.models[billingModel] : undefined;
+      if (!billingPrice) this.refuse(agent, 'Served model has no verified price; usage stays unresolved until reconciled manually.');
+      const actualCostUsd = reconciledCostUsd(billingPrice, usage, createdAt, responseAt);
       for (const row of rows) {
         row.reserved -= reservedTokens; row.used += usage.total; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); row.costEstimateUsd = money(row.costEstimateUsd + actualCostUsd);
         const totals = approximate ? row.mock : row.actual;
@@ -158,7 +165,7 @@ export class TokenService {
       if (!result.outcome && !bypassCache && model.temperature === 0 && this.policy.cacheTtlMs > 0) {
         for (const [key, entry] of this.cache) if (entry.expires <= this.now()) this.cache.delete(key);
         if (this.cache.size >= 256) this.cache.delete(this.cache.keys().next().value!);
-        this.cache.set(hash, { expires: this.now() + this.policy.cacheTtlMs, text: result.text, usage: { ...usage }, approximate });
+        this.cache.set(hash, { expires: this.now() + this.policy.cacheTtlMs, text: result.text, usage: { ...usage }, approximate, billingModel });
       }
       return { ...result, usage, approximate, cached: false };
     } catch (error) {

@@ -2,6 +2,7 @@ import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
 import { ProviderFailure, type Completion, type ProviderAdapter, type RequestOptions, type Usage } from './adapter';
 import { ModelIdError, normalizeModelId } from './model-id';
+import { thinkingCallValid } from './thinking-policy';
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 export function geminiErrorCode(status: number): ProviderFailure['code'] {
   if (status === 400 || status === 401 || status === 403) return 'unauthorized';
@@ -32,7 +33,7 @@ export class GeminiAdapter implements ProviderAdapter {
     catch (error) { if (error instanceof ModelIdError) throw new ProviderFailure('invalid_model_format'); throw error; }
   }
   async complete(input: string, signal: AbortSignal, options?: RequestOptions) {
-    if (options?.thinking?.mode === 'enabled') throw new ProviderFailure('invalid_request');
+    if (!thinkingCallValid(this.id, options?.thinking)) throw new ProviderFailure('invalid_request');
     return this.credentials.use('gemini', async key => {
       try {
         const messages = options?.messages ?? [{ role: 'user' as const, content: input }];

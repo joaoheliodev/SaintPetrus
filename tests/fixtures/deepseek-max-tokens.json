@@ -1,0 +1,25 @@
+{
+  "id": "synthetic-output-limit",
+  "object": "chat.completion",
+  "created": 1788000000,
+  "model": "deepseek-test-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "",
+        "reasoning_content": "Restating the operator instruction verbatim: CHAIN-OF-THOUGHT-MARKER. Considering it at length until the output budget is gone."
+      },
+      "finish_reason": "length"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 24,
+    "completion_tokens": 128,
+    "total_tokens": 152,
+    "prompt_cache_hit_tokens": 0,
+    "prompt_cache_miss_tokens": 24,
+    "completion_tokens_details": { "reasoning_tokens": 128 }
+  }
+}
