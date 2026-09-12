@@ -181,6 +181,9 @@ export class TokenService {
       return { ...result, usage, approximate, cached: false };
     } catch (error) {
       eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'error', severity: 'error', payload: 'Provider execution failed.' });
+      // Names only. A shape we cannot parse pauses the agent, and the names are what makes the next
+      // attempt a correction rather than a guess.
+      if (error instanceof ProviderFailure && error.fields?.length) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.usage_unparsed', severity: 'warning', payload: `Unrecognized provider usage shape. Field names received: ${error.fields.join(', ')}. No values recorded.` });
       // Codes the provider rejected before any generation: nothing was billed, so the reservation is
       // released cleanly. Treating these as unresolved would pause the agent and require a server
       // restart after a single typo in an API key. Timeouts and 5xx stay unresolved: those can mean

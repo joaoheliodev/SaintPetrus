@@ -371,3 +371,22 @@ test('An expired reservation converts at the dearest model in the table, not at 
   assert.ok(Math.abs(settled.costEstimateUsd - 0.000002) < 1e-12, `${settled.costEstimateUsd} kept residue from the conversion`);
   assert.equal(settled.costEstimatedUsd, 0);
 });
+
+test('An unparsed usage shape reports the field names it saw and none of their values', async () => {
+  const { eventBus } = await import('../lib/events/bus');
+  const marker = 'VALUE-THAT-MUST-NOT-BE-RECORDED';
+  const strange = { prompt_tokens: 24, completion_tokens: 12, total_tokens: 36, cache_hit_tokens: marker, usage_detail: { hit_bucket: marker } };
+  assert.throws(() => deepseekUsage(strange), /upstream/);
+  const service = new TokenService(policyFor({ mode: 'disabled' }), pricesFor(), hooks, undefined, () => offPeakAt);
+  const adapter = { id: 'deepseek' as const, model, complete: async () => { deepseekUsage(strange); return { text: 'unreachable' }; } };
+  const before = eventBus().snapshot().cursor;
+  await assert.rejects(service.execute(new ProviderProxy(), adapter, 'Reply OK.', signal(), 'a', 'System'), /upstream/);
+  const reported = eventBus().snapshot(before).events.find(event => event.type === 'provider.usage_unparsed');
+  assert.ok(reported, 'an unparsed shape must say which names it saw');
+  for (const name of ['prompt_tokens', 'cache_hit_tokens', 'usage_detail.hit_bucket']) assert.match(reported.payload, new RegExp(name));
+  assert.doesNotMatch(reported.payload, new RegExp(marker), 'a value is never recorded, only the name that held it');
+  assert.doesNotMatch(reported.payload, /\b24\b|\b36\b/, 'counts are values too');
+  // The call still failed closed: nothing reconciled, reservation held, agent paused.
+  const row = service.snapshot().rows.find(item => item.scope === 'global')!;
+  assert.equal(row.unresolved, 1); assert.deepEqual(row.actual, { prompt: 0, completion: 0, total: 0 });
+});

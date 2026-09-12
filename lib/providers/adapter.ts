@@ -14,5 +14,8 @@ export interface ProviderAdapter {
 export class ProviderFailure extends Error {
   // Adapters translate their own HTTP semantics into this shared vocabulary. Provider error
   // bodies are never read, echoed or logged.
-  constructor(readonly code: 'unconfigured' | 'disabled' | 'invalid_request' | 'invalid_model_format' | 'model_not_allowlisted' | 'unauthorized' | 'insufficient_balance' | 'not_found' | 'rate_limited' | 'upstream' | 'timeout' | 'cancelled' | 'busy') { super(code); }
+  // `fields` carries the names of the keys a response actually had when its shape could not be
+  // parsed, and never a value. Names are not an error body: they are what turns a failed first call
+  // into one correction instead of a blind second attempt.
+  constructor(readonly code: 'unconfigured' | 'disabled' | 'invalid_request' | 'invalid_model_format' | 'model_not_allowlisted' | 'unauthorized' | 'insufficient_balance' | 'not_found' | 'rate_limited' | 'upstream' | 'timeout' | 'cancelled' | 'busy', readonly fields?: readonly string[]) { super(code); }
 }

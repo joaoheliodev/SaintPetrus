@@ -15,27 +15,37 @@ export function deepseekErrorCode(status: number): ProviderFailure['code'] {
   if (status === 429) return 'rate_limited';
   return 'upstream';
 }
+// Key names only, one level deep, capped. A name is never a value and never an error body.
+function usageFieldNames(value: Record<string, unknown>) {
+  const names: string[] = [];
+  for (const [key, item] of Object.entries(value)) {
+    names.push(key);
+    if (record(item)) for (const nested of Object.keys(item)) names.push(`${key}.${nested}`);
+  }
+  return names.slice(0, 32).map(name => name.slice(0, 64));
+}
 export function deepseekUsage(value: unknown): Usage {
   if (!record(value)) throw new ProviderFailure('upstream');
+  const unparsed: () => never = () => { throw new ProviderFailure('upstream', usageFieldNames(value)); };
   const prompt = value.prompt_tokens, completion = value.completion_tokens, total = value.total_tokens;
   const cacheHit = value.prompt_cache_hit_tokens, cacheMiss = value.prompt_cache_miss_tokens;
   // The two input bands differ by orders of magnitude, so a missing split is never assumed to be
   // zero hits: an unrecognized shape stays unpriced and unresolved instead of being guessed.
-  if (!integer(prompt) || !integer(completion) || !integer(total) || !integer(cacheHit) || !integer(cacheMiss)) throw new ProviderFailure('upstream');
-  if (prompt + completion !== total || cacheHit + cacheMiss !== prompt) throw new ProviderFailure('upstream');
+  if (!integer(prompt) || !integer(completion) || !integer(total) || !integer(cacheHit) || !integer(cacheMiss)) unparsed();
+  if (prompt + completion !== total || cacheHit + cacheMiss !== prompt) unparsed();
   // This schema is documented but unverified against a live account. Optional detail objects are
   // accepted only in the one shape we can reconcile, and contradicting counts fail closed.
   const completionDetails = value.completion_tokens_details;
   if (completionDetails !== undefined) {
-    if (!record(completionDetails)) throw new ProviderFailure('upstream');
+    if (!record(completionDetails)) unparsed();
     const reasoning = completionDetails.reasoning_tokens;
-    if (reasoning !== undefined && (!integer(reasoning) || reasoning > completion)) throw new ProviderFailure('upstream');
+    if (reasoning !== undefined && (!integer(reasoning) || reasoning > completion)) unparsed();
   }
   const promptDetails = value.prompt_tokens_details;
   if (promptDetails !== undefined) {
-    if (!record(promptDetails)) throw new ProviderFailure('upstream');
+    if (!record(promptDetails)) unparsed();
     const cached = promptDetails.cached_tokens;
-    if (cached !== undefined && (!integer(cached) || cached !== cacheHit)) throw new ProviderFailure('upstream');
+    if (cached !== undefined && (!integer(cached) || cached !== cacheHit)) unparsed();
   }
   return { prompt, completion, total, inputBreakdown: { cacheHit, cacheMiss } };
 }

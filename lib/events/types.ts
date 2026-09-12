@@ -1,4 +1,4 @@
-export const eventTypes = ['agent.created', 'agent.message', 'agent.status_changed', 'agent.paused', 'agent.replaced', 'budget.warning', 'budget.refused', 'provider.rerouted', 'connection.created', 'connection.removed', 'error'] as const;
+export const eventTypes = ['agent.created', 'agent.message', 'agent.status_changed', 'agent.paused', 'agent.replaced', 'budget.warning', 'budget.refused', 'provider.rerouted', 'provider.usage_unparsed', 'connection.created', 'connection.removed', 'error'] as const;
 export type EventType = typeof eventTypes[number];
 export type EventInput = {
   agent_id: string; role: string; type: EventType; severity?: 'info' | 'warning' | 'error';
