@@ -10,6 +10,8 @@ import { isModelProvider, ModelIdError, normalizeModelId, type ModelProvider } f
 import type { Credentials } from '../security/credentials';
 // Every provider except the synthetic one authenticates with a stored credential.
 export type KeyedProvider = Exclude<ModelProvider, 'mock'>;
+export type ConnectionState = 'disconnected' | 'configured' | 'verified' | 'rejected' | 'incomplete';
+export type ProviderStatusSnapshot = { provider: string; model: string; connected: boolean; mocked: boolean; verified: boolean; verifiedAt?: number; failureCode?: string; state: ConnectionState };
 const keyedProvider = (value: unknown): value is KeyedProvider => isModelProvider(value) && value !== 'mock';
 const adapters: Record<KeyedProvider, new (model: string, credentials: Credentials) => ProviderAdapter> = { gemini: GeminiAdapter, openai: OpenAIAdapter, deepseek: DeepSeekAdapter };
 type ModelAllowlist = Readonly<Record<string, { provider: ModelProvider }>>;
@@ -24,7 +26,7 @@ export function recordVerification(ok: boolean, code?: string) {
   const { provider, model } = providerStatus();
   state.saintpetrusVerification = { provider, model, ok, at: Date.now(), code };
 }
-export function providerStatus() {
+export function providerStatus(): ProviderStatusSnapshot {
   const selected = state.saintpetrusSelection?.provider ?? process.env.SAINTPETRUS_PROVIDER ?? (mockEnabled() ? 'mock' : 'none');
   const base = (() => {
     if (selected === 'mock') return { provider: 'mock', model: 'mock-v1', connected: mockEnabled(), mocked: true };
@@ -34,7 +36,7 @@ export function providerStatus() {
   // A stale verification must never be shown as current: it only counts for the exact pair it proved.
   const proof = state.saintpetrusVerification;
   const current = proof && proof.provider === base.provider && proof.model === base.model ? proof : undefined;
-  const state_ = !base.connected ? 'disconnected' : current?.code === 'output_limit' ? 'incomplete' : current?.ok ? 'verified' : current ? 'rejected' : 'configured';
+  const state_: ConnectionState = !base.connected ? 'disconnected' : current?.code === 'output_limit' ? 'incomplete' : current?.ok ? 'verified' : current ? 'rejected' : 'configured';
   return { ...base, verified: current?.ok === true, verifiedAt: current?.ok ? current.at : undefined, failureCode: current && !current.ok ? current.code : undefined, state: state_ };
 }
 export function configuredAdapter(): ProviderAdapter {

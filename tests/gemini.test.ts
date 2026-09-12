@@ -106,9 +106,9 @@ test('Gemini RF-01 configuration selects the adapter through the existing API; e
     const limited = await execute(req); assert.equal(limited.status, 422); assert.equal(calls, 1);
     const limitedBody = await limited.json(); assert.equal(limitedBody.error, 'output_limit'); assert.equal(limitedBody.outcome, 'output_limit'); assert.deepEqual(limitedBody.usage, { prompt: 17, completion: 64, total: 81 });
     assert.equal(limitedBody.status.state, 'incomplete'); assert.equal(providerStatus().verified, false);
-    assert.doesNotMatch(connectionLabel('incomplete', limitedBody.status), /connected|conectado/i);
+    assert.doesNotMatch(connectionLabel(limitedBody.status), /connected|conectado/i);
     const limitedRow = host.saintpetrusTokens!.snapshot().rows.find(row => row.scope === 'global')!;
-    assert.deepEqual(limitedRow.actual, { prompt: 17, completion: 64, total: 81 }); assert.equal(limitedRow.reserved, 0); assert.equal(limitedRow.unresolved, 0);
+    assert.deepEqual(limitedRow.actual, { prompt: 17, completion: 64, total: 81 }); assert.equal(limitedRow.reserved, 0); assert.equal(limitedRow.unverifiable, 0);
     providerReply = fixture;
     const response = await execute(request('provider', { action: 'test' })); assert.equal(response.status, 200); assert.equal(calls, 2);
     const body = await response.json(); assert.deepEqual(body.usage, { prompt: 17, completion: 7, total: 24, cachedPromptFullRate: 4, inputBreakdown: { cacheHit: 4, cacheMiss: 13 } }); assert.equal(body.provider, 'gemini'); assert.equal(providerStatus().state, 'verified');

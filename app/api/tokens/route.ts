@@ -24,5 +24,5 @@ export async function POST(request: Request) {
       for (const agent of graphRuntime().graph.snapshot().agents) if (agent.status === 'paused' && !service.snapshot().paused.includes(agent.id)) graphRuntime().graph.setAgentStatus(agent.id, 'ready');
     } else throw new Error();
     return safeJson(service.snapshot());
-  } catch { return safeJson({ error: 'Token control rejected. Check scope, limits and unresolved usage.' }, 400); }
+  } catch { return safeJson({ error: 'Token control rejected. Check scope, limits and unverifiable usage.' }, 400); }
 }

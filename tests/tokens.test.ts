@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TokenService } from '../lib/tokens/service';
+import { failureBillingVerdict, TokenService, type BillingVerdict } from '../lib/tokens/service';
 import type { TokenPolicy, Prices } from '../lib/tokens/config';
 import { fixedRatioTokenCounter } from '../lib/core/token-estimate';
 import { ProviderProxy } from '../lib/providers/proxy';
-import { ProviderFailure, type ProviderAdapter, type RequestOptions } from '../lib/providers/adapter';
+import { ProviderFailure, providerFailureCodes, type ProviderAdapter, type ProviderFailureCode, type RequestOptions } from '../lib/providers/adapter';
 import { POST as providerPost } from '../app/api/provider/route';
 import { POST as controls } from '../app/api/tokens/route';
 import { POST as graphPost } from '../app/api/graph/route';
@@ -26,6 +26,25 @@ function fixture(limit = 1000, temperature = 0) {
   const run = (system = 'System', messages?: RequestOptions['messages']) => service.execute(proxy, adapter, 'Question', signal(), 'a', system, messages);
   return { service, policy, prices, proxy, adapter, run, paused, calls: () => calls, advance: (ms = 51) => { now += ms; } };
 }
+
+test('O3 assigns every provider failure code exactly one billing verdict', async () => {
+  const expected = {
+    unconfigured: 'unbilled', disabled: 'unverifiable', invalid_request: 'unbilled', invalid_model_format: 'unverifiable', model_not_allowlisted: 'unverifiable', unauthorized: 'unbilled', insufficient_balance: 'unbilled', not_found: 'unbilled', rate_limited: 'unbilled', upstream: 'unverifiable', timeout: 'unverifiable', cancelled: 'unverifiable', busy: 'unbilled',
+  } satisfies Record<ProviderFailureCode, Exclude<BillingVerdict, 'billed'>>;
+  assert.equal(providerFailureCodes.length, Object.keys(expected).length);
+  for (const code of providerFailureCodes) {
+    const verdict = expected[code];
+    assert.equal(failureBillingVerdict(new ProviderFailure(code)), verdict, code);
+    const f = fixture(); f.adapter.complete = async () => { throw new ProviderFailure(code); };
+    await assert.rejects(f.run(), new RegExp(code));
+    const snapshot = f.service.snapshot(); const row = snapshot.rows.find(item => item.scope === 'global')!;
+    assert.equal(row.unverifiable, verdict === 'unverifiable' ? 1 : 0, code);
+    assert.equal(row.reserved > 0, verdict === 'unverifiable', code);
+    assert.equal(row.costReservedUsd > 0, verdict === 'unverifiable', code);
+    assert.deepEqual(snapshot.reservations.map(item => item.status), verdict === 'unverifiable' ? ['unverifiable'] : [], code);
+  }
+  assert.equal(failureBillingVerdict(new Error('lost contact')), 'unverifiable');
+});
 
 test('RF-06 reserves before dispatch and enforces each of four scopes', async () => {
   for (const scope of ['global','agent','model','session']) {
@@ -68,12 +87,12 @@ test('RF-06 unknown real usage keeps reservation, pauses agent, never fabricates
   const f = fixture(); f.adapter.complete = async () => ({ text: 'No usage returned' });
   await assert.rejects(f.run(), /usage missing/);
   const snapshot = f.service.snapshot(); const row = snapshot.rows.find(row => row.scope === 'global')!;
-  assert.equal(row.actual.total, 0); assert.ok(row.reserved > 0); assert.equal(row.unresolved, 1); assert.ok(f.paused.has('a'));
-  assert.deepEqual(snapshot.reservations.map(item => ({ id: item.id, createdAt: item.createdAt, expiresAt: item.expiresAt, status: item.status })), [{ id: 'reservation-1', createdAt: 0, expiresAt: 100, status: 'unresolved' }]);
-  assert.throws(() => f.service.resume(), /unresolved/);
+  assert.equal(row.actual.total, 0); assert.ok(row.reserved > 0); assert.equal(row.unverifiable, 1); assert.ok(f.paused.has('a'));
+  assert.deepEqual(snapshot.reservations.map(item => ({ id: item.id, createdAt: item.createdAt, expiresAt: item.expiresAt, status: item.status })), [{ id: 'reservation-1', createdAt: 0, expiresAt: 100, status: 'unverifiable' }]);
+  assert.throws(() => f.service.resume(), /unverifiable/);
 });
 
-test('RF-06 expired unresolved reservation becomes conservative usage and remains manually reconcilable', async () => {
+test('RF-06 expired unverifiable reservation becomes conservative usage and remains manually reconcilable', async () => {
   const f = fixture(); f.adapter.complete = async () => { throw new ProviderFailure('timeout'); };
   await assert.rejects(f.run(), /timeout/);
   const pending = f.service.snapshot(); const reservation = pending.reservations[0];
@@ -85,9 +104,9 @@ test('RF-06 expired unresolved reservation becomes conservative usage and remain
   const withinTtl = f.service.snapshot();
   const affectedWithinTtl = withinTtl.rows.filter(row => row.reserved > 0);
   assert.equal(affectedWithinTtl.length, 4);
-  assert.ok(affectedWithinTtl.every(row => row.used === 0 && row.reserved === reservation.tokens && row.unresolved === 1));
+  assert.ok(affectedWithinTtl.every(row => row.used === 0 && row.reserved === reservation.tokens && row.unverifiable === 1));
   assert.ok(affectedWithinTtl.every(row => row.costEstimateUsd === 0 && row.costReservedUsd === reservation.costUsd && row.costEstimatedUsd === 0));
-  assert.throws(() => f.service.resume(), /unresolved/);
+  assert.throws(() => f.service.resume(), /unverifiable/);
 
   f.advance(1);
   assert.doesNotThrow(() => f.service.resume());
@@ -96,7 +115,7 @@ test('RF-06 expired unresolved reservation becomes conservative usage and remain
   assert.deepEqual(expired.rows.map(row => row.costEstimateUsd + row.costReservedUsd), costBefore);
   const affectedExpired = expired.rows.filter(row => row.estimated > 0);
   assert.equal(affectedExpired.length, 4);
-  assert.ok(affectedExpired.every(row => row.used === reservation.tokens && row.reserved === 0 && row.estimated === reservation.tokens && row.unresolved === 0));
+  assert.ok(affectedExpired.every(row => row.used === reservation.tokens && row.reserved === 0 && row.estimated === reservation.tokens && row.unverifiable === 0));
   assert.ok(affectedExpired.every(row => row.costEstimateUsd === reservation.costUsd && row.costReservedUsd === 0 && row.costEstimatedUsd === reservation.costUsd));
   assert.equal(expired.reservations[0]?.status, 'estimated');
 
@@ -114,7 +133,7 @@ test('RF-06 expired unresolved reservation becomes conservative usage and remain
   for (const code of ['unauthorized', 'insufficient_balance', 'rate_limited'] as const) {
     const rejected = fixture(); rejected.adapter.complete = async () => { throw new ProviderFailure(code); };
     await assert.rejects(rejected.run(), new RegExp(code)); rejected.advance(1000);
-    assert.ok(rejected.service.snapshot().rows.every(row => row.used === 0 && row.reserved === 0 && row.unresolved === 0 && row.costReservedUsd === 0 && row.costEstimateUsd === 0));
+    assert.ok(rejected.service.snapshot().rows.every(row => row.used === 0 && row.reserved === 0 && row.unverifiable === 0 && row.costReservedUsd === 0 && row.costEstimateUsd === 0));
     assert.equal(rejected.service.snapshot().reservations.length, 0);
   }
 });
@@ -124,7 +143,7 @@ test('RF-06 does not expire an in-flight reservation', async () => {
   f.adapter.complete = async () => { await new Promise<void>(resolve => { finish = resolve; }); return { text: 'Answer', usage: { prompt: 5, completion: 5, total: 10 } }; };
   const execution = f.run(); f.advance(1000);
   const active = f.service.snapshot().rows.find(row => row.scope === 'global')!;
-  assert.equal(active.used, 0); assert.equal(active.reserved, 65); assert.equal(active.unresolved, 0);
+  assert.equal(active.used, 0); assert.equal(active.reserved, 65); assert.equal(active.unverifiable, 0);
   finish!(); await execution;
   const complete = f.service.snapshot().rows.find(row => row.scope === 'global')!;
   assert.equal(complete.used, 10); assert.equal(complete.reserved, 0);

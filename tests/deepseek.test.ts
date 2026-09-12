@@ -67,7 +67,7 @@ test('DeepSeek reconciles the reported cache split at the off-peak bands through
     assert.deepEqual(result.usage, { prompt: 24, completion: 12, total: 36, inputBreakdown: { cacheHit: 16, cacheMiss: 8 } });
     const row = service.snapshot().rows.find(item => item.scope === 'global')!;
     assert.deepEqual(row.actual, { prompt: 24, completion: 12, total: 36 });
-    assert.equal(row.reserved, 0); assert.equal(row.unresolved, 0);
+    assert.equal(row.reserved, 0); assert.equal(row.unverifiable, 0);
     const expected = (16 * .003 + 8 * .15 + 12 * .6) / 1e6;
     assert.ok(Math.abs(row.costEstimateUsd - expected) < 1e-12, `${row.costEstimateUsd} != ${expected}`);
     // Same token count, all cache miss, must cost the documented 50x more on the input side.
@@ -127,18 +127,18 @@ test('DeepSeek owns its status mapping and contradicts the shared one Gemini nee
 });
 
 test('DeepSeek failures that prove no billing release the reservation; lost contact never does', async () => {
-  for (const [code, unresolved] of [['insufficient_balance', 0], ['rate_limited', 0], ['unauthorized', 0], ['invalid_request', 0], ['upstream', 1], ['timeout', 1]] as const) {
+  for (const [code, unverifiable] of [['insufficient_balance', 0], ['rate_limited', 0], ['unauthorized', 0], ['invalid_request', 0], ['upstream', 1], ['timeout', 1]] as const) {
     const service = new TokenService(policyFor({ mode: 'disabled' }), pricesFor(), hooks, undefined, () => offPeakAt);
     const adapter = { id: 'deepseek' as const, model, complete: async () => { throw new ProviderFailure(code); } };
     await assert.rejects(service.execute(new ProviderProxy(), adapter, 'Reply OK.', signal(), 'a', 'System'), new RegExp(code));
     const row = service.snapshot().rows.find(item => item.scope === 'global')!;
-    assert.equal(row.unresolved, unresolved, `${code} must leave ${unresolved} unresolved`);
-    assert.equal(row.reserved > 0, unresolved === 1, `${code} must ${unresolved ? 'hold' : 'release'} the reservation`);
-    assert.equal(row.costReservedUsd > 0, unresolved === 1);
+    assert.equal(row.unverifiable, unverifiable, `${code} must leave ${unverifiable} unverifiable`);
+    assert.equal(row.reserved > 0, unverifiable === 1, `${code} must ${unverifiable ? 'hold' : 'release'} the reservation`);
+    assert.equal(row.costReservedUsd > 0, unverifiable === 1);
   }
 });
 
-test('DeepSeek prices by the model that answered, and a served model with no price stays unresolved', async () => {
+test('DeepSeek prices by the model that answered, and a served model with no price stays unverifiable', async () => {
   await withCredentials(async store => {
     const reroute = { ...completion, model: served };
     const priced = new TokenService(policyFor({ mode: 'disabled' }), pricesFor([model, served]), hooks, undefined, () => offPeakAt);
@@ -148,14 +148,14 @@ test('DeepSeek prices by the model that answered, and a served model with no pri
     assert.notEqual(result.billingModel, result.model);
     const row = priced.snapshot().rows.find(item => item.scope === 'global')!;
     assert.ok(Math.abs(row.costEstimateUsd - (16 * .003 + 8 * .15 + 12 * .6) / 1e6) < 1e-12);
-    assert.equal(row.unresolved, 0);
+    assert.equal(row.unverifiable, 0);
     // The requested model is priced, the served one is not: the call happened and must not be
     // released as if it had been free.
     const unpriced = new TokenService(policyFor({ mode: 'disabled' }), pricesFor([model]), hooks, undefined, () => offPeakAt);
     const strayAdapter = new DeepSeekAdapter(model, store, async () => Response.json(reroute));
     await assert.rejects(unpriced.execute(new ProviderProxy(), strayAdapter, 'Reply OK.', signal(), 'a', 'System'), /no verified price/);
     const strayRow = unpriced.snapshot().rows.find(item => item.scope === 'global')!;
-    assert.equal(strayRow.unresolved, 1);
+    assert.equal(strayRow.unverifiable, 1);
     assert.ok(strayRow.reserved > 0);
     assert.deepEqual(strayRow.actual, { prompt: 0, completion: 0, total: 0 });
   });
@@ -359,7 +359,7 @@ test('An expired reservation converts at the dearest model in the table, not at 
   assert.ok(held > 0);
   now += 101;
   const row = service.snapshot().rows.find(item => item.scope === 'global')!;
-  assert.equal(row.unresolved, 0); assert.equal(row.reserved, 0); assert.equal(row.costReservedUsd, 0);
+  assert.equal(row.unverifiable, 0); assert.equal(row.reserved, 0); assert.equal(row.costReservedUsd, 0);
   // Peak rate, no cache hits, dearest model: eight times the cheap model's own peak figure.
   assert.ok(Math.abs(row.costEstimatedUsd - held * 4) < 1e-12, `${row.costEstimatedUsd} is not the dearest model's cost`);
   assert.ok(row.costEstimatedUsd > held, 'converting at the held figure would understate a reroute');
@@ -388,5 +388,5 @@ test('An unparsed usage shape reports the field names it saw and none of their v
   assert.doesNotMatch(reported.payload, /\b24\b|\b36\b/, 'counts are values too');
   // The call still failed closed: nothing reconciled, reservation held, agent paused.
   const row = service.snapshot().rows.find(item => item.scope === 'global')!;
-  assert.equal(row.unresolved, 1); assert.deepEqual(row.actual, { prompt: 0, completion: 0, total: 0 });
+  assert.equal(row.unverifiable, 1); assert.deepEqual(row.actual, { prompt: 0, completion: 0, total: 0 });
 });

@@ -19,4 +19,5 @@ npm-debug.log*
 # together with the rest of the file.
 
 /.audit/
+/.prompts/
 /.tools/

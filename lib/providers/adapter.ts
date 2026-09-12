@@ -11,11 +11,13 @@ export interface ProviderAdapter {
   readonly model: string;
   complete(input: string, signal: AbortSignal, options?: RequestOptions): Promise<Completion>;
 }
+export const providerFailureCodes = ['unconfigured', 'disabled', 'invalid_request', 'invalid_model_format', 'model_not_allowlisted', 'unauthorized', 'insufficient_balance', 'not_found', 'rate_limited', 'upstream', 'timeout', 'cancelled', 'busy'] as const;
+export type ProviderFailureCode = typeof providerFailureCodes[number];
 export class ProviderFailure extends Error {
   // Adapters translate their own HTTP semantics into this shared vocabulary. Provider error
   // bodies are never read, echoed or logged.
   // `fields` carries the names of the keys a response actually had when its shape could not be
   // parsed, and never a value. Names are not an error body: they are what turns a failed first call
   // into one correction instead of a blind second attempt.
-  constructor(readonly code: 'unconfigured' | 'disabled' | 'invalid_request' | 'invalid_model_format' | 'model_not_allowlisted' | 'unauthorized' | 'insufficient_balance' | 'not_found' | 'rate_limited' | 'upstream' | 'timeout' | 'cancelled' | 'busy', readonly fields?: readonly string[]) { super(code); }
+  constructor(readonly code: ProviderFailureCode, readonly fields?: readonly string[]) { super(code); }
 }

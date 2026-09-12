@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './ui/dialog';
-type ConnectionState = 'disconnected' | 'configured' | 'verified' | 'rejected' | 'incomplete';
+import type { ConnectionState, ProviderStatusSnapshot } from '../lib/providers/runtime';
 const keyedProviders = ['openai', 'gemini', 'deepseek'];
-type Status = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable?: boolean; verified?: boolean; failureCode?: string; state?: ConnectionState };
+type Status = ProviderStatusSnapshot & { mockAvailable?: boolean };
 // "Connected" must mean a real call succeeded. A stored credential alone only earns "configured".
 const badges: Record<ConnectionState, (status: Status) => string> = {
   verified: s => `● Connected · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
@@ -13,7 +13,7 @@ const badges: Record<ConnectionState, (status: Status) => string> = {
   incomplete: s => `△ Output budget exhausted · ${s.provider} · ${s.model}`,
   disconnected: () => '○ Disconnected',
 };
-export const connectionLabel = (state: ConnectionState, status: Status) => badges[state](status);
+export const connectionLabel = (status: ProviderStatusSnapshot) => badges[status.state](status);
 // Exported so the distinct meaning of each failure is pinned by a test, not only by the panel.
 export const verificationMessage = (status: number) => failures[status] ?? 'Connection verification failed.';
 const failures: Record<number, string> = {
@@ -32,34 +32,40 @@ const configurationFailures: Record<string, string> = {
 };
 class ConfigurationFailure extends Error {}
 export function ProviderStatus() {
-  const [status, setStatus] = useState<Status>({ provider: 'none', model: '', connected: false, mocked: false, state: 'disconnected' });
+  const [status, setStatus] = useState<Status>();
   const [result, setResult] = useState(''); const [pending, setPending] = useState(false);
   const [open, setOpen] = useState(false); const [provider, setProvider] = useState('openai');
   const [model, setModel] = useState(''); const [custom, setCustom] = useState('');
   const [show, setShow] = useState(false); const [remember, setRemember] = useState(false);
   // Uncontrolled, transient field: no credential in React state or browser storage.
   const keyField = useRef<HTMLInputElement>(null);
-  async function refresh() {
-    const response = await fetch('/api/provider', { cache: 'no-store' });
-    if (response.ok) setStatus(await response.json());
-  }
-  useEffect(() => {
-    let disposed = false; let timer: ReturnType<typeof setTimeout>; let abort: AbortController;
-    const poll = async () => {
-      abort = new AbortController();
-      try { const response = await fetch('/api/provider', { cache: 'no-store', signal: abort.signal }); const data = response.ok ? await response.json() : null; if (data && !disposed) setStatus(data); }
-      catch { /* Do not display raw network errors. */ }
-      if (!disposed) timer = setTimeout(poll, 2000);
-    };
-    void poll(); return () => { disposed = true; clearTimeout(timer); abort?.abort(); };
+  const mounted = useRef(false); const refreshController = useRef<AbortController>(null);
+  const refresh = useCallback(async () => {
+    refreshController.current?.abort();
+    const controller = new AbortController(); refreshController.current = controller;
+    try {
+      const response = await fetch('/api/provider', { cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw new Error('Provider status unavailable.');
+      const next: Status = await response.json();
+      if (mounted.current && refreshController.current === controller) setStatus(next);
+    } finally { if (refreshController.current === controller) refreshController.current = null; }
   }, []);
+  useEffect(() => {
+    mounted.current = true; let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try { await refresh(); }
+      catch { /* Do not display raw network errors. */ }
+      if (mounted.current) timer = setTimeout(poll, 2000);
+    };
+    void poll(); return () => { mounted.current = false; clearTimeout(timer); refreshController.current?.abort(); };
+  }, [refresh]);
   function toggle(value: boolean) {
     if (keyField.current) keyField.current.value = '';
     setShow(false); setRemember(false); setOpen(value);
-    if (value) { setProvider(status.mocked ? 'mock' : keyedProviders.includes(status.provider) ? status.provider : 'openai'); setModel(keyedProviders.includes(status.provider) ? status.model : ''); setResult(''); }
+    if (value) { setProvider(status?.mocked ? 'mock' : status && keyedProviders.includes(status.provider) ? status.provider : 'openai'); setModel(status && keyedProviders.includes(status.provider) ? status.model : ''); setResult(''); }
   }
   async function configure(action: 'set' | 'disconnect') {
-    const selected = action === 'disconnect' ? status.provider : provider;
+    const selected = action === 'disconnect' ? status?.provider ?? 'none' : provider;
     const body: Record<string, unknown> = { action, provider: selected };
     if (action === 'set') {
       body.model = selected === 'mock' ? 'mock-v1' : model || custom.trim();
@@ -89,26 +95,25 @@ export function ProviderStatus() {
     try {
       if (action === 'disconnect') { await configure('disconnect'); setResult('Disconnected. Credential removed from the backend.'); return; }
       const selectedModel = provider === 'mock' ? 'mock-v1' : model || custom.trim();
-      if (provider !== 'mock' && !keyField.current?.value && !status.connected) { setResult('Enter an API key before connecting.'); return; }
-      if (action === 'connect' || keyField.current?.value || !status.connected || status.provider !== provider || status.model !== selectedModel) await configure('set');
+      if (provider !== 'mock' && !keyField.current?.value && !status?.connected) { setResult('Enter an API key before connecting.'); return; }
+      if (action === 'connect' || keyField.current?.value || !status?.connected || status.provider !== provider || status.model !== selectedModel) await configure('set');
       await verify(provider === 'mock');
     } catch (error) { setResult(error instanceof ConfigurationFailure ? error.message : 'Operation failed. Check the model, key, and local server; remembering a key requires an unlocked OS keyring.'); }
     finally { setPending(false); }
   }
-  const state: ConnectionState = status.state ?? (status.connected ? 'configured' : 'disconnected');
   return <div className="project-actions">
-    <span role="status" className={`provider-badge is-${state}`}>{connectionLabel(state, status)}</span>
+    <span role="status" className={`provider-badge ${status ? `is-${status.state}` : 'is-loading'}`}>{status ? connectionLabel(status) : '◌ Loading connection state'}</span>
     <Dialog open={open} onOpenChange={toggle}>
       <DialogTrigger render={<Button variant="outline" />}>Connect AI</DialogTrigger>
       <DialogContent className="provider-panel">
         <DialogTitle>Connect AI</DialogTitle>
         <DialogDescription>Keys go only to this local backend. Connecting makes one minimal call to prove the key works, and can incur provider charges. Memory only by default.</DialogDescription>
         <label>Provider<select value={provider} disabled={pending} onChange={event => { setProvider(event.target.value); setModel(''); setCustom(''); if (keyField.current) keyField.current.value = ''; setShow(false); }}>
-          <option value="openai">OpenAI</option><option value="gemini">Google Gemini</option><option value="deepseek">DeepSeek</option>{status.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
+          <option value="openai">OpenAI</option><option value="gemini">Google Gemini</option><option value="deepseek">DeepSeek</option>{status?.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
         </select></label>
         <p>Additional providers are not available in this adapter yet.</p>
         <label>Default model<select value={provider === 'mock' ? 'mock-v1' : model} disabled={pending || provider === 'mock'} onChange={event => setModel(event.target.value)}>
-          {provider === 'mock' ? <option value="mock-v1">mock-v1</option> : <><option value="">Enter model ID…</option>{status.provider === provider && status.model && <option value={status.model}>{status.model}</option>}</>}
+          {provider === 'mock' ? <option value="mock-v1">mock-v1</option> : <><option value="">Enter model ID…</option>{status?.provider === provider && status.model && <option value={status.model}>{status.model}</option>}</>}
         </select></label>
         {provider !== 'mock' && !model && <label>Model ID<input value={custom} onChange={event => setCustom(event.target.value)} maxLength={107} placeholder="Provider model ID" disabled={pending} /></label>}
         {provider !== 'mock' && <>
@@ -118,8 +123,8 @@ export function ProviderStatus() {
           <p>Closing or submitting clears this field. Terminal entry remains available with npm run key.</p>
         </>}
         <Button disabled={pending} onClick={() => run('connect')}>{pending ? 'Verifying…' : 'Connect and verify (1 call)'}</Button>
-        <Button variant="outline" disabled={pending || !status.connected} onClick={() => run('test')}>Test again</Button>
-        <Button variant="outline" disabled={pending || !status.connected} onClick={() => run('disconnect')}>Disconnect</Button>
+        <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('test')}>Test again</Button>
+        <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('disconnect')}>Disconnect</Button>
         <p role="status">{result}</p>
       </DialogContent>
     </Dialog>

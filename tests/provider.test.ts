@@ -212,7 +212,7 @@ test('connection state is proved by a live call, never by a stored credential, a
     // A wrong key must not jam the workspace: nothing was billed, so no reservation is left dangling
     // and the agent stays runnable for the retry.
     const rows = () => (globalThis as typeof globalThis & { saintpetrusTokens?: TokenService }).saintpetrusTokens!.snapshot().rows;
-    assert.ok(rows().every(row => row.reserved === 0 && row.unresolved === 0));
+    assert.ok(rows().every(row => row.reserved === 0 && row.unverifiable === 0));
     // Replacing the credential retracts the proof: the new key has proved nothing.
     globalThis.fetch = ok;
     await configure(browserRequest({ action: 'set', provider: 'openai', model: 'test-model', key: randomBytes(32).toString('hex') }));
@@ -224,12 +224,12 @@ test('connection state is proved by a live call, never by a stored credential, a
     assert.equal(providerStatus().state, 'configured');
     await configure(browserRequest({ action: 'set', provider: 'openai', model: 'test-model', key }));
     assert.equal((await POST(request({ action: 'test' }))).status, 200);
-    // An outage must not retract a proof that already succeeded, and it does stay unresolved:
+    // An outage must not retract a proof that already succeeded, and it does stay unverifiable:
     // a lost answer may still have been billed.
     globalThis.fetch = async () => Response.json({ error: 'down' }, { status: 500 });
     assert.equal((await POST(request({ action: 'test' }))).status, 502);
     assert.equal(providerStatus().state, 'verified');
-    assert.ok(rows().some(row => row.unresolved > 0));
+    assert.ok(rows().some(row => row.unverifiable > 0));
     await configure(browserRequest({ action: 'disconnect', provider: 'openai' }));
     assert.equal(providerStatus().state, 'disconnected');
   } finally { restoreTokens(); clearVerification(); store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }

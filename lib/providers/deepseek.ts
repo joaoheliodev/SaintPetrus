@@ -30,7 +30,7 @@ export function deepseekUsage(value: unknown): Usage {
   const prompt = value.prompt_tokens, completion = value.completion_tokens, total = value.total_tokens;
   const cacheHit = value.prompt_cache_hit_tokens, cacheMiss = value.prompt_cache_miss_tokens;
   // The two input bands differ by orders of magnitude, so a missing split is never assumed to be
-  // zero hits: an unrecognized shape stays unpriced and unresolved instead of being guessed.
+  // zero hits: an unrecognized shape stays unpriced and unverifiable instead of being guessed.
   if (!integer(prompt) || !integer(completion) || !integer(total) || !integer(cacheHit) || !integer(cacheMiss)) unparsed();
   if (prompt + completion !== total || cacheHit + cacheMiss !== prompt) unparsed();
   // This schema is documented but unverified against a live account. Optional detail objects are

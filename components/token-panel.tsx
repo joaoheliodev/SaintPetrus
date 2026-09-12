@@ -5,8 +5,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 type Counts = { prompt: number; completion: number; total: number };
 type RateBand = { inputCacheHitPerMillion: number; inputCacheMissPerMillion: number; outputPerMillion: number };
 type ModelPrice = { effectiveAt: string; verifiedAt: string; peakWindowsUtc: { weekdays: number[]; startMinute: number; endMinute: number }[]; offPeak: RateBand; peak: RateBand; note?: string };
-type Row = { scope: string; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Counts; mock: Counts; costLimitUsd: number; costReservedUsd: number; costEstimateUsd: number; costEstimatedUsd: number; saved: number; unresolved: number; state: string };
-type Reservation = { id: string; agent: string; model: string; tokens: number; costUsd: number; createdAt: number; expiresAt: number | null; status: 'unresolved' | 'estimated' };
+type Row = { scope: string; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Counts; mock: Counts; costLimitUsd: number; costReservedUsd: number; costEstimateUsd: number; costEstimatedUsd: number; saved: number; unverifiable: number; state: string };
+type Reservation = { id: string; agent: string; model: string; tokens: number; costUsd: number; createdAt: number; expiresAt: number | null; status: 'unverifiable' | 'estimated' };
 type Snapshot = { stopped: boolean; sessionId: string; priceDate: string; cacheTtlMs: number; reservationTtlMs: number; reservations: Reservation[]; rows: Row[]; models: Record<string, { provider: string; max_tokens: number; temperature: number }>; prices: Record<string, ModelPrice> };
 export function TokenPanel() {
   const [data, setData] = useState<Snapshot>(); const [error, setError] = useState(''); const [pending, setPending] = useState(false);
@@ -26,7 +26,7 @@ export function TokenPanel() {
   async function command(body: object) {
     setPending(true); setError('');
     try { const response = await fetch('/api/tokens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!response.ok) throw new Error(); setData(await response.json()); }
-    catch { setError('Control rejected. Check limits and unresolved usage before resuming.'); }
+    catch { setError('Control rejected. Check limits and unverifiable usage before resuming.'); }
     finally { setPending(false); }
   }
   const total = data?.rows.find(row => row.scope === 'global');
@@ -40,12 +40,12 @@ export function TokenPanel() {
         <p>Actual provider tokens: {total?.actual.total ?? 0} · Mock estimated tokens: {total?.mock.total ?? 0} · Saved tokens: {total?.saved ?? 0}</p>
         <p>Accounted cost (USD): {(total?.costEstimateUsd ?? 0).toFixed(9)} · Reserved worst-case cost: {(total?.costReservedUsd ?? 0).toFixed(9)} · Local price table date: {data?.priceDate ?? 'Unavailable'}</p>
         <p>Rows overlap: global, agent, model and session describe the same calls. Do not add rows together. Either dimension warns at 80% and pauses at 100%. Increase a limit, then resume explicitly.</p>
-        <div className="token-table"><table><caption>Budgets and consumption</caption><thead><tr><th>Scope / ID</th><th>Token limit</th><th>USD limit</th><th>Actual input / output / total</th><th>Mock estimated input / output / total</th><th>Reserved / unresolved / expired estimate</th><th>USD used / reserved / expired estimate</th><th>Budget status</th></tr></thead><tbody>
+        <div className="token-table"><table><caption>Budgets and consumption</caption><thead><tr><th>Scope / ID</th><th>Token limit</th><th>USD limit</th><th>Actual input / output / total</th><th>Mock estimated input / output / total</th><th>Reserved / unverifiable / expired estimate</th><th>USD used / reserved / expired estimate</th><th>Budget status</th></tr></thead><tbody>
           {data?.rows.map(row => { const key = `${row.scope}:${row.id}`; return <tr key={key}>
             <th>{row.scope}<small>{row.id}</small></th>
             <td><input aria-label={`Budget ${key}`} type="number" min={0} value={drafts[key] ?? row.limit} onChange={event => setDrafts({ ...drafts, [key]: event.target.value })} /><Button disabled={pending} variant="outline" onClick={() => command({ action: 'limit', scope: row.scope, id: row.id, limit: Number(drafts[key] ?? row.limit) })}>Apply {row.scope}</Button></td>
             <td><input aria-label={`USD budget ${key}`} type="number" min={0} step="any" value={costDrafts[key] ?? row.costLimitUsd} onChange={event => setCostDrafts({ ...costDrafts, [key]: event.target.value })} /><Button disabled={pending} variant="outline" onClick={() => command({ action: 'cost-limit', scope: row.scope, id: row.id, limit: Number(costDrafts[key] ?? row.costLimitUsd) })}>Apply USD</Button></td>
-            <td>{row.actual.prompt} / {row.actual.completion} / {row.actual.total}{row.conservativeCachedInput > 0 && <small>{row.conservativeCachedInput} cached input tokens reported</small>}</td><td>{row.mock.prompt} / {row.mock.completion} / {row.mock.total}</td><td>{row.reserved} / {row.unresolved} / {row.estimated}</td><td>{row.costEstimateUsd.toFixed(9)} / {row.costReservedUsd.toFixed(9)} / {row.costEstimatedUsd.toFixed(9)}</td><td>{row.state === 'warning' ? '⚠ Warning ≥80%' : row.state === 'stopped' ? '■ Hard stop' : '● Available'}</td>
+            <td>{row.actual.prompt} / {row.actual.completion} / {row.actual.total}{row.conservativeCachedInput > 0 && <small>{row.conservativeCachedInput} cached input tokens reported</small>}</td><td>{row.mock.prompt} / {row.mock.completion} / {row.mock.total}</td><td>{row.reserved} / {row.unverifiable} / {row.estimated}</td><td>{row.costEstimateUsd.toFixed(9)} / {row.costReservedUsd.toFixed(9)} / {row.costEstimatedUsd.toFixed(9)}</td><td>{row.state === 'warning' ? '⚠ Warning ≥80%' : row.state === 'stopped' ? '■ Hard stop' : '● Available'}</td>
           </tr>; })}
         </tbody></table></div>
         <p>Unresolved usage keeps both reservations for {data?.reservationTtlMs ?? 0} ms. At expiry the worst-case token and USD amounts become conservative usage. Manual reconciliation requires provider-confirmed tokens and invoice cost.</p>

@@ -2,7 +2,7 @@ import { observeArtifact, previewEnabled } from '../preview/store';
 import { eventBus } from '../events/bus';
 import { createHash, randomUUID } from 'node:crypto';
 import { heuristicTokenCounter, type TokenCounter } from '../core/token-estimate';
-import { ProviderFailure, type ProviderAdapter, type RequestOptions, type Usage } from '../providers/adapter';
+import { ProviderFailure, type ProviderAdapter, type ProviderFailureCode, type RequestOptions, type Usage } from '../providers/adapter';
 import type { ProviderProxy } from '../providers/proxy';
 import { redactText } from '../security/redact';
 import { reproducible, validateConfig, validCostLimit, validLimit, type TokenPolicy, type Prices } from './config';
@@ -11,9 +11,14 @@ import { verificationThinking } from '../providers/thinking-policy';
 export class TokenFailure extends Error {}
 type Totals = { prompt: number; completion: number; total: number };
 type Scope = 'global' | 'agent' | 'model' | 'session';
-type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costEstimateUsd: number; costEstimatedUsd: number; saved: number; unresolved: number };
-type Reservation = { id: string; agent: string; model: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unresolved' | 'estimated'; rows: Row[] };
+export type BillingVerdict = 'unbilled' | 'billed' | 'unverifiable';
+type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costEstimateUsd: number; costEstimatedUsd: number; saved: number; unverifiable: number };
+type Reservation = { id: string; agent: string; model: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[] };
 type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => string[]; role?: (id: string) => string };
+const failureVerdicts = {
+  unconfigured: 'unbilled', disabled: 'unverifiable', invalid_request: 'unbilled', invalid_model_format: 'unverifiable', model_not_allowlisted: 'unverifiable', unauthorized: 'unbilled', insufficient_balance: 'unbilled', not_found: 'unbilled', rate_limited: 'unbilled', upstream: 'unverifiable', timeout: 'unverifiable', cancelled: 'unverifiable', busy: 'unbilled',
+} satisfies Record<ProviderFailureCode, Exclude<BillingVerdict, 'billed'>>;
+export function failureBillingVerdict(error: unknown): Exclude<BillingVerdict, 'billed'> { return error instanceof ProviderFailure ? failureVerdicts[error.code] : 'unverifiable'; }
 const zero = (): Totals => ({ prompt: 0, completion: 0, total: 0 });
 const money = (value: number) => Math.round(value * 1_000_000_000_000) / 1_000_000_000_000;
 export class TokenService {
@@ -28,7 +33,7 @@ export class TokenService {
   constructor(readonly policy: TokenPolicy, readonly prices: Prices, private readonly hooks: Hooks, private readonly counter: TokenCounter = heuristicTokenCounter, private readonly now = Date.now) { validateConfig(policy, prices); }
   private row(scope: Scope, id: string, limit: number, costLimitUsd: number) {
     const key = JSON.stringify([scope, id]); let row = this.rows.get(key);
-    if (!row) { row = { scope, id, limit, used: 0, reserved: 0, estimated: 0, conservativeCachedInput: 0, actual: zero(), mock: zero(), costLimitUsd, costReservedUsd: 0, costEstimateUsd: 0, costEstimatedUsd: 0, saved: 0, unresolved: 0 }; this.rows.set(key, row); }
+    if (!row) { row = { scope, id, limit, used: 0, reserved: 0, estimated: 0, conservativeCachedInput: 0, actual: zero(), mock: zero(), costLimitUsd, costReservedUsd: 0, costEstimateUsd: 0, costEstimatedUsd: 0, saved: 0, unverifiable: 0 }; this.rows.set(key, row); }
     return row;
   }
   private scopes(agent: string, model: string) { return [this.row('global', 'all', this.policy.global, this.policy.costLimitsUsd.global), this.row('agent', agent, this.policy.perAgent, this.policy.costLimitsUsd.perAgent), this.row('model', model, this.policy.perModel, this.policy.costLimitsUsd.perModel), this.row('session', this.sessionId, this.policy.perSession, this.policy.costLimitsUsd.perSession)]; }
@@ -38,7 +43,7 @@ export class TokenService {
   private expireReservations() {
     const now = this.now();
     for (const reservation of this.reservations.values()) {
-      if (reservation.status !== 'unresolved' || reservation.expiresAt === null || reservation.expiresAt > now) continue;
+      if (reservation.status !== 'unverifiable' || reservation.expiresAt === null || reservation.expiresAt > now) continue;
       // Convert at the dearer of what was held and what the dearest known model would have cost:
       // the request may have been served, and billed, by a model other than the one asked for.
       const conservative = Math.max(reservation.costUsd, worstCasePeakCostUsd(this.prices.models, reservation.inputTokens, reservation.maxOutputTokens, reservation.createdAt));
@@ -49,7 +54,7 @@ export class TokenService {
         row.costReservedUsd = money(row.costReservedUsd - reservation.costUsd);
         row.costEstimateUsd = money(row.costEstimateUsd + conservative);
         row.costEstimatedUsd = money(row.costEstimatedUsd + conservative);
-        row.unresolved--;
+        row.unverifiable--;
       }
       // The converted figure replaces the held one so a later manual reconciliation subtracts what
       // was actually charged to the budget, not the understated reservation.
@@ -61,7 +66,7 @@ export class TokenService {
   isStopped() { return this.stopped; }
   resume(agent?: string) {
     this.expireReservations();
-    if ([...this.rows.values()].some(row => row.unresolved > 0)) throw new TokenFailure('Usage unresolved; restart only after checking provider billing.');
+    if ([...this.rows.values()].some(row => row.unverifiable > 0)) throw new TokenFailure('Usage unverifiable; restart only after checking provider billing.');
     if (!agent) this.stopped = false;
     for (const id of agent ? [agent] : this.hooks.ids()) {
       const blocked = [...this.rows.values()].some(row => (row.scope === 'global' || row.scope === 'session' || (row.scope === 'agent' && row.id === id) || (row.scope === 'model' && this.agentModels.get(id)?.has(row.id))) && this.blocked(row));
@@ -143,7 +148,7 @@ export class TokenService {
     const reservation: Reservation = { id: `reservation-${++this.reservationSequence}`, agent, model: adapter.model, tokens: reservedTokens, costUsd: reservedCostUsd, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, createdAt, expiresAt: null, status: 'inflight', rows };
     this.reservations.set(reservation.id, reservation);
     if (previewEnabled()) options.onText = text => observeArtifact(agent, this.hooks.role?.(agent) ?? agent, text);
-    let reconciled = false; let notSent = false;
+    let verdict: BillingVerdict = 'unverifiable';
     try {
       const result = await proxy.execute(adapter, input, signal, options);
       const approximate = adapter.id === 'mock';
@@ -159,7 +164,7 @@ export class TokenService {
       const billingModel = result.billingModel ?? adapter.model;
       if (billingModel !== adapter.model) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.rerouted', severity: 'warning', payload: `Request for ${adapter.model} was served by ${billingModel}; reconciled at the served model price.` });
       const billingPrice = Object.hasOwn(this.prices.models, billingModel) ? this.prices.models[billingModel] : undefined;
-      if (!billingPrice) this.refuse(agent, 'Served model has no verified price; usage stays unresolved until reconciled manually.');
+      if (!billingPrice) this.refuse(agent, 'Served model has no verified price; usage stays unverifiable until reconciled manually.');
       const actualCostUsd = reconciledCostUsd(billingPrice, usage, createdAt, responseAt);
       for (const row of rows) {
         row.reserved -= reservedTokens; row.used += usage.total; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); row.costEstimateUsd = money(row.costEstimateUsd + actualCostUsd);
@@ -169,7 +174,7 @@ export class TokenService {
       }
       this.reservations.delete(reservation.id);
       if (!result.outcome) observeArtifact(agent, this.hooks.role?.(agent) ?? agent, result.text);
-      reconciled = true;
+      verdict = 'billed';
       if (!result.outcome) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'agent.message', payload: (approximate ? '[Mock] ' : '') + result.text, tokens: { prompt: usage.prompt, completion: usage.completion } });
       if (rows.some(row => this.warning(row))) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'budget.warning', severity: 'warning', payload: 'Token or monetary budget reached 80% or more.' });
       if (rows.some(row => this.blocked(row))) this.pause(agent);
@@ -184,18 +189,16 @@ export class TokenService {
       // Names only. A shape we cannot parse pauses the agent, and the names are what makes the next
       // attempt a correction rather than a guess.
       if (error instanceof ProviderFailure && error.fields?.length) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.usage_unparsed', severity: 'warning', payload: `Unrecognized provider usage shape. Field names received: ${error.fields.join(', ')}. No values recorded.` });
-      // Codes the provider rejected before any generation: nothing was billed, so the reservation is
-      // released cleanly. Treating these as unresolved would pause the agent and require a server
-      // restart after a single typo in an API key. Timeouts and 5xx stay unresolved: those can mean
-      // the call was processed and the answer was lost.
-      notSent = error instanceof ProviderFailure && ['busy', 'unconfigured', 'invalid_request', 'unauthorized', 'insufficient_balance', 'not_found', 'rate_limited'].includes(error.code);
+      // A proven rejection releases the reservation. Lost contact remains unverifiable because the
+      // provider may have processed and billed a response that never reached us.
+      verdict = adapter.id === 'mock' ? 'unbilled' : failureBillingVerdict(error);
       throw error;
     } finally {
-      if (!reconciled) {
-        if (adapter.id === 'mock' || notSent) { rows.forEach(row => { row.reserved -= reservedTokens; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); }); this.reservations.delete(reservation.id); }
+      if (verdict !== 'billed') {
+        if (verdict === 'unbilled') { rows.forEach(row => { row.reserved -= reservedTokens; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); }); this.reservations.delete(reservation.id); }
         else {
-          rows.forEach(row => { row.unresolved++; });
-          reservation.status = 'unresolved'; reservation.expiresAt = this.now() + this.policy.reservationTtlMs;
+          rows.forEach(row => { row.unverifiable++; });
+          reservation.status = 'unverifiable'; reservation.expiresAt = this.now() + this.policy.reservationTtlMs;
           this.pause(agent);
         }
       }
