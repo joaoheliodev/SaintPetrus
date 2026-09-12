@@ -6,13 +6,13 @@ import { ProviderFailure, type ProviderAdapter, type RequestOptions, type Usage 
 import type { ProviderProxy } from '../providers/proxy';
 import { redactText } from '../security/redact';
 import { reproducible, validateConfig, validCostLimit, validLimit, type TokenPolicy, type Prices } from './config';
-import { preflightCostUsd, reconciledCostUsd } from './pricing';
+import { preflightCostUsd, reconciledCostUsd, worstCasePeakCostUsd } from './pricing';
 import { verificationThinking } from '../providers/thinking-policy';
 export class TokenFailure extends Error {}
 type Totals = { prompt: number; completion: number; total: number };
 type Scope = 'global' | 'agent' | 'model' | 'session';
 type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costEstimateUsd: number; costEstimatedUsd: number; saved: number; unresolved: number };
-type Reservation = { id: string; agent: string; model: string; tokens: number; costUsd: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unresolved' | 'estimated'; rows: Row[] };
+type Reservation = { id: string; agent: string; model: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unresolved' | 'estimated'; rows: Row[] };
 type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => string[]; role?: (id: string) => string };
 const zero = (): Totals => ({ prompt: 0, completion: 0, total: 0 });
 const money = (value: number) => Math.round(value * 1_000_000_000_000) / 1_000_000_000_000;
@@ -39,15 +39,21 @@ export class TokenService {
     const now = this.now();
     for (const reservation of this.reservations.values()) {
       if (reservation.status !== 'unresolved' || reservation.expiresAt === null || reservation.expiresAt > now) continue;
+      // Convert at the dearer of what was held and what the dearest known model would have cost:
+      // the request may have been served, and billed, by a model other than the one asked for.
+      const conservative = Math.max(reservation.costUsd, worstCasePeakCostUsd(this.prices.models, reservation.inputTokens, reservation.maxOutputTokens, reservation.createdAt));
       for (const row of reservation.rows) {
         row.reserved -= reservation.tokens;
         row.used += reservation.tokens;
         row.estimated += reservation.tokens;
         row.costReservedUsd = money(row.costReservedUsd - reservation.costUsd);
-        row.costEstimateUsd = money(row.costEstimateUsd + reservation.costUsd);
-        row.costEstimatedUsd = money(row.costEstimatedUsd + reservation.costUsd);
+        row.costEstimateUsd = money(row.costEstimateUsd + conservative);
+        row.costEstimatedUsd = money(row.costEstimatedUsd + conservative);
         row.unresolved--;
       }
+      // The converted figure replaces the held one so a later manual reconciliation subtracts what
+      // was actually charged to the budget, not the understated reservation.
+      reservation.costUsd = conservative;
       reservation.status = 'estimated';
     }
   }
@@ -134,7 +140,7 @@ export class TokenService {
     if (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costEstimateUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd)) { this.pause(agent); this.refuse(agent, 'Preflight reservation exceeds token or monetary budget.'); }
     // Synchronous reservation across all four scopes happens before any provider I/O.
     rows.forEach(row => { row.reserved += reservedTokens; row.costReservedUsd = money(row.costReservedUsd + reservedCostUsd); });
-    const reservation: Reservation = { id: `reservation-${++this.reservationSequence}`, agent, model: adapter.model, tokens: reservedTokens, costUsd: reservedCostUsd, createdAt, expiresAt: null, status: 'inflight', rows };
+    const reservation: Reservation = { id: `reservation-${++this.reservationSequence}`, agent, model: adapter.model, tokens: reservedTokens, costUsd: reservedCostUsd, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, createdAt, expiresAt: null, status: 'inflight', rows };
     this.reservations.set(reservation.id, reservation);
     if (previewEnabled()) options.onText = text => observeArtifact(agent, this.hooks.role?.(agent) ?? agent, text);
     let reconciled = false; let notSent = false;

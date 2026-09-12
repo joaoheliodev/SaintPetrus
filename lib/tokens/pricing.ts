@@ -110,3 +110,15 @@ export function reconciledCostUsd(price: ModelPrice, usage: PriceUsage, requestA
   if (!tokenCount(split.cacheHit) || !tokenCount(split.cacheMiss) || split.cacheHit + split.cacheMiss !== usage.prompt) throw new Error('Invalid cache usage for cost calculation.');
   return bandCost(intervalTouchesPeak(price, requestAt, responseAt) ? price.peak : price.offPeak, split.cacheHit, split.cacheMiss, usage.completion);
 }
+
+// Lost contact means the served model is unknown, and a provider may reroute to a dearer one. The
+// reservation was priced for the model that was asked for, so it can understate what was billed.
+// The conservative floor is the dearest model the table knows, at peak, with no cache hits.
+export function worstCasePeakCostUsd(models: Record<string, ModelPrice>, inputTokens: number, maximumOutputTokens: number, at: number) {
+  let worst = 0;
+  for (const price of Object.values(models)) {
+    try { worst = Math.max(worst, preflightCostUsd(price, inputTokens, maximumOutputTokens, at)); }
+    catch { /* A model with no usable price cannot raise the floor; it is simply not a candidate. */ }
+  }
+  return worst;
+}

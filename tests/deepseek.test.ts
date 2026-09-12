@@ -344,3 +344,30 @@ test('C5 the connection probe switches reasoning off even when the policy asks f
     assert.deepEqual(seen[0], { mode: 'enabled', effort: 'minimal' });
   });
 });
+
+test('An expired reservation converts at the dearest model in the table, not at what was held', async () => {
+  const dear = 'deepseek-test-dear';
+  const policy = policyFor({ mode: 'disabled' }); policy.reservationTtlMs = 100;
+  const prices = pricesFor([model]);
+  // A model the request could have been rerouted to, four times the price of the one asked for.
+  prices.models[dear] = { ...price(), offPeak: band(4), peak: band(8) };
+  let now = offPeakAt;
+  const service = new TokenService(policy, prices, hooks, undefined, () => now);
+  const adapter = { id: 'deepseek' as const, model, complete: async () => { throw new ProviderFailure('timeout'); } };
+  await assert.rejects(service.execute(new ProviderProxy(), adapter, 'Reply OK.', signal(), 'a', 'System'), /timeout/);
+  const held = service.snapshot().rows.find(row => row.scope === 'global')!.costReservedUsd;
+  assert.ok(held > 0);
+  now += 101;
+  const row = service.snapshot().rows.find(item => item.scope === 'global')!;
+  assert.equal(row.unresolved, 0); assert.equal(row.reserved, 0); assert.equal(row.costReservedUsd, 0);
+  // Peak rate, no cache hits, dearest model: eight times the cheap model's own peak figure.
+  assert.ok(Math.abs(row.costEstimatedUsd - held * 4) < 1e-12, `${row.costEstimatedUsd} is not the dearest model's cost`);
+  assert.ok(row.costEstimatedUsd > held, 'converting at the held figure would understate a reroute');
+  assert.equal(row.costEstimateUsd, row.costEstimatedUsd);
+  // Manual reconciliation must remove exactly what the conversion charged, not the held figure.
+  const reservation = service.snapshot().reservations[0];
+  service.reconcileReservation(reservation.id, 24, 12, 0.000002);
+  const settled = service.snapshot().rows.find(item => item.scope === 'global')!;
+  assert.ok(Math.abs(settled.costEstimateUsd - 0.000002) < 1e-12, `${settled.costEstimateUsd} kept residue from the conversion`);
+  assert.equal(settled.costEstimatedUsd, 0);
+});
