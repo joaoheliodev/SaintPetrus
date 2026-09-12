@@ -261,3 +261,28 @@ test('RT-04 reuses an answer only when the policy claims determinism and the req
   // The claim is validated as a claim, not coerced from whatever the operator typed.
   assert.throws(() => new TokenService(cachingPolicy('deepseek', model, { mode: 'disabled' }, 'yes' as unknown as boolean), priced(model), hooks), /Invalid local model policy/);
 });
+
+test('C5 the connection probe switches reasoning off even when the policy asks for it', async () => {
+  await withCredentials(async store => {
+    const bodies: Record<string, unknown>[] = [];
+    const adapter = new DeepSeekAdapter(model, store, async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return Response.json(completion); });
+    const reasoningPolicy = policyFor({ mode: 'enabled', effort: 'high' });
+    const service = new TokenService(reasoningPolicy, pricesFor(), hooks, undefined, () => offPeakAt);
+    await service.execute(new ProviderProxy(), adapter, 'Reply OK.', signal(), 'a', 'System', undefined, true);
+    assert.deepEqual(bodies[0].thinking, { type: 'disabled' }, 'the probe must not pay for a chain of thought');
+    assert.equal('reasoning_effort' in bodies[0], false);
+    // Ordinary execution still obeys the policy the operator wrote.
+    await service.execute(new ProviderProxy(), adapter, 'Reply OK.', signal(), 'a', 'System');
+    assert.equal(bodies[1].reasoning_effort, 'high');
+    assert.equal('thinking' in bodies[1], false);
+    // A provider with no off switch keeps its policy: omitting the field would fall back to a
+    // costlier provider default instead of a cheaper one.
+    const openaiPolicy = policyFor({ mode: 'enabled', effort: 'minimal' });
+    openaiPolicy.models[model].provider = 'openai';
+    const seen: unknown[] = [];
+    const openaiService = new TokenService(openaiPolicy, pricesFor(), hooks, undefined, () => offPeakAt);
+    const openaiAdapter = { id: 'openai' as const, model, complete: async (_input: string, _signal: AbortSignal, options?: { thinking?: unknown }) => { seen.push(options?.thinking); return { text: 'Answer', usage: { prompt: 10, completion: 10, total: 20 } }; } };
+    await openaiService.execute(new ProviderProxy(), openaiAdapter, 'Reply OK.', signal(), 'a', 'System', undefined, true);
+    assert.deepEqual(seen[0], { mode: 'enabled', effort: 'minimal' });
+  });
+});
