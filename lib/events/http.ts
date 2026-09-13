@@ -14,11 +14,11 @@ export function eventStream(request: Request, bus: EventBus) {
       const encoder = new TextEncoder(); let closed = false;
       const raw = Number(request.headers.get('last-event-id') ?? 0);
       let cursor = Number.isSafeInteger(raw) && raw >= 0 ? raw : 0;
-      if (cursor > bus.snapshot().cursor) cursor = 0;
       const send = () => {
         if (closed) return;
         if ((controller.desiredSize ?? 0) <= 0) { cleanup(); controller.close(); return; }
-        const batch = bus.snapshot(cursor); cursor = batch.cursor;
+        // Every frame is the server-owned retained window. Clients replace their mirror verbatim.
+        const batch = bus.window(cursor); cursor = batch.cursor;
         controller.enqueue(encoder.encode(`id: ${cursor}\nevent: update\ndata: ${JSON.stringify(batch)}\n\n`));
       };
       const unsubscribe = bus.subscribe(send);

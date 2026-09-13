@@ -113,6 +113,13 @@ export class GraphService {
     if (from !== status) this.record(status === 'paused' ? 'agent.paused' : 'agent.status_changed', id, 'Agent status changed.', { status: { from, to: status } });
     this.emit('agent.updated', 'Agent status updated.');
   }
+  compareAndSetAgentStatus(id: string, expected: Agent['status'], status: Agent['status']) {
+    const agent = this.graph.agents.find(a => a.id === id);
+    if (!agent) throw new GraphError('Agent not found.');
+    if (agent.status !== expected) return false;
+    this.setAgentStatus(id, status);
+    return true;
+  }
   appendMockOutput(id: string, character: string, charge: boolean): boolean {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) throw new GraphError('Agent not found.');

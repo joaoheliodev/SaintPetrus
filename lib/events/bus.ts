@@ -1,5 +1,5 @@
 import { redact } from '../security/redact';
-import { eventTypes, isEventInput, type EventInput, type BusEvent, type EventBatch } from './types';
+import { eventTypes, isEventInput, type EventInput, type BusEvent, type EventBatch, type EventWindow } from './types';
 // Process-local, append-only sequence. Eviction removes old entries, never edits them.
 export class EventBus {
   private entries: BusEvent[] = [];
@@ -25,6 +25,16 @@ export class EventBus {
   }
   snapshot(after = 0): EventBatch {
     return { events: structuredClone(this.entries.filter(event => event.id > after).sort((a, b) => a.id - b.id)), cursor: this.cursor, prompt: this.prompt, completion: this.completion, truncated: after > 0 && after < Math.max(1, this.cursor - this.capacity + 1) - 1 };
+  }
+  window(previousCursor = 0): EventWindow {
+    const snapshot = this.snapshot();
+    const retainedFrom = snapshot.events[0]?.id ?? snapshot.cursor + 1;
+    return {
+      ...snapshot,
+      events: [...snapshot.events].reverse(),
+      authoritative: true,
+      truncated: previousCursor > snapshot.cursor || (previousCursor > 0 && previousCursor < retainedFrom - 1),
+    };
   }
   subscribe(listener: (event: BusEvent) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
 }

@@ -7,6 +7,7 @@ export type EventInput = {
 };
 export type BusEvent = EventInput & { id: number; timestamp: string; severity: 'info' | 'warning' | 'error' };
 export type EventBatch = { events: BusEvent[]; prompt: number; completion: number; cursor: number; truncated: boolean };
+export type EventWindow = EventBatch & { authoritative: true };
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const optionalString = (value: unknown) => value === undefined || typeof value === 'string';
 const isTokens = (value: unknown) => value === undefined || (record(value) && Number.isSafeInteger(value.prompt) && typeof value.prompt === 'number' && value.prompt >= 0 && Number.isSafeInteger(value.completion) && typeof value.completion === 'number' && value.completion >= 0);

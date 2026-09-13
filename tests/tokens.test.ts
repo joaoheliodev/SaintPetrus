@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { failureBillingVerdict, TokenService, type BillingVerdict } from '../lib/tokens/service';
 import type { TokenPolicy, Prices } from '../lib/tokens/config';
 import { fixedRatioTokenCounter } from '../lib/core/token-estimate';
@@ -183,6 +184,47 @@ test('RF-06 direct API cannot override limits, forge session or evade kill throu
     if (oldMock === undefined) delete process.env.SAINTPETRUS_MOCK; else process.env.SAINTPETRUS_MOCK = oldMock;
     if (oldProvider === undefined) delete process.env.SAINTPETRUS_PROVIDER; else process.env.SAINTPETRUS_PROVIDER = oldProvider;
   }
+});
+
+test('O4 resume changes only graph pauses owned and released by TokenService', async () => {
+  const previous = Reflect.get(globalThis, 'saintpetrusTokens');
+  runtime().mock.reset(); const graph = runtime().graph;
+  const child = graph.add({ name: 'Budget paused', provider: 'Unconfigured', context: { objective: 'Test token pause ownership.', summary: '', artifacts: [] } });
+  const superseded = graph.add({ name: 'Later blocked', provider: 'Unconfigured', context: { objective: 'Preserve a newer graph status.', summary: '', artifacts: [] } });
+  const f = fixture(1000);
+  const service = new TokenService(f.policy, f.prices, { ids: () => graph.snapshot().agents.map(agent => agent.id), pause: id => graph.setAgentStatus(id, 'paused'), pauseAll: () => graph.pauseAll() }, fixedRatioTokenCounter(1000), () => 0);
+  Reflect.set(globalThis, 'saintpetrusTokens', service);
+  const request = (data: unknown) => new Request('http://127.0.0.1:3000/api/tokens', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  try {
+    graph.setAgentStatus('root', 'paused');
+    service.setLimit('agent', child, 1);
+    await assert.rejects(service.execute(f.proxy, f.adapter, 'Question', signal(), child, 'System'), /reservation/);
+    service.setLimit('agent', superseded, 1);
+    await assert.rejects(service.execute(f.proxy, f.adapter, 'Question', signal(), superseded, 'System'), /reservation/);
+    assert.deepEqual(service.snapshot().paused, [child, superseded]);
+    service.setLimit('agent', child, 1000);
+    service.setLimit('agent', superseded, 1000);
+    graph.setAgentStatus(superseded, 'blocked');
+
+    const response = await controls(request({ action: 'resume' }));
+    assert.equal(response.status, 200);
+    const states = new Map(graph.snapshot().agents.map(agent => [agent.id, agent.status]));
+    assert.equal(states.get('root'), 'paused');
+    assert.equal(states.get(child), 'ready');
+    assert.equal(states.get(superseded), 'blocked');
+    assert.deepEqual(service.resume(), []);
+  } finally {
+    Reflect.set(globalThis, 'saintpetrusTokens', previous); runtime().mock.reset();
+  }
+});
+
+test('O4 token panel imports the owner contract and has one snapshot writer', () => {
+  const source = readFileSync(new URL('../components/token-panel.tsx', import.meta.url), 'utf8');
+  assert.match(source, /import type \{ TokenSnapshot \} from '\.\.\/lib\/tokens\/service'/);
+  assert.doesNotMatch(source, /type (Counts|RateBand|ModelPrice|Row|Reservation|Snapshot)\s*=/);
+  assert.equal(source.match(/setData\(/g)?.length, 1);
+  assert.match(source, /sequence === refreshSequence\.current/);
+  assert.match(source, /if \(!response\.ok\) throw new Error\(\); await refresh\(\);/);
 });
 
 test('RF-06 active reservations prevent concurrent budget oversubscription', async () => {

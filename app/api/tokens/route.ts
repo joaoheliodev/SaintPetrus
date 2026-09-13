@@ -20,8 +20,7 @@ export async function POST(request: Request) {
     else if (data.action === 'cost-limit') service.setCostLimit(String(data.scope), String(data.id), data.limit);
     else if (data.action === 'reconcile') service.reconcileReservation(String(data.reservationId), data.prompt, data.completion, data.costUsd);
     else if (data.action === 'resume') {
-      service.resume();
-      for (const agent of graphRuntime().graph.snapshot().agents) if (agent.status === 'paused' && !service.snapshot().paused.includes(agent.id)) graphRuntime().graph.setAgentStatus(agent.id, 'ready');
+      for (const id of service.resume()) graphRuntime().graph.compareAndSetAgentStatus(id, 'paused', 'ready');
     } else throw new Error();
     return safeJson(service.snapshot());
   } catch { return safeJson({ error: 'Token control rejected. Check scope, limits and unverifiable usage.' }, 400); }

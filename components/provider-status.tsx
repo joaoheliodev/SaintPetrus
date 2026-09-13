@@ -4,9 +4,32 @@ import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './ui/dialog';
 import type { ConnectionState, ProviderStatusSnapshot } from '../lib/providers/runtime';
 const keyedProviders = ['openai', 'gemini', 'deepseek'];
-type Status = ProviderStatusSnapshot & { mockAvailable?: boolean };
+type RefreshPriority = 'poll' | 'explicit';
+type ActiveRefresh = { priority: RefreshPriority; controller: AbortController; promise: Promise<void> };
+export function createProviderStatusRefresher(
+  load: (signal: AbortSignal) => Promise<ProviderStatusSnapshot>,
+  project: (status: ProviderStatusSnapshot) => void,
+) {
+  let active: ActiveRefresh | undefined;
+  return {
+    refresh(priority: RefreshPriority) {
+      if (active) {
+        if (priority === 'poll' || active.priority === 'explicit') return active.promise;
+        active.controller.abort();
+      }
+      const controller = new AbortController();
+      const request: ActiveRefresh = { priority, controller, promise: Promise.resolve() };
+      request.promise = load(controller.signal)
+        .then(next => { if (active === request && !controller.signal.aborted) project(next); })
+        .finally(() => { if (active === request) active = undefined; });
+      active = request;
+      return request.promise;
+    },
+    abort() { active?.controller.abort(); },
+  };
+}
 // "Connected" must mean a real call succeeded. A stored credential alone only earns "configured".
-const badges: Record<ConnectionState, (status: Status) => string> = {
+const badges: Record<ConnectionState, (status: ProviderStatusSnapshot) => string> = {
   verified: s => `● Connected · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
   rejected: s => `▲ Connection rejected · ${s.provider}`,
   configured: s => `◐ Configured, not verified · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
@@ -32,32 +55,30 @@ const configurationFailures: Record<string, string> = {
 };
 class ConfigurationFailure extends Error {}
 export function ProviderStatus() {
-  const [status, setStatus] = useState<Status>();
+  const [status, setStatus] = useState<ProviderStatusSnapshot>();
   const [result, setResult] = useState(''); const [pending, setPending] = useState(false);
   const [open, setOpen] = useState(false); const [provider, setProvider] = useState('openai');
   const [model, setModel] = useState(''); const [custom, setCustom] = useState('');
   const [show, setShow] = useState(false); const [remember, setRemember] = useState(false);
   // Uncontrolled, transient field: no credential in React state or browser storage.
   const keyField = useRef<HTMLInputElement>(null);
-  const mounted = useRef(false); const refreshController = useRef<AbortController>(null);
-  const refresh = useCallback(async () => {
-    refreshController.current?.abort();
-    const controller = new AbortController(); refreshController.current = controller;
-    try {
-      const response = await fetch('/api/provider', { cache: 'no-store', signal: controller.signal });
+  const mounted = useRef(false); const refresher = useRef<ReturnType<typeof createProviderStatusRefresher> | null>(null);
+  const refresh = useCallback((priority: RefreshPriority) => {
+    if (!refresher.current) refresher.current = createProviderStatusRefresher(async signal => {
+      const response = await fetch('/api/provider', { cache: 'no-store', signal });
       if (!response.ok) throw new Error('Provider status unavailable.');
-      const next: Status = await response.json();
-      if (mounted.current && refreshController.current === controller) setStatus(next);
-    } finally { if (refreshController.current === controller) refreshController.current = null; }
+      return response.json();
+    }, next => { if (mounted.current) setStatus(next); });
+    return refresher.current.refresh(priority);
   }, []);
   useEffect(() => {
     mounted.current = true; let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
-      try { await refresh(); }
+      try { await refresh('poll'); }
       catch { /* Do not display raw network errors. */ }
       if (mounted.current) timer = setTimeout(poll, 2000);
     };
-    void poll(); return () => { mounted.current = false; clearTimeout(timer); refreshController.current?.abort(); };
+    void poll(); return () => { mounted.current = false; clearTimeout(timer); refresher.current?.abort(); };
   }, [refresh]);
   function toggle(value: boolean) {
     if (keyField.current) keyField.current.value = '';
@@ -79,13 +100,13 @@ export function ProviderStatus() {
       const data = await response.json();
       throw new ConfigurationFailure(configurationFailures[data?.error] ?? 'Configuration failed. Check model/key; remembering requires an unlocked OS keyring.');
     }
-    await refresh();
+    await refresh('explicit');
   }
   // One minimal live call. Its outcome, not the presence of a key, is what the badge reports.
   async function verify(mocked: boolean) {
     const response = await fetch('/api/provider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test' }) });
     const data = await response.json();
-    await refresh();
+    await refresh('explicit');
     setResult(response.ok
       ? `${mocked ? 'Mock verified' : 'Connection verified'} · ${data.latencyMs} ms`
       : verificationMessage(response.status));

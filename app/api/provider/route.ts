@@ -5,13 +5,12 @@ import { configuredAdapter, providerProxy, providerStatus, recordVerification } 
 import { tokenService } from '@/lib/tokens/runtime';
 import { TokenFailure } from '@/lib/tokens/service';
 import { runtime as graphRuntime } from '@/lib/server/runtime';
-import { mockEnabled } from '@/lib/server/runtime';
 import { ProviderFailure } from '@/lib/providers/adapter';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   if (!localRequest(request, false)) return safeJson({ error: 'Local requests only.' }, 403);
-  return safeJson({ ...providerStatus(), mockAvailable: mockEnabled() });
+  return safeJson(providerStatus());
 }
 export async function POST(request: Request) {
   if (!localRequest(request, true)) return safeJson({ error: 'Same-origin local requests only.' }, 403);

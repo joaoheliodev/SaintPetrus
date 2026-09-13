@@ -1,4 +1,4 @@
-import { isGraph, isGraphEvent, type GraphEvent } from './orchestrator';
+import { isGraph, isGraphEvent, type Graph, type GraphEvent } from './orchestrator';
 
 export type GraphEventSource = {
   onopen: ((event: Event) => unknown) | null;
@@ -15,6 +15,20 @@ type Options = {
   pollMs?: number;
 };
 
+export function validatedGraph(value: unknown): Graph {
+  if (!isGraph(value)) throw new Error('Invalid graph snapshot.');
+  return value;
+}
+
+export function applyGraphCommandResponse(
+  value: unknown,
+  action: unknown,
+  apply: (event: GraphEvent) => Graph,
+): Graph {
+  const snapshot = validatedGraph(value);
+  return apply({ id: snapshot.revision, type: `command.${String(action)}`, message: 'Server accepted command.', snapshot });
+}
+
 export function startGraphSync({ createSource, fetchSnapshot, apply, unavailable, pollMs = 300 }: Options) {
   let disposed = false; let fallback = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -29,8 +43,7 @@ export function startGraphSync({ createSource, fetchSnapshot, apply, unavailable
     if (disposed || !fallback) return;
     const controller = new AbortController(); pollController = controller;
     try {
-      const snapshot = await fetchSnapshot(controller.signal);
-      if (!isGraph(snapshot)) throw new Error('Invalid graph snapshot.');
+      const snapshot = validatedGraph(await fetchSnapshot(controller.signal));
       if (!disposed && fallback) {
         apply({ id: snapshot.revision, type: 'graph.updated', message: 'Fallback snapshot received.', snapshot });
         unavailable(false);

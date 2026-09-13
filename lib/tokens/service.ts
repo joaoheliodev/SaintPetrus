@@ -64,14 +64,16 @@ export class TokenService {
   }
   kill() { this.stopped = true; this.hooks.ids().forEach(id => this.paused.add(id)); this.hooks.pauseAll(); }
   isStopped() { return this.stopped; }
-  resume(agent?: string) {
+  resume(agent?: string): string[] {
     this.expireReservations();
     if ([...this.rows.values()].some(row => row.unverifiable > 0)) throw new TokenFailure('Usage unverifiable; restart only after checking provider billing.');
     if (!agent) this.stopped = false;
+    const resumed: string[] = [];
     for (const id of agent ? [agent] : this.hooks.ids()) {
       const blocked = [...this.rows.values()].some(row => (row.scope === 'global' || row.scope === 'session' || (row.scope === 'agent' && row.id === id) || (row.scope === 'model' && this.agentModels.get(id)?.has(row.id))) && this.blocked(row));
-      if (!blocked) this.paused.delete(id);
+      if (!blocked && this.paused.delete(id)) resumed.push(id);
     }
+    return resumed;
   }
   reconcileReservation(id: string, prompt: unknown, completion: unknown, costUsd: unknown) {
     this.expireReservations();
@@ -205,3 +207,4 @@ export class TokenService {
     }
   }
 }
+export type TokenSnapshot = ReturnType<TokenService['snapshot']>;

@@ -26,7 +26,7 @@ If a build fails with an error the code does not explain, run `rm -rf node_modul
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 255 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it.
+The test count is a floor, not a target. It stands at 263 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff.
 
@@ -75,6 +75,18 @@ RF-03 and RF-04 are out of scope. Do not start them.
 Before writing new logic at any scale, look for an existing implementation and extend it. Search in proportion to the work: a quick look for something trivial, a real search before a subsystem.
 
 The §5.4 detectors and the RF-07 handoff come from `lib/core`. They are pure, dependency-free and already tested. Do not reimplement them elsewhere.
+
+## State ownership
+
+Read `docs/reference/state-ownership.md` before adding a producer, cache, fallback, reader precedence or client-side ordering for graph, connection, token or event state. Each domain has one server owner; readers keep only transient presentation state.
+
+## Reference decisions
+
+- Read `docs/reference/react-flow-node-identity.md` before changing React Flow node reconciliation or replacing `useNodesState` ownership.
+- Read `docs/reference/react-flow-minimap-sizing.md` before moving MiniMap dimensions between its `style` prop and CSS.
+- Read `docs/reference/reservation-expiry.md` before changing unresolved reservation expiry or reconciliation.
+- Read `docs/reference/deepseek-price-table.md` before adding or updating DeepSeek model or price configuration.
+- Read `docs/reference/connection-state.md` before changing credential, provider verification or connection-status semantics.
 
 ## Comments
 

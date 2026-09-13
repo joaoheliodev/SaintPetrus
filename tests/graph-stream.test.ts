@@ -6,7 +6,7 @@ import { graphRoutes, graphStream } from '../lib/server/graph-http';
 import { GraphService } from '../lib/server/graph-service';
 import { optionalEventRoutes } from '../lib/events/http';
 import { registerSecret } from '../lib/security/redact';
-import { startGraphSync, type GraphEventSource } from '../lib/graph-sync';
+import { applyGraphCommandResponse, startGraphSync, type GraphEventSource } from '../lib/graph-sync';
 import { createGraph, type Graph, type GraphEvent } from '../lib/orchestrator';
 import { useProjection } from '../lib/store';
 
@@ -96,4 +96,49 @@ test('graph sync rejects malformed stream events and fallback snapshots before p
     assert.equal(useProjection.getState().graph.revision, 5);
     assert.equal(useProjection.getState().graph.agents[0].context.objective, 'safe');
   } finally { stop(); }
+});
+
+test('graph command responses are validated before the revision guard sees them', () => {
+  useProjection.getState().hydrate(graphAt(5, 'safe'));
+  const malformed = { ...graphAt(99, 'poisoned'), agents: [] };
+
+  assert.throws(
+    () => applyGraphCommandResponse(malformed, 'move', event => useProjection.getState().apply(event)),
+    /Invalid graph snapshot/,
+  );
+  assert.equal(useProjection.getState().graph.revision, 5);
+  assert.equal(useProjection.getState().graph.agents[0].context.objective, 'safe');
+
+  const accepted = applyGraphCommandResponse(graphAt(6, 'accepted'), 'move', event => useProjection.getState().apply(event));
+  assert.ok(accepted);
+  assert.equal(accepted.revision, 6);
+  assert.equal(useProjection.getState().graph.agents[0].context.objective, 'accepted');
+});
+
+test('a stale command response cannot escape the projection revision guard', () => {
+  useProjection.getState().hydrate(graphAt(7, 'newest projection'));
+  let usedByCaller = '';
+
+  const stale = applyGraphCommandResponse(graphAt(6, 'stale command'), 'add', event => useProjection.getState().apply(event));
+  usedByCaller = stale.agents[0].context.objective;
+
+  assert.equal(stale.revision, 7);
+  assert.equal(usedByCaller, 'newest projection');
+  assert.equal(useProjection.getState().graph.revision, 7);
+  assert.equal(useProjection.getState().graph.agents[0].context.objective, 'newest projection');
+
+  const newer = applyGraphCommandResponse(graphAt(8, 'newer command'), 'add', event => useProjection.getState().apply(event));
+  if (newer) usedByCaller = newer.agents[0].context.objective;
+
+  assert.equal(newer?.revision, 8);
+  assert.equal(usedByCaller, 'newer command');
+  assert.equal(useProjection.getState().graph.agents[0].context.objective, 'newer command');
+});
+
+test('the projection owner retains accepted graph events newest first', () => {
+  useProjection.getState().hydrate(graphAt(5, 'safe'));
+  useProjection.getState().apply({ id: 6, type: 'graph.updated', message: 'Six', snapshot: graphAt(6, 'six') });
+  useProjection.getState().apply({ id: 7, type: 'graph.updated', message: 'Seven', snapshot: graphAt(7, 'seven') });
+
+  assert.deepEqual(useProjection.getState().events.map(event => event.id), [7, 6]);
 });

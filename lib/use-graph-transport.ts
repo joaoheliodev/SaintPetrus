@@ -2,7 +2,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useProjection } from './store';
 import type { Graph } from './orchestrator';
-import { startGraphSync } from './graph-sync';
+import { applyGraphCommandResponse, startGraphSync } from './graph-sync';
+
+const commandError = (value: unknown): string => {
+  if (value !== null && typeof value === 'object' && 'error' in value && typeof value.error === 'string') return value.error;
+  return 'Command rejected.';
+};
+
 export function useGraphTransport(initialGraph: Graph) {
   const [pending, setPending] = useState(false);
   useEffect(() => {
@@ -25,13 +31,12 @@ export function useGraphTransport(initialGraph: Graph) {
     setPending(true);
     try {
       const response = await fetch('/api/graph', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
-      const result = await response.json();
+      const result: unknown = await response.json();
       if (!response.ok) {
-        useProjection.setState({ notice: typeof result.error === 'string' ? result.error : 'Command rejected.' });
+        useProjection.setState({ notice: commandError(result) });
         return null;
       }
-      const snapshot = result as Graph;
-      useProjection.getState().apply({ id: snapshot.revision, type: `command.${input.action}`, message: 'Server accepted command.', snapshot });
+      const snapshot = applyGraphCommandResponse(result, input.action, event => useProjection.getState().apply(event));
       useProjection.setState({ notice: '' }); return snapshot;
     } catch {
       useProjection.setState({ notice: 'Local server unavailable. Command not confirmed.' }); return null;

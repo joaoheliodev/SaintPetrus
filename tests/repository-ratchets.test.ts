@@ -189,3 +189,20 @@ test('O2 Gitleaks suppressions stay on the shrinking justified allowlist', () =>
     assert.ok(metadata.reason.length > 20, `${path} needs a concrete suppression justification.`);
   }
 });
+
+const referenceDecisions = new Map<string, readonly string[]>([
+  ['react-flow-node-identity.md', ['adoptUserNodes', 'userNode === internals.userNode', 'measured', 'handleBounds', 'Do not simplify']],
+  ['react-flow-minimap-sizing.md', ['style?.width ?? 200', 'viewBox', 'style` prop', 'Do not simplify']],
+  ['reservation-expiry.md', ['unverifiable', 'dearest known model', '100% cache miss', 'Do not simplify']],
+  ['deepseek-price-table.md', ['operator', 'verifiedAt', 'must not transcribe', 'Do not simplify']],
+  ['connection-state.md', ['configured', 'verified', 'uncached connection test', 'Do not simplify']],
+]);
+
+for (const [file, evidence] of referenceDecisions) {
+  test(`O5 ${file} remains documented and anchored`, () => {
+    const path = `docs/reference/${file}`;
+    const document = read(path);
+    assert.ok(read('AGENTS.md').includes(path), `${path} must stay anchored from AGENTS.md.`);
+    for (const phrase of evidence) assert.ok(document.includes(phrase), `${path} lost required evidence: ${phrase}`);
+  });
+}
