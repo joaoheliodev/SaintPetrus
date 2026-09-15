@@ -12,7 +12,8 @@ export class TokenFailure extends Error {}
 type Totals = { prompt: number; completion: number; total: number };
 type Scope = 'global' | 'agent' | 'model' | 'session';
 export type BillingVerdict = 'unbilled' | 'billed' | 'unverifiable';
-type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costEstimateUsd: number; costEstimatedUsd: number; saved: number; unverifiable: number };
+// The USD ceiling reads costAccountedUsd; costUnmeasuredUsd is the part of it charged at reservation expiry and not yet confirmed.
+type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costAccountedUsd: number; costUnmeasuredUsd: number; saved: number; unverifiable: number };
 type Reservation = { id: string; agent: string; model: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[] };
 type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => string[]; role?: (id: string) => string };
 const failureVerdicts = {
@@ -33,12 +34,12 @@ export class TokenService {
   constructor(readonly policy: TokenPolicy, readonly prices: Prices, private readonly hooks: Hooks, private readonly counter: TokenCounter = heuristicTokenCounter, private readonly now = Date.now) { validateConfig(policy, prices); }
   private row(scope: Scope, id: string, limit: number, costLimitUsd: number) {
     const key = JSON.stringify([scope, id]); let row = this.rows.get(key);
-    if (!row) { row = { scope, id, limit, used: 0, reserved: 0, estimated: 0, conservativeCachedInput: 0, actual: zero(), mock: zero(), costLimitUsd, costReservedUsd: 0, costEstimateUsd: 0, costEstimatedUsd: 0, saved: 0, unverifiable: 0 }; this.rows.set(key, row); }
+    if (!row) { row = { scope, id, limit, used: 0, reserved: 0, estimated: 0, conservativeCachedInput: 0, actual: zero(), mock: zero(), costLimitUsd, costReservedUsd: 0, costAccountedUsd: 0, costUnmeasuredUsd: 0, saved: 0, unverifiable: 0 }; this.rows.set(key, row); }
     return row;
   }
   private scopes(agent: string, model: string) { return [this.row('global', 'all', this.policy.global, this.policy.costLimitsUsd.global), this.row('agent', agent, this.policy.perAgent, this.policy.costLimitsUsd.perAgent), this.row('model', model, this.policy.perModel, this.policy.costLimitsUsd.perModel), this.row('session', this.sessionId, this.policy.perSession, this.policy.costLimitsUsd.perSession)]; }
-  private blocked(row: Row) { return row.used + row.reserved >= row.limit || row.costEstimateUsd + row.costReservedUsd >= row.costLimitUsd; }
-  private warning(row: Row) { return row.used + row.reserved >= row.limit * .8 || row.costEstimateUsd + row.costReservedUsd >= row.costLimitUsd * .8; }
+  private blocked(row: Row) { return row.used + row.reserved >= row.limit || row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd; }
+  private warning(row: Row) { return row.used + row.reserved >= row.limit * .8 || row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd * .8; }
   private pause(id: string) { this.paused.add(id); this.hooks.pause(id); }
   private expireReservations() {
     const now = this.now();
@@ -52,8 +53,8 @@ export class TokenService {
         row.used += reservation.tokens;
         row.estimated += reservation.tokens;
         row.costReservedUsd = money(row.costReservedUsd - reservation.costUsd);
-        row.costEstimateUsd = money(row.costEstimateUsd + conservative);
-        row.costEstimatedUsd = money(row.costEstimatedUsd + conservative);
+        row.costAccountedUsd = money(row.costAccountedUsd + conservative);
+        row.costUnmeasuredUsd = money(row.costUnmeasuredUsd + conservative);
         row.unverifiable--;
       }
       // The converted figure replaces the held one so a later manual reconciliation subtracts what
@@ -84,8 +85,8 @@ export class TokenService {
     for (const row of reservation.rows) {
       row.used += total - reservation.tokens;
       row.estimated -= reservation.tokens;
-      row.costEstimateUsd = money(row.costEstimateUsd + costUsd - reservation.costUsd);
-      row.costEstimatedUsd = money(row.costEstimatedUsd - reservation.costUsd);
+      row.costAccountedUsd = money(row.costAccountedUsd + costUsd - reservation.costUsd);
+      row.costUnmeasuredUsd = money(row.costUnmeasuredUsd - reservation.costUsd);
       row.actual.prompt += prompt; row.actual.completion += completion; row.actual.total += total;
     }
     this.reservations.delete(id);
@@ -144,7 +145,7 @@ export class TokenService {
     const cached = !verification && reusable ? this.cache.get(hash) : undefined;
     if (cached && cached.expires > this.now()) { rows.forEach(row => { row.saved += cached.usage.total; }); return { provider: adapter.id, model: adapter.model, billingModel: cached.billingModel, mocked: adapter.id === 'mock', text: redactText(cached.text), latencyMs: 0, cached: true, usage: cached.usage, approximate: cached.approximate }; }
     const reservedTokens = inputEstimate + options.maxTokens;
-    if (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costEstimateUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd)) { this.pause(agent); this.refuse(agent, 'Preflight reservation exceeds token or monetary budget.'); }
+    if (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costAccountedUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd)) { this.pause(agent); this.refuse(agent, 'Preflight reservation exceeds token or monetary budget.'); }
     // Synchronous reservation across all four scopes happens before any provider I/O.
     rows.forEach(row => { row.reserved += reservedTokens; row.costReservedUsd = money(row.costReservedUsd + reservedCostUsd); });
     const reservation: Reservation = { id: `reservation-${++this.reservationSequence}`, agent, model: adapter.model, tokens: reservedTokens, costUsd: reservedCostUsd, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, createdAt, expiresAt: null, status: 'inflight', rows };
@@ -169,7 +170,7 @@ export class TokenService {
       if (!billingPrice) this.refuse(agent, 'Served model has no verified price; usage stays unverifiable until reconciled manually.');
       const actualCostUsd = reconciledCostUsd(billingPrice, usage, createdAt, responseAt);
       for (const row of rows) {
-        row.reserved -= reservedTokens; row.used += usage.total; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); row.costEstimateUsd = money(row.costEstimateUsd + actualCostUsd);
+        row.reserved -= reservedTokens; row.used += usage.total; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); row.costAccountedUsd = money(row.costAccountedUsd + actualCostUsd);
         const totals = approximate ? row.mock : row.actual;
         totals.prompt += usage.prompt; totals.completion += usage.completion; totals.total += usage.total;
         row.conservativeCachedInput += usage.cachedPromptFullRate ?? 0;

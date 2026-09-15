@@ -69,15 +69,15 @@ test('DeepSeek reconciles the reported cache split at the off-peak bands through
     assert.deepEqual(row.actual, { prompt: 24, completion: 12, total: 36 });
     assert.equal(row.reserved, 0); assert.equal(row.unverifiable, 0);
     const expected = (16 * .003 + 8 * .15 + 12 * .6) / 1e6;
-    assert.ok(Math.abs(row.costEstimateUsd - expected) < 1e-12, `${row.costEstimateUsd} != ${expected}`);
+    assert.ok(Math.abs(row.costAccountedUsd - expected) < 1e-12, `${row.costAccountedUsd} != ${expected}`);
     // Same token count, all cache miss, must cost the documented 50x more on the input side.
     const missService = new TokenService(policyFor({ mode: 'disabled' }), pricesFor(), hooks, undefined, () => offPeakAt);
     const missAdapter = new DeepSeekAdapter(model, store, async () => Response.json(cacheMiss));
     const missResult = await missService.execute(new ProviderProxy(), missAdapter, 'Reply OK.', signal(), 'a', 'Brief system prompt');
     assert.deepEqual(missResult.usage!.inputBreakdown, { cacheHit: 0, cacheMiss: 24 });
     const missRow = missService.snapshot().rows.find(item => item.scope === 'global')!;
-    assert.ok(Math.abs(missRow.costEstimateUsd - (24 * .15 + 12 * .6) / 1e6) < 1e-12);
-    assert.ok(missRow.costEstimateUsd - 12 * .6 / 1e6 > 49 * (row.costEstimateUsd - 12 * .6 / 1e6 - 8 * .15 / 1e6));
+    assert.ok(Math.abs(missRow.costAccountedUsd - (24 * .15 + 12 * .6) / 1e6) < 1e-12);
+    assert.ok(missRow.costAccountedUsd - 12 * .6 / 1e6 > 49 * (row.costAccountedUsd - 12 * .6 / 1e6 - 8 * .15 / 1e6));
   });
 });
 
@@ -147,7 +147,7 @@ test('DeepSeek prices by the model that answered, and a served model with no pri
     assert.equal(result.billingModel, served);
     assert.notEqual(result.billingModel, result.model);
     const row = priced.snapshot().rows.find(item => item.scope === 'global')!;
-    assert.ok(Math.abs(row.costEstimateUsd - (16 * .003 + 8 * .15 + 12 * .6) / 1e6) < 1e-12);
+    assert.ok(Math.abs(row.costAccountedUsd - (16 * .003 + 8 * .15 + 12 * .6) / 1e6) < 1e-12);
     assert.equal(row.unverifiable, 0);
     // The requested model is priced, the served one is not: the call happened and must not be
     // released as if it had been free.
@@ -361,15 +361,15 @@ test('An expired reservation converts at the dearest model in the table, not at 
   const row = service.snapshot().rows.find(item => item.scope === 'global')!;
   assert.equal(row.unverifiable, 0); assert.equal(row.reserved, 0); assert.equal(row.costReservedUsd, 0);
   // Peak rate, no cache hits, dearest model: eight times the cheap model's own peak figure.
-  assert.ok(Math.abs(row.costEstimatedUsd - held * 4) < 1e-12, `${row.costEstimatedUsd} is not the dearest model's cost`);
-  assert.ok(row.costEstimatedUsd > held, 'converting at the held figure would understate a reroute');
-  assert.equal(row.costEstimateUsd, row.costEstimatedUsd);
+  assert.ok(Math.abs(row.costUnmeasuredUsd - held * 4) < 1e-12, `${row.costUnmeasuredUsd} is not the dearest model's cost`);
+  assert.ok(row.costUnmeasuredUsd > held, 'converting at the held figure would understate a reroute');
+  assert.equal(row.costAccountedUsd, row.costUnmeasuredUsd);
   // Manual reconciliation must remove exactly what the conversion charged, not the held figure.
   const reservation = service.snapshot().reservations[0];
   service.reconcileReservation(reservation.id, 24, 12, 0.000002);
   const settled = service.snapshot().rows.find(item => item.scope === 'global')!;
-  assert.ok(Math.abs(settled.costEstimateUsd - 0.000002) < 1e-12, `${settled.costEstimateUsd} kept residue from the conversion`);
-  assert.equal(settled.costEstimatedUsd, 0);
+  assert.ok(Math.abs(settled.costAccountedUsd - 0.000002) < 1e-12, `${settled.costAccountedUsd} kept residue from the conversion`);
+  assert.equal(settled.costUnmeasuredUsd, 0);
 });
 
 test('An unparsed usage shape reports the field names it saw and none of their values', async () => {

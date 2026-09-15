@@ -40,7 +40,7 @@ test('Gemini fixture reconciles reported input, candidates plus thinking, total 
     assert.equal(calls, 1); assert.equal(result.approximate, false); assert.deepEqual(result.usage, { prompt: 17, completion: 7, total: 24, cachedPromptFullRate: 4, inputBreakdown: { cacheHit: 4, cacheMiss: 13 } });
     const row = service.snapshot().rows.find(r => r.scope === 'global')!;
     assert.deepEqual(row.actual, { prompt: 17, completion: 7, total: 24 }); assert.equal(row.reserved, 0); assert.equal(row.conservativeCachedInput, 4);
-    assert.ok(Math.abs(row.costEstimateUsd - .0000045) < 1e-12);
+    assert.ok(Math.abs(row.costAccountedUsd - .0000045) < 1e-12);
     const failed = new GeminiAdapter(configuredModel, store, async () => Response.json({ error: { message: secret.toString() } }, { status: 429 }));
     let error: unknown; try { await new ProviderProxy().execute(failed, 'Hi', new AbortController().signal); } catch (caught) { error = caught; }
     let log = ''; safeLog(error, text => { log = text; });
@@ -66,8 +66,8 @@ test('Gemini cached prompt tokens reconcile at the conservative full input rate'
   const row = service.snapshot().rows.find(item => item.scope === 'global')!;
   const freeCacheCost = ((usage.prompt - usage.cachedPromptFullRate) * .1 + usage.completion * .4) / 1e6;
   assert.equal(row.conservativeCachedInput, 4);
-  assert.ok(Math.abs(row.costEstimateUsd - (usage.prompt * .1 + usage.completion * .4) / 1e6) <= 1e-12);
-  assert.ok(row.costEstimateUsd >= freeCacheCost);
+  assert.ok(Math.abs(row.costAccountedUsd - (usage.prompt * .1 + usage.completion * .4) / 1e6) <= 1e-12);
+  assert.ok(row.costAccountedUsd >= freeCacheCost);
 });
 
 test('Gemini thinking policy rejects models without explicit zero-budget support', () => {

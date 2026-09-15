@@ -62,7 +62,7 @@ test('RF-06 reconciles actual usage, costs, 80% warning and 100% pause', async (
   await f.run();
   let row = f.service.snapshot().rows.find(row => row.scope === 'global')!;
   assert.deepEqual(row.actual, { prompt: 50, completion: 30, total: 80 }); assert.equal(row.reserved, 0); assert.equal(row.state, 'warning');
-  assert.equal(row.costEstimateUsd, (50 * 2 + 30 * 4) / 1e6);
+  assert.equal(row.costAccountedUsd, (50 * 2 + 30 * 4) / 1e6);
   await assert.rejects(f.run('Different'), /reservation/); assert.ok(f.paused.has('a'));
   const g = fixture(100); g.adapter.complete = async () => ({ text: 'Answer', usage: { prompt: 60, completion: 40, total: 100 } });
   await g.run(); row = g.service.snapshot().rows.find(row => row.scope === 'global')!;
@@ -98,7 +98,7 @@ test('RF-06 expired unverifiable reservation becomes conservative usage and rema
   await assert.rejects(f.run(), /timeout/);
   const pending = f.service.snapshot(); const reservation = pending.reservations[0];
   const before = pending.rows.map(row => row.used + row.reserved);
-  const costBefore = pending.rows.map(row => row.costEstimateUsd + row.costReservedUsd);
+  const costBefore = pending.rows.map(row => row.costAccountedUsd + row.costReservedUsd);
   assert.ok(reservation); assert.equal(reservation.tokens, 65); assert.equal(reservation.costUsd, 258 / 1e6);
 
   f.advance(99);
@@ -106,26 +106,26 @@ test('RF-06 expired unverifiable reservation becomes conservative usage and rema
   const affectedWithinTtl = withinTtl.rows.filter(row => row.reserved > 0);
   assert.equal(affectedWithinTtl.length, 4);
   assert.ok(affectedWithinTtl.every(row => row.used === 0 && row.reserved === reservation.tokens && row.unverifiable === 1));
-  assert.ok(affectedWithinTtl.every(row => row.costEstimateUsd === 0 && row.costReservedUsd === reservation.costUsd && row.costEstimatedUsd === 0));
+  assert.ok(affectedWithinTtl.every(row => row.costAccountedUsd === 0 && row.costReservedUsd === reservation.costUsd && row.costUnmeasuredUsd === 0));
   assert.throws(() => f.service.resume(), /unverifiable/);
 
   f.advance(1);
   assert.doesNotThrow(() => f.service.resume());
   const expired = f.service.snapshot();
   assert.deepEqual(expired.rows.map(row => row.used + row.reserved), before);
-  assert.deepEqual(expired.rows.map(row => row.costEstimateUsd + row.costReservedUsd), costBefore);
+  assert.deepEqual(expired.rows.map(row => row.costAccountedUsd + row.costReservedUsd), costBefore);
   const affectedExpired = expired.rows.filter(row => row.estimated > 0);
   assert.equal(affectedExpired.length, 4);
   assert.ok(affectedExpired.every(row => row.used === reservation.tokens && row.reserved === 0 && row.estimated === reservation.tokens && row.unverifiable === 0));
-  assert.ok(affectedExpired.every(row => row.costEstimateUsd === reservation.costUsd && row.costReservedUsd === 0 && row.costEstimatedUsd === reservation.costUsd));
+  assert.ok(affectedExpired.every(row => row.costAccountedUsd === reservation.costUsd && row.costReservedUsd === 0 && row.costUnmeasuredUsd === reservation.costUsd));
   assert.equal(expired.reservations[0]?.status, 'estimated');
 
   f.service.reconcileReservation(reservation.id, 10, 5, .25);
   const reconciled = f.service.snapshot(); const global = reconciled.rows.find(row => row.scope === 'global')!;
   assert.deepEqual(global.actual, { prompt: 10, completion: 5, total: 15 });
-  assert.equal(global.used, 15); assert.equal(global.estimated, 0); assert.equal(global.costEstimateUsd, .25);
-  assert.equal(global.costEstimatedUsd, 0); assert.equal(global.costReservedUsd, 0);
-  assert.ok(reconciled.rows.filter(row => row.actual.total === 15).every(row => row.costEstimateUsd === .25 && row.costEstimatedUsd === 0));
+  assert.equal(global.used, 15); assert.equal(global.estimated, 0); assert.equal(global.costAccountedUsd, .25);
+  assert.equal(global.costUnmeasuredUsd, 0); assert.equal(global.costReservedUsd, 0);
+  assert.ok(reconciled.rows.filter(row => row.actual.total === 15).every(row => row.costAccountedUsd === .25 && row.costUnmeasuredUsd === 0));
   assert.equal(reconciled.reservations.length, 0);
   assert.throws(() => f.service.reconcileReservation(reservation.id, 10, 5, .25), /Unknown/);
   assert.throws(() => f.service.reconcileReservation('missing', -1, 5, 0), /Invalid/);
@@ -134,7 +134,7 @@ test('RF-06 expired unverifiable reservation becomes conservative usage and rema
   for (const code of ['unauthorized', 'insufficient_balance', 'rate_limited'] as const) {
     const rejected = fixture(); rejected.adapter.complete = async () => { throw new ProviderFailure(code); };
     await assert.rejects(rejected.run(), new RegExp(code)); rejected.advance(1000);
-    assert.ok(rejected.service.snapshot().rows.every(row => row.used === 0 && row.reserved === 0 && row.unverifiable === 0 && row.costReservedUsd === 0 && row.costEstimateUsd === 0));
+    assert.ok(rejected.service.snapshot().rows.every(row => row.used === 0 && row.reserved === 0 && row.unverifiable === 0 && row.costReservedUsd === 0 && row.costAccountedUsd === 0));
     assert.equal(rejected.service.snapshot().reservations.length, 0);
   }
 });
@@ -265,14 +265,27 @@ test('D2 monetary usage alone drives warning and hard stop', async () => {
   warning.adapter.complete = async () => ({ text: 'Answer', usage: { prompt: 26, completion: 26, total: 52 } });
   await warning.run();
   let row = warning.service.snapshot().rows.find(item => item.scope === 'global')!;
-  assert.equal(row.used, 52); assert.equal(row.costEstimateUsd, 52); assert.equal(row.state, 'warning'); assert.equal(warning.paused.has('a'), false);
+  assert.equal(row.used, 52); assert.equal(row.costAccountedUsd, 52); assert.equal(row.state, 'warning'); assert.equal(warning.paused.has('a'), false);
 
   const stopped = fixture(1000); stopped.policy.costLimitsUsd = costLimits(1000); stopped.prices.models['test-model'] = modelPrice(1_000_000, 1_000_000, 1_000_000);
   stopped.service.setCostLimit('global', 'all', 65);
   stopped.adapter.complete = async () => ({ text: 'Answer', usage: { prompt: 1, completion: 64, total: 65 } });
   await stopped.run();
   row = stopped.service.snapshot().rows.find(item => item.scope === 'global')!;
-  assert.equal(row.costEstimateUsd, 65); assert.equal(row.state, 'stopped'); assert.ok(stopped.paused.has('a'));
+  assert.equal(row.costAccountedUsd, 65); assert.equal(row.state, 'stopped'); assert.ok(stopped.paused.has('a'));
+});
+
+test('P2 preflight adds a new reservation to the accounted cost, not to its unmeasured part', async () => {
+  const f = fixture(1000); f.policy.costLimitsUsd = costLimits(1000); f.prices.models['test-model'] = modelPrice(1_000_000, 1_000_000, 1_000_000);
+  f.service.setCostLimit('global', 'all', 100);
+  let adapterCalls = 0;
+  f.adapter.complete = async () => { adapterCalls++; return { text: 'Answer', usage: { prompt: 1, completion: 39, total: 40 } }; };
+  await f.run();
+  let row = f.service.snapshot().rows.find(item => item.scope === 'global')!;
+  assert.equal(row.costAccountedUsd, 40); assert.equal(row.costUnmeasuredUsd, 0); assert.equal(row.costReservedUsd, 0); assert.equal(row.state, 'available'); assert.equal(f.paused.has('a'), false);
+  await assert.rejects(f.service.execute(new ProviderProxy(), f.adapter, 'Other', signal(), 'a', 'System'), /Preflight reservation exceeds/);
+  row = f.service.snapshot().rows.find(item => item.scope === 'global')!;
+  assert.equal(adapterCalls, 1); assert.equal(row.costAccountedUsd, 40); assert.equal(row.costReservedUsd, 0); assert.ok(f.paused.has('a'));
 });
 
 test('D2 TokenService reconciliation passes actual cache split and both call timestamps', async () => {
@@ -284,7 +297,7 @@ test('D2 TokenService reconciliation passes actual cache split and both call tim
     const service = new TokenService(policy, prices, { ids: () => ['a'], pause: () => {}, pauseAll: () => {} }, fixedRatioTokenCounter(1000), () => now);
     const adapter: ProviderAdapter = { id: 'openai', model: 'test-model', complete: async () => { now = responseAt; return { text: 'Answer', usage: { prompt: 1_000_000, completion: 0, total: 1_000_000, inputBreakdown: { cacheHit: 500_000, cacheMiss: 500_000 } } }; } };
     await service.execute(new ProviderProxy(), adapter, 'Question', signal(), 'a', 'System');
-    return service.snapshot().rows.find(row => row.scope === 'global')!.costEstimateUsd;
+    return service.snapshot().rows.find(row => row.scope === 'global')!.costAccountedUsd;
   };
   const monday = (hour: number, minute: number) => Date.UTC(2026, 8, 7, hour, minute);
   assert.equal(await executeAcross(monday(0, 59), monday(1, 1)), 51);
@@ -343,7 +356,7 @@ test('P1 prices without expiresAt keep the same usage and cost across the year b
     assert.deepEqual(result.usage, { prompt: 10, completion: 10, total: 20 });
     assert.equal(f.calls(), 1);
     const row = f.service.snapshot().rows.find(item => item.scope === 'global')!;
-    assert.equal(row.costEstimateUsd, 60 / 1e6);
+    assert.equal(row.costAccountedUsd, 60 / 1e6);
     assert.equal(row.reserved, 0);
   }
 });
