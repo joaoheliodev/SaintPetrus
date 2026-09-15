@@ -60,3 +60,10 @@
 14:44 | PREVIEW | final disabled-server check | main 200; events/artifacts/preview 404; preview port absent; directory and full-history Gitleaks clean
 23:13 | GEMINI-1A | official API/pricing/model research and implementation | same proxy; thinking counted as output; retired 1.5/2.0 models documented; OpenAI unchanged
 23:13 | GEMINI-1A | verification | 212 tests, lint, both typechecks and build passed; fixture and API path synthetic; real validation pending key in UI
+13:40 | 2026-09-15 price-schema baseline | created night/price-schema from clean night/orca; read permanent rules and pricing references | implementation not started
+13:40 | 2026-09-15 price-schema recovery | fresh npm ci completed; prior dependencies/cache retained under ignored node_modules recovery directory | lint and both typechecks pass; build still fails: Could not parse output from TypeScript's --showConfig.
+13:40 | 2026-09-15 price-schema diagnostics | minimal compiler subprocess reproduction | spawn exit 0 with empty stdout/stderr; spawnSync /usr/bin/node EPERM; exact policy not established
+13:40 | 2026-09-15 price-schema gate | direct full suite 279 passed; no shim or provider call | build gate blocked; HANDOFF-PRICE-SCHEMA.md records pending tasks; no code change or commit
+13:55 | 2026-09-15 price-schema operator decision | agent gate is lint, both typechecks and tests; operator owns each boundary build | baseline build confirmed by operator; sandbox EPERM is not a source failure; no shim or further dependency recovery
+13:55 | 2026-09-15 price-schema P1 | optional strict expiresAt and exclusive UTC cutoff; preflight covers reservation TTL; expired response retains unresolved usage | 286 tests and revised gate passed; 6 mutations killed and restored; operator build and commit pending; stop before P2
+16:23 | 2026-09-15 price-schema handoff | operator authorized committing and pushing current P1 on night/price-schema for Claude Code | revised gate rerun passed; build remains operator-owned and not verified by agent; no work beyond P1

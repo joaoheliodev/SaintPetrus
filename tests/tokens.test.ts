@@ -302,6 +302,88 @@ test('D2 missing model price fails closed before provider I/O or reservation', a
   assert.ok(service.snapshot().rows.every(row => row.reserved === 0 && row.costReservedUsd === 0));
 });
 
+test('P1 expired prices refuse before provider I/O and leave all reservation scopes empty', async () => {
+  for (const elapsed of [0, 1, 86_400_000]) {
+    const f = fixture();
+    f.prices.models['test-model'] = { ...f.prices.models['test-model'], expiresAt: '2027-01-01' };
+    f.advance(Date.UTC(2027, 0, 1) + elapsed);
+    await assert.rejects(f.run(), /price.*expired/);
+    assert.equal(f.calls(), 0);
+    const snapshot = f.service.snapshot();
+    assert.equal(snapshot.reservations.length, 0);
+    assert.ok(snapshot.rows.every(row => row.used === 0 && row.reserved === 0 && row.costReservedUsd === 0 && row.unverifiable === 0));
+  }
+});
+
+test('P1 preflight requires the price to outlive the configured reservation TTL', async () => {
+  for (const ttl of [100, 60_000, 300_000]) {
+    for (const offset of [-1, 0, 1]) {
+      const f = fixture();
+      f.policy.reservationTtlMs = ttl;
+      f.prices.models['test-model'] = { ...f.prices.models['test-model'], expiresAt: '2027-01-01' };
+      f.advance(Date.UTC(2027, 0, 1) - ttl + offset);
+      if (offset < 0) {
+        await f.run();
+        assert.equal(f.calls(), 1);
+        assert.equal(f.service.snapshot().rows.find(row => row.scope === 'global')!.actual.total, 20);
+      } else {
+        await assert.rejects(f.run(), /price.*expired/);
+        assert.equal(f.calls(), 0);
+        assert.ok(f.service.snapshot().rows.every(row => row.reserved === 0 && row.costReservedUsd === 0));
+      }
+    }
+  }
+});
+
+test('P1 prices without expiresAt keep the same usage and cost across the year boundary', async () => {
+  for (const now of [Date.UTC(2026, 11, 31, 23, 59, 59), Date.UTC(2027, 0, 1), Date.UTC(2099, 0, 1)]) {
+    const f = fixture();
+    f.advance(now);
+    const result = await f.run();
+    assert.deepEqual(result.usage, { prompt: 10, completion: 10, total: 20 });
+    assert.equal(f.calls(), 1);
+    const row = f.service.snapshot().rows.find(item => item.scope === 'global')!;
+    assert.equal(row.costEstimateUsd, 60 / 1e6);
+    assert.equal(row.reserved, 0);
+  }
+});
+
+test('P1 an expired price cannot be reused through the response cache', async () => {
+  const f = fixture();
+  const end = Date.UTC(2027, 0, 1);
+  f.policy.reservationTtlMs = 1;
+  f.prices.models['test-model'] = { ...f.prices.models['test-model'], expiresAt: '2027-01-01' };
+  f.advance(end - 2);
+  await f.run();
+  f.advance(2);
+  await assert.rejects(f.run(), /price.*expired/);
+  assert.equal(f.calls(), 1);
+  assert.equal(f.service.snapshot().rows.find(row => row.scope === 'global')!.saved, 0);
+});
+
+test('P1 a response arriving after price expiration retains unresolved usage until manual reconciliation', async () => {
+  const f = fixture();
+  f.prices.models['test-model'] = { ...f.prices.models['test-model'], expiresAt: '2027-01-01' };
+  f.advance(Date.UTC(2027, 0, 1) - f.policy.reservationTtlMs - 1);
+  const complete = f.adapter.complete;
+  f.adapter.complete = async (...args) => {
+    f.advance(f.policy.reservationTtlMs + 1);
+    return complete(...args);
+  };
+  await assert.rejects(f.run(), /expired/);
+  assert.equal(f.calls(), 1);
+  const snapshot = f.service.snapshot();
+  assert.equal(snapshot.reservations[0]?.status, 'unverifiable');
+  assert.equal(snapshot.rows.find(row => row.scope === 'global')!.actual.total, 0);
+  assert.ok(f.paused.has('a'));
+  f.advance(f.policy.reservationTtlMs);
+  const expired = f.service.snapshot().reservations[0];
+  assert.equal(expired.status, 'estimated');
+  assert.equal(expired.costUsd, 258 / 1e6);
+  f.service.reconcileReservation(expired.id, 10, 10, 60 / 1e6);
+  assert.equal(f.service.snapshot().reservations.length, 0);
+});
+
 test('RF-06 resume cannot erase exhaustion; model allowlist rejects before dispatch', async () => {
   const f = fixture(0); await assert.rejects(f.run(), /exhausted/); f.service.resume(); await assert.rejects(f.run(), /paused/);
   assert.equal(f.calls(), 0);

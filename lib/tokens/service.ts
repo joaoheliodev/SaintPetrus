@@ -138,8 +138,8 @@ export class TokenService {
     const createdAt = this.now();
     const inputEstimate = this.counter.count(JSON.stringify({ systemPrompt: options.systemPrompt, messages: options.messages }));
     let reservedCostUsd: number;
-    try { reservedCostUsd = preflightCostUsd(price, inputEstimate, options.maxTokens, createdAt); }
-    catch { this.refuse(agent, 'Model price unavailable or not yet effective.'); }
+    try { reservedCostUsd = preflightCostUsd(price, inputEstimate, options.maxTokens, createdAt, this.policy.reservationTtlMs); }
+    catch { this.refuse(agent, 'Model price unavailable, not yet effective, expired or expires within reservation TTL.'); }
     const reusable = reproducible(model, requestedThinking);
     const cached = !verification && reusable ? this.cache.get(hash) : undefined;
     if (cached && cached.expires > this.now()) { rows.forEach(row => { row.saved += cached.usage.total; }); return { provider: adapter.id, model: adapter.model, billingModel: cached.billingModel, mocked: adapter.id === 'mock', text: redactText(cached.text), latencyMs: 0, cached: true, usage: cached.usage, approximate: cached.approximate }; }

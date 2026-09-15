@@ -45,3 +45,23 @@ test('D2 price validation rejects inactive, malformed and non-worst-case configu
   assert.equal(validateModelPrice({ ...price, offPeak: { ...price.offPeak, inputCacheHitPerMillion: 51 } }), false);
   assert.equal(validateModelPrice({ ...price, peak: { ...price.peak, outputPerMillion: 9 } }), false);
 });
+
+test('P1 expiresAt is optional and must be a strict UTC calendar date after effectiveAt', () => {
+  assert.equal(validateModelPrice(price), true);
+  for (const expiresAt of ['2027-01-01', '2028-02-29']) {
+    assert.equal(validateModelPrice({ ...price, expiresAt }), true, expiresAt);
+  }
+  for (const expiresAt of [null, undefined, 2027, '', '2027-1-1', '2027-02-29', '2027-04-31', '2027-01-01T00:00:00Z', ' 2027-01-01', price.effectiveAt, '2026-08-31']) {
+    assert.equal(validateModelPrice({ ...price, expiresAt }), false, String(expiresAt));
+  }
+});
+
+test('P1 pricing rejects expiration at either end of the request/response interval', () => {
+  const expiring = { ...price, expiresAt: '2027-01-01' };
+  const end = Date.UTC(2027, 0, 1);
+  const usage = { prompt: 1_000_000, completion: 0 };
+  assert.equal(reconciledCostUsd(expiring, usage, end - 2, end - 1), 50);
+  assert.throws(() => preflightCostUsd(expiring, 1, 1, end), /expired/);
+  assert.throws(() => reconciledCostUsd(expiring, usage, end - 1, end), /expired/);
+  assert.throws(() => reconciledCostUsd(expiring, usage, end, end + 1), /expired/);
+});

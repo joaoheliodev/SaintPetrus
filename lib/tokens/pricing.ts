@@ -13,6 +13,7 @@ export type UtcPeakWindow = {
 export type ModelPrice = {
   effectiveAt: string;
   verifiedAt: string;
+  expiresAt?: string;
   peakWindowsUtc: UtcPeakWindow[];
   offPeak: RateBand;
   peak: RateBand;
@@ -54,6 +55,7 @@ function validWindow(value: unknown): value is UtcPeakWindow {
 
 export function validateModelPrice(value: unknown): value is ModelPrice {
   if (!record(value) || !validDate(value.effectiveAt) || !validDate(value.verifiedAt)
+    || ('expiresAt' in value && (!validDate(value.expiresAt) || value.expiresAt <= value.effectiveAt))
     || !Array.isArray(value.peakWindowsUtc) || !value.peakWindowsUtc.every(validWindow)
     || !validBand(value.offPeak) || !validBand(value.peak)) return false;
   if (value.peak.inputCacheHitPerMillion < value.offPeak.inputCacheHitPerMillion
@@ -65,6 +67,9 @@ export function validateModelPrice(value: unknown): value is ModelPrice {
 function requireActivePrice(price: ModelPrice, at: number) {
   if (!validateModelPrice(price) || !Number.isFinite(at) || Date.parse(`${price.effectiveAt}T00:00:00.000Z`) > at) {
     throw new Error('Model price unavailable or not yet effective.');
+  }
+  if (price.expiresAt !== undefined && at >= Date.parse(`${price.expiresAt}T00:00:00.000Z`)) {
+    throw new Error('Model price expired.');
   }
 }
 
@@ -78,8 +83,11 @@ function bandCost(band: RateBand, cacheHit: number, cacheMiss: number, completio
   return roundCostUp((cacheHit * band.inputCacheHitPerMillion + cacheMiss * band.inputCacheMissPerMillion + completion * band.outputPerMillion) / 1_000_000);
 }
 
-export function preflightCostUsd(price: ModelPrice, inputTokens: number, maximumOutputTokens: number, requestAt: number) {
+export function preflightCostUsd(price: ModelPrice, inputTokens: number, maximumOutputTokens: number, requestAt: number, reservationTtlMs = 0) {
   requireActivePrice(price, requestAt);
+  if (!Number.isSafeInteger(reservationTtlMs) || reservationTtlMs < 0) throw new Error('Invalid reservation TTL.');
+  // No successor rate exists to reconcile a response after this price expires.
+  requireActivePrice(price, requestAt + reservationTtlMs);
   // Preflight deliberately assumes the two independent worst cases: peak rates and no cache hits.
   return bandCost(price.peak, 0, inputTokens, maximumOutputTokens);
 }
@@ -105,6 +113,7 @@ function intervalTouchesPeak(price: ModelPrice, requestAt: number, responseAt: n
 
 export function reconciledCostUsd(price: ModelPrice, usage: PriceUsage, requestAt: number, responseAt: number) {
   requireActivePrice(price, requestAt);
+  requireActivePrice(price, responseAt);
   if (![requestAt, responseAt].every(Number.isFinite) || !tokenCount(usage.prompt) || !tokenCount(usage.completion)) throw new Error('Invalid usage for cost calculation.');
   const split = usage.inputBreakdown ?? { cacheHit: 0, cacheMiss: usage.prompt };
   if (!tokenCount(split.cacheHit) || !tokenCount(split.cacheMiss) || split.cacheHit + split.cacheMiss !== usage.prompt) throw new Error('Invalid cache usage for cost calculation.');
