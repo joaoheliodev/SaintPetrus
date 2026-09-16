@@ -1,11 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { failureBillingVerdict, TokenService, type BillingVerdict } from '../lib/tokens/service';
+import { failureBillingVerdict, TokenFailure, TokenService, type BillingVerdict } from '../lib/tokens/service';
 import type { TokenPolicy, Prices } from '../lib/tokens/config';
 import { fixedRatioTokenCounter } from '../lib/core/token-estimate';
 import { ProviderProxy } from '../lib/providers/proxy';
 import { ProviderFailure, providerFailureCodes, type ProviderAdapter, type ProviderFailureCode, type RequestOptions } from '../lib/providers/adapter';
+import { openAIErrorCode } from '../lib/providers/openai';
+import { geminiErrorCode } from '../lib/providers/gemini';
+import { deepseekErrorCode } from '../lib/providers/deepseek';
 import { POST as providerPost } from '../app/api/provider/route';
 import { POST as controls } from '../app/api/tokens/route';
 import { POST as graphPost } from '../app/api/graph/route';
@@ -45,6 +48,32 @@ test('O3 assigns every provider failure code exactly one billing verdict', async
     assert.deepEqual(snapshot.reservations.map(item => item.status), verdict === 'unverifiable' ? ['unverifiable'] : [], code);
   }
   assert.equal(failureBillingVerdict(new Error('lost contact')), 'unverifiable');
+});
+
+test('C2 local refusal codes cannot fire while a reservation is live', async () => {
+  const localRefusals: ProviderFailureCode[] = ['disabled', 'invalid_model_format', 'model_not_allowlisted'];
+  const cases: { code: ProviderFailureCode; id: string; model: string }[] = [
+    { code: 'invalid_model_format', id: 'openai', model: 'not a model id' },
+    { code: 'model_not_allowlisted', id: 'openai', model: 'unlisted-model' },
+    { code: 'model_not_allowlisted', id: 'gemini', model: 'test-model' },
+    { code: 'disabled', id: 'retired-provider', model: 'test-model' },
+  ];
+  assert.deepEqual([...new Set(cases.map(item => item.code))].sort(), [...localRefusals].sort());
+  for (const { code, id, model } of cases) {
+    const f = fixture(); let calls = 0;
+    const adapter: ProviderAdapter = { ...JSON.parse(JSON.stringify({ id, model })), complete: async () => { calls++; throw new ProviderFailure(code); } };
+    const refusal = await f.service.execute(f.proxy, adapter, 'Question', signal(), 'a', 'System').then(() => undefined, (error: unknown) => error);
+    const snapshot = f.service.snapshot();
+    assert.equal(calls, 0, code); assert.equal(f.paused.has('a'), false, code); assert.deepEqual(snapshot.reservations, [], code);
+    assert.ok(snapshot.rows.every(row => row.reserved === 0 && row.costReservedUsd === 0 && row.unverifiable === 0), code);
+    assert.ok(refusal instanceof TokenFailure && /not allowlisted/.test(refusal.message), code);
+    assert.equal(failureBillingVerdict(new ProviderFailure(code)), 'unverifiable', code);
+  }
+  const f = fixture(); const hooks = { ids: () => ['a'], pause: () => {}, pauseAll: () => {} };
+  const policyWith = (model: string, provider: string): TokenPolicy => JSON.parse(JSON.stringify({ ...f.policy, models: { [model]: { ...f.policy.models['test-model'], provider } } }));
+  assert.throws(() => new TokenService(policyWith('not a model id', 'openai'), f.prices, hooks), /Invalid local model policy/);
+  assert.throws(() => new TokenService(policyWith('test-model', 'retired-provider'), f.prices, hooks), /Invalid local model policy/);
+  for (const translate of [openAIErrorCode, geminiErrorCode, deepseekErrorCode]) for (let status = 100; status < 600; status++) assert.ok(!localRefusals.includes(translate(status)), `${translate.name}(${status})`);
 });
 
 test('RF-06 reserves before dispatch and enforces each of four scopes', async () => {

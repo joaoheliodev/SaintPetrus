@@ -16,6 +16,8 @@ export type BillingVerdict = 'unbilled' | 'billed' | 'unverifiable';
 type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costAccountedUsd: number; costUnmeasuredUsd: number; saved: number; unverifiable: number };
 type Reservation = { id: string; agent: string; model: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[] };
 type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => string[]; role?: (id: string) => string };
+// disabled, invalid_model_format and model_not_allowlisted are local refusals that bill nothing, yet stay unverifiable: a test
+// proves none can fire with a live reservation, and unbilled would silently free a hold if one ever fired after provider contact.
 const failureVerdicts = {
   unconfigured: 'unbilled', disabled: 'unverifiable', invalid_request: 'unbilled', invalid_model_format: 'unverifiable', model_not_allowlisted: 'unverifiable', unauthorized: 'unbilled', insufficient_balance: 'unbilled', not_found: 'unbilled', rate_limited: 'unbilled', upstream: 'unverifiable', timeout: 'unverifiable', cancelled: 'unverifiable', busy: 'unbilled',
 } satisfies Record<ProviderFailureCode, Exclude<BillingVerdict, 'billed'>>;

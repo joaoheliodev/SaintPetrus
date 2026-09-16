@@ -1,59 +1,48 @@
 # SaintPetrus — current status
 
-Branch: `night/m0-m2`. Remote repository: `joaoheliodev/SaintPetrus`.
+Branch: `night/price-schema`, a linear continuation of `night/m0-m2`, `night/deepseek` and `night/orca`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`; timestamped events live in the append-only `NIGHT-LOG.md`.
 
-## Gemini step 1A / 1B
+## Verified in round C (2026-09-15)
 
-Step 1A implemented: GeminiAdapter uses the existing ProviderProxy and RF-06 TokenService, with UI and terminal credential configuration. OpenAI adapter unchanged (verified by git diff). Endpoint: fixed Google generateContent API; key only in x-goog-api-key backend header; no query credential, redirects or raw error passthrough.
+Run on this tree without any API key: lint, the app ES2017 and core ES2022 typechecks, 292 tests in 29 suites and the production build passed, as they did after every task in the round, and directory and full-history Gitleaks scans found no leaks. No provider request was made, including `GET /models`.
 
-Documented mapping: promptTokenCount → prompt; candidatesTokenCount + thoughtsTokenCount → completion; totalTokenCount → total. Required numeric counts and exact equality checked. `cachedContentTokenCount` is already included in prompt and now becomes the explicit cache-hit part of dimensional pricing. Nonzero tool usage remains rejected. Valid zero-text responses retain usage. Gemini uses non-streaming generateContent in this step; preview gets the completed output.
+The suite covers the delivered behavior below with synthetic fixtures only. Browser checks and the results of earlier rounds are historical evidence from the commits and handoffs that delivered them, and were not repeated.
 
-Prepared model: gemini-2.5-flash-lite, global 1024 tokens, maxOutputTokens 64, cache off, persistence off by default. Thinking behavior is declared through the provider-neutral policy and Gemini accepts only explicit disabled thinking in this milestone. Models that require thinking are rejected during policy validation. An empty `MAX_TOKENS` response is returned as `output_limit`, keeps and charges provider usage, records an incomplete verification state, and never displays the connected badge. Gemini 1.5 models and 2.0 Flash requested initially are retired according to official changelog/deprecation pages; they are not exposed as working allowlisted models. Model/account availability remains unverified.
+## Delivered
 
-Prices checked 2026-09-07 at https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite : standard paid text input USD 0.10/M, output including thinking USD 0.40/M. Free tier can cost zero if eligible; usageMetadata does not prove the billing tier. UI cost is a configured-rate estimate based on reported usage, not an invoice.
+- **Workspace, credentials and proxy (M0–M2, RF-01).** Loopback server, memory-only credentials with opt-in OS-keyring encryption, and a provider proxy that owns the timeout, the single active request and redaction.
+- **Core integration.** The §5.4 detectors and the RF-07 handoff come from `lib/core`, which typechecks on its own.
+- **Token and USD budgets (RF-06).** Global, agent, model and session scopes. Preflight reserves at peak with no cache hits before provider I/O, reconciliation prices the served model with the reported cache split, and unresolved reservations expire into conservative usage that accepts manual reconciliation.
+- **Event feed and artifact preview.** Both off by default (`SAINTPETRUS_FEED`, `SAINTPETRUS_PREVIEW`). The preview runs generated code in a script-only sandbox under CSP; its Chromium isolation check passed on 2026-09-07 and is reproducible with `npm run test:browser`.
+- **Providers.** OpenAI Responses, Gemini `generateContent`, DeepSeek with its own adapter and strict usage parser, and the mock. Status mapping lives in each adapter, thinking capabilities in one table, and chain of thought stays out of context, events, previews and artifacts.
+- **Repository discipline (Orca O1–O5).** `AGENTS.md`, ratchet tests, exhaustive `unbilled | billed | unverifiable` verdicts, one server owner per state and anchored reference decisions.
+- **Price schema.** Optional `expiresAt` with a preflight horizon covering the reservation TTL (P1); the enforced total `costAccountedUsd` named apart from its unmeasured part `costUnmeasuredUsd` (P2).
+- **Round C.** Orphan permanent rules moved into `AGENTS.md`, local refusal verdicts proven unreachable with a live reservation, and the deferred price dimensions and first real call protocol documented.
 
-The synthetic fixture proves 17 prompt + 2 candidate + 5 thinking = 24 total, completion 7; full configure/execute/disconnect API path is also tested. The fixture is explicitly labeled synthetic, with official schema source. No live response has been captured.
+## Not verified or pending
 
-Step 1B NOT EXECUTED: awaiting Gemini key entered via RF-01 with Remember unchecked and Connect only. Pending: one successful minimal real call; usage/reconciliation/cost/schema comparison; forced real provider error and fragment checks; 429/timeout if feasible; context export and enabled-feed scans; sanitized real fixtures and regression fixes for each observed divergence. Do not mark any real-key acceptance approved yet.
-
-## Current scope
-
-### DeepSeek preparation D1/D2
-
-D1 and D2 are implemented in the uncommitted working tree. Provider HTTP status mapping is adapter-owned, thinking control is provider-neutral, and usage can report an explicit cache hit/miss split. Pricing now represents effective and verified dates, UTC peak windows, cache hit, cache miss and output rates in off-peak and peak bands. Validation guarantees peak is never cheaper than off-peak and cache miss is never cheaper than cache hit, preserving the preflight worst-case invariant.
-
-Token and USD budgets have the same global, agent, model and session scopes. Preflight reserves peak, 100%-cache-miss cost synchronously before provider I/O. Actual usage reconciles with the reported cache split and both call timestamps; crossing a peak boundary selects peak. Unresolved calls retain both reservations, expiry converts both to conservative usage, and manual reconciliation requires confirmed tokens and cost. A model can be allowlisted before its rate is entered, but execution then fails closed before provider I/O.
-
-`GET /models`: **NOT APPROVED** for this round. It would be an authenticated external request and is unnecessary before operator validation. DeepSeek has no default model and no price entry; the operator supplies the model ID and browser-verified rates with `verifiedAt`. D3 has not started, and no DeepSeek API call or real-key call was made.
-
-Item 1 completed in `c4c6895` after foundation WIP `87c2e47`: internal typed append-only circular event bus and optional SSE feed. Both live SSE and disabled HTTP 404 verified. The Node entrypoint change was explicitly approved by the user. Feed event selection targets the existing agent inspector; the full RF-02 panel remains pending.
-
-Item 2 implemented in this change: independent optional preview SSE, separate loopback listener, trusted wrapper with HTTP CSP, nested opaque generated-code iframe, partial Responses text integration, bounded debounced version history, pause, source and previous-version controls. Both sandboxes permit only scripts. Generated code cannot fetch the backend or navigate itself there: the outer CSP blocks child frame navigation. Storage, cookies and parent document access were denied in Chromium.
-
-Both toggles default false: `SAINTPETRUS_FEED` and `SAINTPETRUS_PREVIEW`. They are read by the server at startup. Feed-off leaves the internal bus running. Preview-off registers no artifact endpoint and opens no preview port. User must explicitly enable and restart; these are not cosmetic UI toggles. No RF-03/RF-04 implementation started.
-
-## Verification
-
-- 242 unit/integration tests passed without API keys, including dimensional pricing, concurrent monetary reservations, event-to-SSE redaction and HTML text escaping, bounded histories, disabled route registries and streaming usage/partial text.
-- Gitleaks directory and full-history scans passed with build cache present; staged scan is enforced before commit.
-- Lint, root ES2017 typecheck, separate core ES2022 typecheck and production build passed.
-- Feed live browser verification: creation arrives via SSE, newest first, type filter and selecting corresponding inspector; disabled endpoint HTTP 404.
-- Independent disposable Chromium check: HTML/JS rendering, incremental versions, source, previous version, paused historical view retained while new versions arrive, fetch denied by connect-src, self-navigation denied by parent frame-src, storage/cookies/parent inaccessible, allow-scripts only.
-- Preview-only and both-enabled server configurations tested independently of feed. With preview disabled, artifact route and preview route return 404 and its port does not listen.
-- Browser check is reproducible with `npm run test:browser`, an installed Chromium and the documented disposable mock server. No real key, user browser profile, external provider or live fixture used.
+- No provider has answered a real request. Gemini step 1B and DeepSeek D7 wait for explicit operator approval and follow `docs/reference/first-real-call.md`. `GET /models` is not approved.
+- Step 1B also owes a forced real provider error with fragment checks, 429 and timeout if feasible, context export and enabled-feed credential scans, and sanitized real fixtures with a regression fix for each observed divergence.
+- DeepSeek has no model ID and no price in configuration, so selecting it is refused with `model_not_allowlisted` until the operator enters both from the browser.
+- The configured OpenAI and Gemini rates were verified on 2026-09-07. Account and model availability are unverified.
+- The response cache is off (`cacheTtlMs` 0) until a real key is validated, so the per-model determinism declarations are dormant.
+- P3, a provider-scoped worst case for reservation expiry, is a proposal awaiting the operator's monetary decision. The all-model floor stays.
+- Long-context tiers and cache-write pricing are not modeled; see `docs/reference/deferred-price-dimensions.md`.
+- The Responses streaming path and real error, quota and timeout handling are tested only with synthetic transport.
+- The full RF-02 panel is pending. RF-03 and RF-04 are out of scope.
 
 ## Open debts and limits
 
-- Counters, budgets, graph, events and artifacts are process-local; restarting clears them.
-- Unresolved reservations carry a process-local ID and timestamps. After the configured 300000 ms TTL, each reservation is charged at its full reserved token and USD amounts, preserving both ceilings so expiry can never create budget. It stays visibly marked as an expired estimate until the operator checks provider billing and manually supplies exact prompt/completion usage and confirmed cost. Active requests and clean 4xx releases never enter the TTL path.
-- Existing Gitleaks suppression in tests/core/token-estimate.test.ts remains for the verified public counter name.
-- Native Windows/macOS keyrings are not verified. Prior Linux keyring test used synthetic material.
-- No real provider call has been executed. Real usage/cost reconciliation, error/fragment handling and the new Responses streaming path remain unverified against the live provider.
-- Existing allowlisted models retain their configured rates in the new dimensional schema. Account availability remains unverified. The production policy adds a USD ceiling at all four scopes without increasing the prior maximum configured spend; rates and counters remain local configuration and process memory.
-- Configured credential fragments of 12+ characters are redacted. Arbitrary shorter substrings are not reliably distinguishable from normal text.
-- Generated code can consume excessive CPU/memory; iframe sandboxing is not a resource quota. Browser checks cover the documented HTTP fetch/navigation, origin and storage boundaries, not every browser engine or every possible network subsystem.
-- RF-02 full panel and all later milestones are pending. The earlier real-key validation gate is still open, not silently approved.
+- Counters, budgets, reservations, graph, events and artifacts are process-local. Restarting clears them; this is not a durable ledger.
+- An unresolved reservation converts after `reservationTtlMs` (300000 ms in the shipped policy) at the greater of the hold and the dearest model at peak with no cache hits, and stays marked as an expired estimate until manual reconciliation.
+- The input counter is approximate. The monetary ceiling is a guard, not a proof of the invoice.
+- Configured credential fragments of 12 or more characters are redacted; shorter substrings cannot be told apart from ordinary text.
+- Native Windows and macOS keyrings are unverified. The Linux keyring roundtrip passed with synthetic material.
+- Generated preview code can exhaust CPU or memory; a sandbox is not a resource quota.
+- The Gitleaks suppression in `tests/core/token-estimate.test.ts` stays for a public counter name and is pinned by a ratchet.
+- `lib/utils.ts` remains the one naming exception, waiting on a decision.
 
 ## Execution notes
 
-The sandbox initially denied binding (`listen EPERM`) and a later build could not parse `tsc --showConfig`; granted turn-scoped network permission resolved those execution restrictions. Initial browser harness attempts needed hydration waiting, out-of-process frame attachment and moving storage assertions before deliberately invalidating a document through blocked navigation. These were test-harness corrections; final assertions passed. NIGHT-LOG.md remains append-only.
+- In the Codex sandbox `npm run build` fails with `Could not parse output from TypeScript's --showConfig` because nested Node processes are refused (`spawnSync /usr/bin/node EPERM`). The operator runs the build there.
+- Under the installed Node 26, the first build after any edit prints `DEP0205` from `@tailwindcss/node` calling `module.register()`. It is a dependency warning, and the build passes.
