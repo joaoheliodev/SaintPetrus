@@ -1,3 +1,5 @@
+import { isModelProvider, type ModelProvider } from '../providers/model-id';
+
 export type RateBand = {
   inputCacheHitPerMillion: number;
   inputCacheMissPerMillion: number;
@@ -11,6 +13,7 @@ export type UtcPeakWindow = {
 };
 
 export type ModelPrice = {
+  provider?: ModelProvider;
   effectiveAt: string;
   verifiedAt: string;
   expiresAt?: string;
@@ -55,6 +58,7 @@ function validWindow(value: unknown): value is UtcPeakWindow {
 
 export function validateModelPrice(value: unknown): value is ModelPrice {
   if (!record(value) || !validDate(value.effectiveAt) || !validDate(value.verifiedAt)
+    || ('provider' in value && !isModelProvider(value.provider))
     || ('expiresAt' in value && (!validDate(value.expiresAt) || value.expiresAt <= value.effectiveAt))
     || !Array.isArray(value.peakWindowsUtc) || !value.peakWindowsUtc.every(validWindow)
     || !validBand(value.offPeak) || !validBand(value.peak)) return false;
@@ -122,12 +126,13 @@ export function reconciledCostUsd(price: ModelPrice, usage: PriceUsage, requestA
 
 // Lost contact means the served model is unknown, and a provider may reroute to a dearer one. The
 // reservation was priced for the model that was asked for, so it can understate what was billed.
-// The conservative floor is the dearest model the table knows, at peak, with no cache hits.
-export function worstCasePeakCostUsd(models: Record<string, ModelPrice>, inputTokens: number, maximumOutputTokens: number, at: number) {
-  let worst = 0;
+// Missing billing-provider metadata keeps the global floor; a price need not be request-allowlisted.
+export function worstCasePeakCostUsd(models: Record<string, ModelPrice>, inputTokens: number, maximumOutputTokens: number, at: number, provider?: ModelProvider) {
+  const candidates: { price: ModelPrice; cost: number }[] = [];
   for (const price of Object.values(models)) {
-    try { worst = Math.max(worst, preflightCostUsd(price, inputTokens, maximumOutputTokens, at)); }
+    try { candidates.push({ price, cost: preflightCostUsd(price, inputTokens, maximumOutputTokens, at) }); }
     catch { /* A model with no usable price cannot raise the floor; it is simply not a candidate. */ }
   }
-  return worst;
+  const scoped = provider !== undefined && candidates.every(({ price }) => price.provider !== undefined);
+  return candidates.reduce((worst, { price, cost }) => !scoped || price.provider === provider ? Math.max(worst, cost) : worst, 0);
 }

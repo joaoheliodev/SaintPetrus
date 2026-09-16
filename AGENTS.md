@@ -32,7 +32,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 292 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 299 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -50,7 +50,7 @@ Preflight never underestimates. It prices at the peak rate and assumes zero cach
 
 The price key is the `model` field of the **response**, never the string that was requested. Providers reroute: from 2026-09-14 every `deepseek-v4-pro` request is served and billed as Flash. A model missing from the price table fails closed before any provider I/O. Record the divergence when response and request disagree. Budget rows stay keyed by the requested model while the price comes from the served one. Read `docs/reference/billing-scope-and-price-key.md` before changing either.
 
-A reservation that expires unresolved converts at the greater of what was held and the dearest model in the price table, at peak with no cache hits. Lost contact means the served model is unknown, so the figure held for the requested model can understate what was billed.
+A reservation that expires unresolved converts at the greater of what was held and the dearest eligible price, at peak with no cache hits. Capture its validated provider when reserving. Narrow to that provider only when every usable price candidate declares its provider in `prices.json`; otherwise retain the global floor. Price metadata is independent of request authorization, so never filter candidates through the policy allowlist. Lost contact means the served model is unknown; narrowing removes incidental headroom from unrelated providers, not uncertainty about the invoice. Read `docs/reference/billing-scope-and-price-key.md` for the accepted tradeoff.
 
 A model policy declares whether the model can produce a reproducible answer at all. The claim is per model, like price, because the capability belongs to the model and not to its provider. Absent means no. The response cache needs both halves: the policy vouching for the model, and this particular request having actually turned reasoning off.
 

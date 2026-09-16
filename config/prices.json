@@ -4,6 +4,7 @@
   "note": "Existing entries preserve the previously configured flat rates in the dimensional schema. DeepSeek is intentionally absent until the operator enters browser-verified rates and verifiedAt. No prices are fetched at runtime.",
   "models": {
     "mock-v1": {
+      "provider": "mock",
       "effectiveAt": "2026-09-07",
       "verifiedAt": "2026-09-07",
       "peakWindowsUtc": [],
@@ -11,6 +12,7 @@
       "peak": { "inputCacheHitPerMillion": 0, "inputCacheMissPerMillion": 0, "outputPerMillion": 0 }
     },
     "gpt-5-nano": {
+      "provider": "openai",
       "effectiveAt": "2026-09-07",
       "verifiedAt": "2026-09-07",
       "peakWindowsUtc": [],
@@ -18,6 +20,7 @@
       "peak": { "inputCacheHitPerMillion": 0.05, "inputCacheMissPerMillion": 0.05, "outputPerMillion": 0.4 }
     },
     "gemini-2.5-flash-lite": {
+      "provider": "gemini",
       "effectiveAt": "2026-09-07",
       "verifiedAt": "2026-09-07",
       "peakWindowsUtc": [],

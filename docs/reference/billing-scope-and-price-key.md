@@ -24,8 +24,22 @@ Two consequences follow, and both are deliberate:
   it is not released as free. The reservation stays unresolved, the agent pauses, and the reservation
   expiry converts it to conservative usage.
 - An expired reservation does not convert at the figure that was held. It converts at the greater of
-  the held figure and the dearest model in the price table, at the peak rate with no cache hits,
+  the held figure and the dearest eligible price candidate, at the peak rate with no cache hits,
   because lost contact means the served model is unknown and could have been a dearer one.
+
+The reservation captures the validated provider before I/O. Optional `provider` metadata in
+`prices.json` identifies each price's provider; it does not authorize requests. Candidates include
+prices absent from the policy allowlist, since a provider may reroute to a model the operator never
+requested. Consider prices usable at the original request time. Restrict their floor to the captured
+provider only when every candidate has a known provider; otherwise retain the global calculation.
+Missing provider metadata forces the global floor because an unbound price may be a dearer rerouting destination.
+Charge the greater of this floor and the original reservation to the same
+four scopes: global, agent, requested model and session.
+
+The operator accepted this narrower floor on the assumption that rerouting stays within a provider.
+An unrelated provider's expensive model adds only coincidental headroom, so removing it improves
+precision without establishing an invoice guarantee: routing outside the known price table or across
+providers can exceed either estimate, and narrowing removes that extra unrelated-provider margin.
 
 A divergence between requested and served publishes a `provider.rerouted` event. That event is the
 audit trail for the asymmetry, and it is the thing to look at before assuming a budget row is wrong.

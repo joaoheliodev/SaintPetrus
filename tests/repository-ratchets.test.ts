@@ -197,7 +197,7 @@ const referenceDecisions = new Map<string, readonly string[]>([
   ['deepseek-price-table.md', ['operator', 'verifiedAt', 'must not transcribe', 'Do not simplify']],
   ['connection-state.md', ['configured', 'verified', 'uncached connection test', 'Do not simplify']],
   ['state-ownership.md', ['a descending revision sequence the server cannot emit', 'records the server never published', 'the gap the window reports as truncated', 'the badge does not show']],
-  ['billing-scope-and-price-key.md', ['looks like an oversight and is not one', 'the concurrency guarantee the four-scope reservation exists to provide', 'the only honest answer', 'it is not released as free', 'could have been a dearer one']],
+  ['billing-scope-and-price-key.md', ['looks like an oversight and is not one', 'the concurrency guarantee the four-scope reservation exists to provide', 'the only honest answer', 'it is not released as free', 'could have been a dearer one', 'Missing provider metadata forces the global floor because an unbound price may be a dearer rerouting destination.']],
   ['deferred-price-dimensions.md', ['RateBand', 'prompt-size axis', 'inputCacheMissPerMillion >= inputCacheHitPerMillion', 'only price source', 'Do not simplify']],
   ['first-real-call.md', ['peakWindowsUtc', 'provider.usage_unparsed', 'reservationTtlMs', 'not a proof of the invoice', 'Do not shorten']],
 ]);

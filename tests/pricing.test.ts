@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { preflightCostUsd, reconciledCostUsd, validateModelPrice, type ModelPrice } from '../lib/tokens/pricing';
+import { preflightCostUsd, reconciledCostUsd, validateModelPrice, worstCasePeakCostUsd, type ModelPrice } from '../lib/tokens/pricing';
 
 const monday = (hour: number, minute = 0) => Date.UTC(2026, 8, 7, hour, minute);
 const price: ModelPrice = {
@@ -64,4 +64,59 @@ test('P1 pricing rejects expiration at either end of the request/response interv
   assert.throws(() => preflightCostUsd(expiring, 1, 1, end), /expired/);
   assert.throws(() => reconciledCostUsd(expiring, usage, end - 1, end), /expired/);
   assert.throws(() => reconciledCostUsd(expiring, usage, end, end + 1), /expired/);
+});
+
+test('P3 provider metadata is optional but any supplied value must identify a known provider', () => {
+  assert.equal(validateModelPrice(price), true);
+  for (const provider of ['mock', 'openai', 'gemini', 'deepseek']) {
+    assert.equal(validateModelPrice({ ...price, provider }), true, provider);
+  }
+  for (const provider of [undefined, null, '', 'unknown', 'OPENAI', 1, {}]) {
+    assert.equal(validateModelPrice({ ...price, provider }), false, String(provider));
+  }
+});
+
+test('P3 complete price metadata excludes other providers and retains priced reroute candidates', () => {
+  const models: Record<string, ModelPrice> = {
+    requested: { ...price, provider: 'openai' },
+    'priced-reroute-only': { ...price, provider: 'openai', peak: { ...price.peak, outputPerMillion: 40 } },
+    'other-provider': { ...price, provider: 'gemini', peak: { ...price.peak, outputPerMillion: 80 } },
+  };
+  assert.equal(worstCasePeakCostUsd(models, 1_000_000, 1_000_000, monday(5), 'openai'), 140);
+  assert.equal(worstCasePeakCostUsd(models, 1_000_000, 1_000_000, monday(5), 'gemini'), 180);
+  assert.equal(worstCasePeakCostUsd(models, 1_000_000, 1_000_000, monday(5)), 180);
+});
+
+test('P3 even a cheap unlinked price forces the global floor instead of excluding another provider', () => {
+  const models: Record<string, ModelPrice> = {
+    requested: { ...price, provider: 'openai', peak: { ...price.peak, outputPerMillion: 40 } },
+    unlinked: price,
+    'other-provider': { ...price, provider: 'gemini', peak: { ...price.peak, outputPerMillion: 80 } },
+  };
+  assert.equal(worstCasePeakCostUsd(models, 1_000_000, 1_000_000, monday(5), 'openai'), 180);
+});
+
+test('P3 unusable prices are not candidates and cannot turn provider restriction into a global floor', () => {
+  const models: Record<string, ModelPrice> = {
+    requested: { ...price, provider: 'openai' },
+    'other-provider': { ...price, provider: 'gemini', peak: { ...price.peak, outputPerMillion: 80 } },
+    expired: { ...price, expiresAt: '2026-09-07' },
+    future: { ...price, effectiveAt: '2026-09-08' },
+    malformed: { ...price, effectiveAt: '2026-09-31' },
+  };
+  assert.equal(worstCasePeakCostUsd(models, 1_000_000, 1_000_000, monday(5), 'openai'), 120);
+});
+
+test('P3 candidate linkage is evaluated at the original request instant with exclusive expiry', () => {
+  const start = Date.UTC(2026, 8, 8);
+  const end = Date.UTC(2026, 8, 9);
+  const models: Record<string, ModelPrice> = {
+    requested: { ...price, provider: 'openai' },
+    'other-provider': { ...price, provider: 'gemini', peak: { ...price.peak, outputPerMillion: 80 } },
+    unlinked: { ...price, effectiveAt: '2026-09-08', expiresAt: '2026-09-09' },
+  };
+  assert.equal(worstCasePeakCostUsd(models, 1_000_000, 1_000_000, start - 1, 'openai'), 120);
+  assert.equal(worstCasePeakCostUsd(models, 1_000_000, 1_000_000, start, 'openai'), 180);
+  assert.equal(worstCasePeakCostUsd(models, 1_000_000, 1_000_000, end - 1, 'openai'), 180);
+  assert.equal(worstCasePeakCostUsd(models, 1_000_000, 1_000_000, end, 'openai'), 120);
 });

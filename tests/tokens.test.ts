@@ -168,6 +168,53 @@ test('RF-06 expired unverifiable reservation becomes conservative usage and rema
   }
 });
 
+test('P3 expiry uses price-side providers, falls back globally on any missing link and reconciles all four scopes', async () => {
+  for (const missingLink of [false, true]) {
+    const f = fixture();
+    f.prices.models['test-model'].provider = 'openai';
+    f.prices.models['mock-v1'].provider = 'mock';
+    f.prices.models['reroute-only'] = { ...modelPrice(0, 8, 16), provider: 'openai' };
+    f.prices.models['other-provider'] = { ...modelPrice(0, 20, 40), provider: 'gemini' };
+    if (missingLink) f.prices.models['unlinked-cheap'] = modelPrice(0, 0, 0);
+    assert.equal(f.policy.models['reroute-only'], undefined);
+    f.adapter.complete = async () => { throw new ProviderFailure('timeout'); };
+    await assert.rejects(f.run(), /timeout/);
+    // Expiry must retain the validated dispatch provider, even if later policy changes.
+    f.policy.models['test-model'].provider = 'gemini';
+    f.advance(f.policy.reservationTtlMs);
+    const expired = f.service.snapshot();
+    const affected = expired.rows.filter(row => row.estimated > 0);
+    const expected = missingLink ? 2580 / 1e6 : 1032 / 1e6;
+    assert.deepEqual(affected.map(row => row.scope).sort(), ['agent', 'global', 'model', 'session']);
+    assert.ok(affected.every(row => Math.abs(row.costAccountedUsd - expected) < 1e-12 && row.costUnmeasuredUsd === row.costAccountedUsd && row.costReservedUsd === 0 && row.reserved === 0));
+    assert.equal(affected.find(row => row.scope === 'model')!.id, 'test-model');
+    const reservation = expired.reservations[0];
+    assert.equal(reservation.status, 'estimated');
+    assert.ok(Math.abs(reservation.costUsd - expected) < 1e-12);
+    f.service.reconcileReservation(reservation.id, 10, 5, 25 / 1e6);
+    const reconciled = f.service.snapshot().rows.filter(row => row.actual.total === 15);
+    assert.equal(reconciled.length, 4);
+    assert.ok(reconciled.every(row => row.costAccountedUsd === 25 / 1e6 && row.costUnmeasuredUsd === 0));
+  }
+});
+
+test('P3 expiry never charges less than the original hold when current candidates become cheaper', async () => {
+  const f = fixture();
+  f.prices.models['test-model'].provider = 'openai';
+  f.prices.models['mock-v1'].provider = 'mock';
+  f.adapter.complete = async () => { throw new ProviderFailure('timeout'); };
+  await assert.rejects(f.run(), /timeout/);
+  const held = f.service.snapshot().reservations[0].costUsd;
+  assert.ok(held > 0);
+  f.prices.models['test-model'] = { ...modelPrice(0, 0, 0), provider: 'openai' };
+  f.advance(f.policy.reservationTtlMs);
+  const expired = f.service.snapshot();
+  assert.equal(expired.reservations[0].costUsd, held);
+  const affected = expired.rows.filter(row => row.estimated > 0);
+  assert.equal(affected.length, 4);
+  assert.ok(affected.every(row => row.costAccountedUsd === held && row.costUnmeasuredUsd === held && row.costReservedUsd === 0));
+});
+
 test('RF-06 does not expire an in-flight reservation', async () => {
   const f = fixture(); let finish: (() => void) | undefined;
   f.adapter.complete = async () => { await new Promise<void>(resolve => { finish = resolve; }); return { text: 'Answer', usage: { prompt: 5, completion: 5, total: 10 } }; };

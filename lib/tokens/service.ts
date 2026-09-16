@@ -14,7 +14,7 @@ type Scope = 'global' | 'agent' | 'model' | 'session';
 export type BillingVerdict = 'unbilled' | 'billed' | 'unverifiable';
 // The USD ceiling reads costAccountedUsd; costUnmeasuredUsd is the part of it charged at reservation expiry and not yet confirmed.
 type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costAccountedUsd: number; costUnmeasuredUsd: number; saved: number; unverifiable: number };
-type Reservation = { id: string; agent: string; model: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[] };
+type Reservation = { id: string; agent: string; model: string; provider: ProviderAdapter['id']; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[] };
 type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => string[]; role?: (id: string) => string };
 // disabled, invalid_model_format and model_not_allowlisted are local refusals that bill nothing, yet stay unverifiable: a test
 // proves none can fire with a live reservation, and unbilled would silently free a hold if one ever fired after provider contact.
@@ -47,9 +47,9 @@ export class TokenService {
     const now = this.now();
     for (const reservation of this.reservations.values()) {
       if (reservation.status !== 'unverifiable' || reservation.expiresAt === null || reservation.expiresAt > now) continue;
-      // Convert at the dearer of what was held and what the dearest known model would have cost:
+      // Convert at the dearer of what was held and what the dearest eligible model would have cost:
       // the request may have been served, and billed, by a model other than the one asked for.
-      const conservative = Math.max(reservation.costUsd, worstCasePeakCostUsd(this.prices.models, reservation.inputTokens, reservation.maxOutputTokens, reservation.createdAt));
+      const conservative = Math.max(reservation.costUsd, worstCasePeakCostUsd(this.prices.models, reservation.inputTokens, reservation.maxOutputTokens, reservation.createdAt, reservation.provider));
       for (const row of reservation.rows) {
         row.reserved -= reservation.tokens;
         row.used += reservation.tokens;
@@ -150,7 +150,7 @@ export class TokenService {
     if (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costAccountedUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd)) { this.pause(agent); this.refuse(agent, 'Preflight reservation exceeds token or monetary budget.'); }
     // Synchronous reservation across all four scopes happens before any provider I/O.
     rows.forEach(row => { row.reserved += reservedTokens; row.costReservedUsd = money(row.costReservedUsd + reservedCostUsd); });
-    const reservation: Reservation = { id: `reservation-${++this.reservationSequence}`, agent, model: adapter.model, tokens: reservedTokens, costUsd: reservedCostUsd, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, createdAt, expiresAt: null, status: 'inflight', rows };
+    const reservation: Reservation = { id: `reservation-${++this.reservationSequence}`, agent, model: adapter.model, provider: adapter.id, tokens: reservedTokens, costUsd: reservedCostUsd, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, createdAt, expiresAt: null, status: 'inflight', rows };
     this.reservations.set(reservation.id, reservation);
     if (previewEnabled()) options.onText = text => observeArtifact(agent, this.hooks.role?.(agent) ?? agent, text);
     let verdict: BillingVerdict = 'unverifiable';
