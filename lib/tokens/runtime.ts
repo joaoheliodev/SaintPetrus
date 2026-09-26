@@ -2,6 +2,8 @@ import { runtime } from '../server/runtime';
 import { providerProxy } from '../providers/runtime';
 import { TokenService } from './service';
 import { loadConfig } from './config';
+import { PriceCatalog } from '../prices/catalog';
+import { join } from 'node:path';
 const state = globalThis as typeof globalThis & { saintpetrusTokens?: TokenService };
 export function tokenService() {
   if (!state.saintpetrusTokens) {
@@ -11,7 +13,7 @@ export function tokenService() {
       ids: () => runtime().graph.snapshot().agents.map(a => a.id),
       pause: id => runtime().graph.setAgentStatus(id, 'paused'),
       pauseAll: () => { providerProxy().cancel(); runtime().mock.pause(); runtime().graph.pauseAll(); },
-    });
+    }, undefined, Date.now, new PriceCatalog(prices, join(process.cwd(), 'config/prices.json')));
   }
   return state.saintpetrusTokens;
 }

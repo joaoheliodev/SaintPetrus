@@ -5,11 +5,12 @@ import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { GeminiAdapter, geminiErrorCode, geminiUsage } from '../lib/providers/gemini';
 import { ProviderProxy } from '../lib/providers/proxy';
 import { TokenService } from '../lib/tokens/service';
-import type { TokenPolicy } from '../lib/tokens/config';
+import { loadConfig, type TokenPolicy } from '../lib/tokens/config';
 import { Credentials } from '../lib/security/credentials';
 import { EncryptedVault } from '../lib/security/encrypted-vault';
 import { safeLog, safeStringify } from '../lib/security/redact';
 import { connectionLabel } from '../components/provider-status';
+import { runtime } from '../lib/server/runtime';
 const fixture = JSON.parse(await readFile('tests/fixtures/gemini-generate-content.json', 'utf8'));
 const maxTokensFixture = JSON.parse(await readFile('tests/fixtures/gemini-max-tokens.json', 'utf8'));
 const model = 'gemini-2.5-flash-lite';
@@ -97,7 +98,10 @@ test('Gemini RF-01 configuration selects the adapter through the existing API; e
   const secret = randomBytes(32).toString('hex'); let calls = 0; let providerReply = maxTokensFixture;
   const request = (path: string, body: unknown) => new Request(`http://127.0.0.1:3100/api/${path}`, { method: 'POST', headers: { Origin: 'http://127.0.0.1:3100', 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'same-origin', 'X-SaintPetrus-Client': 'browser' }, body: JSON.stringify(body) });
   try {
-    host.saintpetrusCredentials = store; delete host.saintpetrusTokens;
+    host.saintpetrusCredentials = store;
+    // Route tests must not persist reconciliation metadata into the operator's price file.
+    const { policy, prices } = loadConfig();
+    host.saintpetrusTokens = new TokenService(policy, prices, { ids: () => runtime().graph.snapshot().agents.map(agent => agent.id), pause: () => {}, pauseAll: () => {} });
     globalThis.fetch = async (url, options) => { calls++; assert.equal(String(url), `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`); assert.ok(!String(options?.body).includes(secret)); return Response.json(providerReply); };
     assert.equal((await configure(request('credentials', { action: 'set', provider: 'gemini', model: `models/${model}`, key: secret }))).status, 200);
     assert.equal(store.status('gemini').remembered, false);

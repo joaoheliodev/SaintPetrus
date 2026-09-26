@@ -18,9 +18,10 @@ Omitting the field preserves the existing open-ended price behavior.
 
 Before reserving or dispatching, the server requires the price to remain valid through
 `requestAt + reservationTtlMs`: expiration at or before that instant refuses the request,
-even when a response-cache entry exists. No successor rate is configured to reconcile a
-call crossing the boundary, so using the old rate would silently undercount its cost.
-If a response nevertheless arrives after expiration, reconciliation also fails closed:
-usage stays unresolved, the reservation is retained and the agent pauses for billing review.
-The existing conservative reservation-expiry and manual-reconciliation paths still apply;
-the historical worst-case floor is evaluated at the original request time.
+even when a response-cache entry exists. Price administration retains that preflight
+guard. For work already dispatched, the operator approved reconciliation with the
+captured tariff even after its expiry or closure by a successor; the newer tariff
+never reprices that reservation. This explicitly supersedes the previous refusal
+of every late response. An unpriced served model still stays unresolved. The
+conservative expiry floor uses the captured candidates at the original request time;
+see [price administration](price-validity-administration.md) for the version contract.

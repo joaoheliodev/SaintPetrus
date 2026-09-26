@@ -450,7 +450,7 @@ test('P1 an expired price cannot be reused through the response cache', async ()
   assert.equal(f.service.snapshot().rows.find(row => row.scope === 'global')!.saved, 0);
 });
 
-test('P1 a response arriving after price expiration retains unresolved usage until manual reconciliation', async () => {
+test('Price admin captured reconciliation survives response-time expiration without changing the tariff', async () => {
   const f = fixture();
   f.prices.models['test-model'] = { ...f.prices.models['test-model'], expiresAt: '2027-01-01' };
   f.advance(Date.UTC(2027, 0, 1) - f.policy.reservationTtlMs - 1);
@@ -459,18 +459,13 @@ test('P1 a response arriving after price expiration retains unresolved usage unt
     f.advance(f.policy.reservationTtlMs + 1);
     return complete(...args);
   };
-  await assert.rejects(f.run(), /expired/);
+  await f.run();
   assert.equal(f.calls(), 1);
   const snapshot = f.service.snapshot();
-  assert.equal(snapshot.reservations[0]?.status, 'unverifiable');
-  assert.equal(snapshot.rows.find(row => row.scope === 'global')!.actual.total, 0);
-  assert.ok(f.paused.has('a'));
-  f.advance(f.policy.reservationTtlMs);
-  const expired = f.service.snapshot().reservations[0];
-  assert.equal(expired.status, 'estimated');
-  assert.equal(expired.costUsd, 258 / 1e6);
-  f.service.reconcileReservation(expired.id, 10, 10, 60 / 1e6);
-  assert.equal(f.service.snapshot().reservations.length, 0);
+  assert.equal(snapshot.reservations.length, 0);
+  assert.equal(snapshot.rows.find(row => row.scope === 'global')!.actual.total, 20);
+  assert.equal(snapshot.rows.find(row => row.scope === 'global')!.costAccountedUsd, 60 / 1e6);
+  assert.equal(f.paused.has('a'), false);
 });
 
 test('RF-06 resume cannot erase exhaustion; model allowlist rejects before dispatch', async () => {

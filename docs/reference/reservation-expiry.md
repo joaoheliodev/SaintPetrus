@@ -13,3 +13,7 @@ the charge in all four original budget scopes; see [the pricing decision](billin
 for the accepted loss of coincidental headroom from unrelated providers. Do not simplify
 this to ordinary release: only a failure that proves no generation occurred is `unbilled`, and later
 reconciliation must replace the same converted amount rather than charge it twice.
+
+Candidates are the tariff values captured with the reservation, not the current
+catalog. Closing or appending a validity after dispatch must not change this floor;
+see [price administration](price-validity-administration.md).

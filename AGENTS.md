@@ -32,7 +32,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 299 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 338 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -61,6 +61,8 @@ A usage parser is strict and fails closed on a shape it does not know. It never 
 When a provider's usage shape cannot be parsed, record the set of field names the response carried, never a value. Names are not an error body, and they turn a failed first call into one correction instead of a blind retry.
 
 `config/prices.json` is maintained by the operator, from their own browser, with a `verifiedAt` date. No agent transcribes a provider's price into it, and no agent adds a DeepSeek price or model identifier to configuration. Independent readings of the DeepSeek page on the same day produced different numbers, and cached snapshots circulate as if official. Until the operator enters a DeepSeek model with its price, selecting it is refused with `model_not_allowlisted`; that is the correct answer, not a gap to close.
+
+Price administration appends validity records in the same file. The server may fill only an open predecessor's `expiresAt`, exactly at the successor's `effectiveAt`; all other predecessor fields remain unchanged. Refuse overlap and edits or closures covering reconciled consumption. Reservations capture price-version identities and their tariff data before I/O, including known reroute candidates: a later price edit must never change their reconciliation or expiry floor. Historical prices are never deleted; browser price writes do not relax credential protections.
 
 **The input counter is approximate.** The monetary ceiling blocks concurrency and refuses later calls, but it is a guard, not a proof of what the invoice will say. Treat it as a guard. This is why the first real call ever made against each provider, not merely the first of a session, must be checked against the actual invoice before a second one is made.
 
@@ -105,6 +107,7 @@ Each reference answers, in one short paragraph, why its decision must not be sim
 - Read `docs/reference/react-flow-node-identity.md` before changing React Flow node reconciliation or replacing `useNodesState` ownership.
 - Read `docs/reference/react-flow-minimap-sizing.md` before moving MiniMap dimensions between its `style` prop and CSS.
 - Read `docs/reference/reservation-expiry.md` before changing unresolved reservation expiry or reconciliation.
+- Read `docs/reference/price-validity-administration.md` before changing price writes, validity selection or captured reservation tariffs.
 - Read `docs/reference/deepseek-price-table.md` before adding or updating DeepSeek model or price configuration.
 - Read `docs/reference/deferred-price-dimensions.md` before adding a model whose rates change with prompt size, such as a long-context tier, or that charges for cache writes. The price schema models neither.
 - Read `docs/reference/connection-state.md` before changing credential, provider verification or connection-status semantics.

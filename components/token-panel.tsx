@@ -3,8 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TokenSnapshot } from '../lib/tokens/service';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { PricePanel } from './price-panel';
 export function TokenPanel() {
   const [data, setData] = useState<TokenSnapshot>(); const [error, setError] = useState(''); const [pending, setPending] = useState(false);
+  const [priceError, setPriceError] = useState('');
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
   const [reconciliation, setReconciliation] = useState<Record<string, { prompt: string; completion: string; costUsd: string }>>({});
@@ -28,10 +31,24 @@ export function TokenPanel() {
     void poll();
     return () => { mounted.current = false; clearTimeout(timer); refreshController.current?.abort(); };
   }, [refresh]);
-  async function command(body: object) {
+  async function command(body: object, endpoint: '/api/tokens' | '/api/prices' = '/api/tokens') {
     setPending(true); setError('');
-    try { const response = await fetch('/api/tokens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!response.ok) throw new Error(); await refresh(); }
-    catch { setError('Control rejected. Check limits and unverifiable usage before resuming.'); }
+    if (endpoint === '/api/prices') setPriceError('');
+    try {
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!response.ok && endpoint === '/api/prices') {
+        const body: unknown = await response.json();
+        setPriceError(body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : 'Price request failed.');
+        return false;
+      }
+      if (!response.ok) throw new Error(); await refresh();
+      return true;
+    }
+    catch {
+      if (endpoint === '/api/prices') setPriceError('Price request unavailable. Check the local server.');
+      else setError('Control rejected. Check limits and unverifiable usage before resuming.');
+      return false;
+    }
     finally { setPending(false); }
   }
   const total = data?.rows.find(row => row.scope === 'global');
@@ -39,9 +56,12 @@ export function TokenPanel() {
     <Button variant="outline" disabled={pending} onClick={() => command({ action: 'kill' })}>Pause all agents</Button>
     <Dialog><DialogTrigger render={<Button variant="outline" />}>Tokens</DialogTrigger>
       <DialogContent className="token-panel">
-        <DialogTitle>Token controls</DialogTitle>
+        <DialogTitle>Tokens and prices</DialogTitle>
         <DialogDescription>Server-enforced token and USD budgets. Preflight reserves peak, cache-miss cost; reported usage reconciles against the configured local table. Mock consumption is estimated separately.</DialogDescription>
         <p role="status">{!data ? 'Loading server token state…' : data.stopped ? '■ Global pause active' : '● Global execution enabled'} {error}</p>
+        <Tabs defaultValue="budgets">
+          <TabsList aria-label="Token and price controls"><TabsTrigger value="budgets">Budgets</TabsTrigger><TabsTrigger value="prices">Prices</TabsTrigger></TabsList>
+          <TabsContent value="budgets">
         <p>Actual provider tokens: {total?.actual.total ?? 0} · Mock estimated tokens: {total?.mock.total ?? 0} · Saved tokens: {total?.saved ?? 0}</p>
         <p>Accounted cost (USD): {(total?.costAccountedUsd ?? 0).toFixed(9)} · Reserved worst-case cost: {(total?.costReservedUsd ?? 0).toFixed(9)} · Local price table date: {data?.priceDate ?? 'Unavailable'}</p>
         <p>Rows overlap: global, agent, model and session describe the same calls. Do not add rows together. Either dimension warns at 80% and pauses at 100%. Increase a limit, then resume explicitly.</p>
@@ -60,8 +80,11 @@ export function TokenPanel() {
         </section>; })}
         <Button disabled={pending} variant="outline" onClick={() => command({ action: 'resume' })}>Resume eligible agents</Button>
         <h3>Model allowlist</h3>
-        <p>Edit config/token-policy.json and config/prices.json, then restart. Cache TTL: {data?.cacheTtlMs ?? 0} ms; only temperature 0 is cached. Connection tests always bypass cache.</p>
+        <p>Edit config/token-policy.json and restart to change the allowlist. Manage tariffs in Prices without restarting. Cache TTL: {data?.cacheTtlMs ?? 0} ms; only temperature 0 is cached. Connection tests always bypass cache.</p>
         {Object.entries(data?.models ?? {}).map(([id, model]) => { const price = data?.prices[id]; return <p key={id}>{model.provider} / {id} · max_tokens {model.max_tokens} · temperature {model.temperature} · {price ? <>verified {price.verifiedAt} · off-peak hit/miss/output {price.offPeak.inputCacheHitPerMillion} / {price.offPeak.inputCacheMissPerMillion} / {price.offPeak.outputPerMillion} · peak {price.peak.inputCacheHitPerMillion} / {price.peak.inputCacheMissPerMillion} / {price.peak.outputPerMillion}{price.note && <small>{price.note}</small>}</> : <strong>price missing — execution refused</strong>}</p>; })}
+          </TabsContent>
+          <TabsContent value="prices"><PricePanel catalog={data?.catalog} pending={pending} error={priceError} onAppend={body => command(body, '/api/prices')} /></TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
     <span role="status">{error}</span>

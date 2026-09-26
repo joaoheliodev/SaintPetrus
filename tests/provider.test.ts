@@ -78,6 +78,11 @@ test('M2 proxy mock, input validation, busy, timeout and cancellation', async ()
 });
 
 test('M2 frontend test request carries no credential; server rejects credential fields', async () => {
+  const priceFile = await readFile('config/prices.json', 'utf8');
+  const { loadConfig } = await import('../lib/tokens/config');
+  const { policy, prices } = loadConfig();
+  const previousTokens = Reflect.get(globalThis, 'saintpetrusTokens');
+  Reflect.set(globalThis, 'saintpetrusTokens', new TokenService(policy, prices, { ids: () => runtime().graph.snapshot().agents.map(agent => agent.id), pause: () => {}, pauseAll: () => {} }));
   const previous = process.env.SAINTPETRUS_MOCK, selected = process.env.SAINTPETRUS_PROVIDER;
   process.env.SAINTPETRUS_MOCK = 'true'; process.env.SAINTPETRUS_PROVIDER = 'mock';
   try {
@@ -93,7 +98,9 @@ test('M2 frontend test request carries no credential; server rejects credential 
     const client = await readFile('components/provider-status.tsx', 'utf8');
     assert.ok(client.includes("JSON.stringify({ action: 'test' })"));
     assert.ok(!/Authorization|localStorage|sessionStorage/.test(client));
+    assert.equal(await readFile('config/prices.json', 'utf8'), priceFile, 'Mock route tests must never write the operator price file.');
   } finally {
+    Reflect.set(globalThis, 'saintpetrusTokens', previousTokens);
     if (previous === undefined) delete process.env.SAINTPETRUS_MOCK; else process.env.SAINTPETRUS_MOCK = previous;
     if (selected === undefined) delete process.env.SAINTPETRUS_PROVIDER; else process.env.SAINTPETRUS_PROVIDER = selected;
   }

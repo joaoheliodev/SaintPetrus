@@ -17,6 +17,7 @@ export type ModelPrice = {
   effectiveAt: string;
   verifiedAt: string;
   expiresAt?: string;
+  sourceUrl?: string;
   peakWindowsUtc: UtcPeakWindow[];
   offPeak: RateBand;
   peak: RateBand;
@@ -35,6 +36,12 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const finiteRate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1e9;
 const tokenCount = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+
+export function validPriceSource(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 2048) return false;
+  try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password; }
+  catch { return false; }
+}
 
 function validDate(value: unknown): value is string {
   if (typeof value !== 'string' || !DATE_PATTERN.test(value)) return false;
@@ -59,6 +66,7 @@ function validWindow(value: unknown): value is UtcPeakWindow {
 export function validateModelPrice(value: unknown): value is ModelPrice {
   if (!record(value) || !validDate(value.effectiveAt) || !validDate(value.verifiedAt)
     || ('provider' in value && !isModelProvider(value.provider))
+    || ('sourceUrl' in value && !validPriceSource(value.sourceUrl))
     || ('expiresAt' in value && (!validDate(value.expiresAt) || value.expiresAt <= value.effectiveAt))
     || !Array.isArray(value.peakWindowsUtc) || !value.peakWindowsUtc.every(validWindow)
     || !validBand(value.offPeak) || !validBand(value.peak)) return false;
@@ -90,7 +98,7 @@ function bandCost(band: RateBand, cacheHit: number, cacheMiss: number, completio
 export function preflightCostUsd(price: ModelPrice, inputTokens: number, maximumOutputTokens: number, requestAt: number, reservationTtlMs = 0) {
   requireActivePrice(price, requestAt);
   if (!Number.isSafeInteger(reservationTtlMs) || reservationTtlMs < 0) throw new Error('Invalid reservation TTL.');
-  // No successor rate exists to reconcile a response after this price expires.
+  // Captured reconciliation does not relax the existing preflight validity guard.
   requireActivePrice(price, requestAt + reservationTtlMs);
   // Preflight deliberately assumes the two independent worst cases: peak rates and no cache hits.
   return bandCost(price.peak, 0, inputTokens, maximumOutputTokens);
@@ -115,9 +123,10 @@ function intervalTouchesPeak(price: ModelPrice, requestAt: number, responseAt: n
   return false;
 }
 
-export function reconciledCostUsd(price: ModelPrice, usage: PriceUsage, requestAt: number, responseAt: number) {
+export function reconciledCostUsd(price: ModelPrice, usage: PriceUsage, requestAt: number, responseAt: number, captured = false) {
   requireActivePrice(price, requestAt);
-  requireActivePrice(price, responseAt);
+  // Captured reservations retain their tariff when a successor closes its validity.
+  if (!captured) requireActivePrice(price, responseAt);
   if (![requestAt, responseAt].every(Number.isFinite) || !tokenCount(usage.prompt) || !tokenCount(usage.completion)) throw new Error('Invalid usage for cost calculation.');
   const split = usage.inputBreakdown ?? { cacheHit: 0, cacheMiss: usage.prompt };
   if (!tokenCount(split.cacheHit) || !tokenCount(split.cacheMiss) || split.cacheHit + split.cacheMiss !== usage.prompt) throw new Error('Invalid cache usage for cost calculation.');

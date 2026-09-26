@@ -36,6 +36,11 @@ Missing provider metadata forces the global floor because an unbound price may b
 Charge the greater of this floor and the original reservation to the same
 four scopes: global, agent, requested model and session.
 
+Price administration captures the tariff values and version identities usable at
+dispatch. Reconciliation selects the served model from that capture, and expiry
+uses those captured candidates: a live price update must not reprice an inflight
+reservation. See [the validity contract](price-validity-administration.md).
+
 The operator accepted this narrower floor on the assumption that rerouting stays within a provider.
 An unrelated provider's expensive model adds only coincidental headroom, so removing it improves
 precision without establishing an invoice guarantee: routing outside the known price table or across

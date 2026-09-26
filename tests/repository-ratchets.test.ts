@@ -191,6 +191,7 @@ test('O2 Gitleaks suppressions stay on the shrinking justified allowlist', () =>
 });
 
 const referenceDecisions = new Map<string, readonly string[]>([
+  ['price-validity-administration.md', ['Reservations capture tariff values as well as version identities because closing a validity later must not change the ruler used to reconcile work already dispatched.', 'Do not simplify', 'expiresAt', 'sourceUrl', 'reconciled']],
   ['react-flow-node-identity.md', ['adoptUserNodes', 'userNode === internals.userNode', 'measured', 'handleBounds', 'Do not simplify']],
   ['react-flow-minimap-sizing.md', ['style?.width ?? 200', 'viewBox', 'style` prop', 'Do not simplify']],
   ['reservation-expiry.md', ['unverifiable', 'dearest known model', '100% cache miss', 'Do not simplify']],

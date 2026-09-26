@@ -8,13 +8,14 @@ import { redactText } from '../security/redact';
 import { reproducible, validateConfig, validCostLimit, validLimit, type TokenPolicy, type Prices } from './config';
 import { preflightCostUsd, reconciledCostUsd, worstCasePeakCostUsd } from './pricing';
 import { verificationThinking } from '../providers/thinking-policy';
+import { PriceCatalog } from '../prices/catalog';
 export class TokenFailure extends Error {}
 type Totals = { prompt: number; completion: number; total: number };
 type Scope = 'global' | 'agent' | 'model' | 'session';
 export type BillingVerdict = 'unbilled' | 'billed' | 'unverifiable';
 // The USD ceiling reads costAccountedUsd; costUnmeasuredUsd is the part of it charged at reservation expiry and not yet confirmed.
 type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costAccountedUsd: number; costUnmeasuredUsd: number; saved: number; unverifiable: number };
-type Reservation = { id: string; agent: string; model: string; provider: ProviderAdapter['id']; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[] };
+type Reservation = { id: string; agent: string; model: string; provider: ProviderAdapter['id']; priceVersionId: string; priceVersions: ReturnType<PriceCatalog['capture']>; billingModel?: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[] };
 type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => string[]; role?: (id: string) => string };
 // disabled, invalid_model_format and model_not_allowlisted are local refusals that bill nothing, yet stay unverifiable: a test
 // proves none can fire with a live reservation, and unbilled would silently free a hold if one ever fired after provider contact.
@@ -26,6 +27,7 @@ const zero = (): Totals => ({ prompt: 0, completion: 0, total: 0 });
 const money = (value: number) => Math.round(value * 1_000_000_000_000) / 1_000_000_000_000;
 export class TokenService {
   readonly sessionId = randomUUID();
+  readonly catalog: PriceCatalog;
   private rows = new Map<string, Row>();
   private stopped = false;
   private paused = new Set<string>();
@@ -33,7 +35,9 @@ export class TokenService {
   private cache = new Map<string, { expires: number; text: string; usage: Usage; approximate: boolean; billingModel: string }>();
   private reservations = new Map<string, Reservation>();
   private reservationSequence = 0;
-  constructor(readonly policy: TokenPolicy, readonly prices: Prices, private readonly hooks: Hooks, private readonly counter: TokenCounter = heuristicTokenCounter, private readonly now = Date.now) { validateConfig(policy, prices); }
+  constructor(readonly policy: TokenPolicy, readonly prices: Prices, private readonly hooks: Hooks, private readonly counter: TokenCounter = heuristicTokenCounter, private readonly now = Date.now, catalog?: PriceCatalog) {
+    validateConfig(policy, prices); this.catalog = catalog ?? new PriceCatalog(prices, undefined, now);
+  }
   private row(scope: Scope, id: string, limit: number, costLimitUsd: number) {
     const key = JSON.stringify([scope, id]); let row = this.rows.get(key);
     if (!row) { row = { scope, id, limit, used: 0, reserved: 0, estimated: 0, conservativeCachedInput: 0, actual: zero(), mock: zero(), costLimitUsd, costReservedUsd: 0, costAccountedUsd: 0, costUnmeasuredUsd: 0, saved: 0, unverifiable: 0 }; this.rows.set(key, row); }
@@ -49,7 +53,8 @@ export class TokenService {
       if (reservation.status !== 'unverifiable' || reservation.expiresAt === null || reservation.expiresAt > now) continue;
       // Convert at the dearer of what was held and what the dearest eligible model would have cost:
       // the request may have been served, and billed, by a model other than the one asked for.
-      const conservative = Math.max(reservation.costUsd, worstCasePeakCostUsd(this.prices.models, reservation.inputTokens, reservation.maxOutputTokens, reservation.createdAt, reservation.provider));
+      const prices = Object.fromEntries(Object.entries(reservation.priceVersions).map(([model, version]) => [model, version.price]));
+      const conservative = Math.max(reservation.costUsd, worstCasePeakCostUsd(prices, reservation.inputTokens, reservation.maxOutputTokens, reservation.createdAt, reservation.provider));
       for (const row of reservation.rows) {
         row.reserved -= reservation.tokens;
         row.used += reservation.tokens;
@@ -84,6 +89,7 @@ export class TokenService {
     const reservation = this.reservations.get(id);
     if (!reservation || reservation.status !== 'estimated') throw new TokenFailure('Unknown estimated reservation.');
     const total = prompt + completion;
+    this.catalog.recordReconciliation([...new Set([reservation.model, reservation.billingModel ?? reservation.model])], reservation.createdAt, Math.max(reservation.createdAt, this.now()) + 1);
     for (const row of reservation.rows) {
       row.used += total - reservation.tokens;
       row.estimated -= reservation.tokens;
@@ -113,8 +119,9 @@ export class TokenService {
     this.scopes(this.hooks.ids()[0] ?? 'none', Object.keys(this.policy.models)[0] ?? 'none');
     for (const id of this.hooks.ids()) this.row('agent', id, this.policy.perAgent, this.policy.costLimitsUsd.perAgent);
     for (const id of Object.keys(this.policy.models)) this.row('model', id, this.policy.perModel, this.policy.costLimitsUsd.perModel);
-    const reservations = [...this.reservations.values()].filter(item => item.status !== 'inflight').map(item => ({ id: item.id, agent: item.agent, model: item.model, tokens: item.tokens, costUsd: item.costUsd, createdAt: item.createdAt, expiresAt: item.expiresAt, status: item.status }));
-    return { sessionId: this.sessionId, stopped: this.stopped, paused: [...this.paused], priceDate: this.prices.date, prices: this.prices.models, models: this.policy.models, cacheTtlMs: this.policy.cacheTtlMs, reservationTtlMs: this.policy.reservationTtlMs, reservations, rows: [...this.rows.values()].map(row => ({ ...structuredClone(row), state: this.blocked(row) ? 'stopped' : this.warning(row) ? 'warning' : 'available' })) };
+    const reservations = [...this.reservations.values()].filter(item => item.status !== 'inflight').map(item => ({ id: item.id, agent: item.agent, model: item.model, priceVersionId: item.priceVersionId, tokens: item.tokens, costUsd: item.costUsd, createdAt: item.createdAt, expiresAt: item.expiresAt, status: item.status }));
+    const prices = Object.fromEntries(Object.entries(this.catalog.capture(this.now())).map(([model, version]) => [model, version.price]));
+    return { sessionId: this.sessionId, stopped: this.stopped, paused: [...this.paused], priceDate: this.prices.date, prices, catalog: this.catalog.snapshot(), models: this.policy.models, cacheTtlMs: this.policy.cacheTtlMs, reservationTtlMs: this.policy.reservationTtlMs, reservations, rows: [...this.rows.values()].map(row => ({ ...structuredClone(row), state: this.blocked(row) ? 'stopped' : this.warning(row) ? 'warning' : 'available' })) };
   }
   private refuse(agent: string, message: string): never {
     eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'budget.refused', severity: 'warning', payload: message });
@@ -127,8 +134,11 @@ export class TokenService {
     if (!model || model.provider !== adapter.id) this.refuse(agent, 'Model not allowlisted. Edit local token policy and prices.');
     if (typeof input !== 'string' || !input.trim() || input.length > 2000) this.refuse(agent, 'Invalid input.');
     if (this.stopped || this.paused.has(agent)) { this.pause(agent); this.refuse(agent, 'Agent paused.'); }
-    const price = Object.hasOwn(this.prices.models, adapter.model) ? this.prices.models[adapter.model] : undefined;
-    if (!price) this.refuse(agent, 'Model price missing. Add an operator-verified price before execution.');
+    const createdAt = this.now();
+    const priceVersions = this.catalog.capture(createdAt);
+    const selectedPrice = Object.hasOwn(priceVersions, adapter.model) ? priceVersions[adapter.model] : undefined;
+    if (!selectedPrice) this.refuse(agent, 'Model price missing, expired or not yet effective. Add an operator-verified validity before execution.');
+    const price = selectedPrice.price;
     const models = this.agentModels.get(agent) ?? new Set<string>(); models.add(adapter.model); this.agentModels.set(agent, models);
     const rows = this.scopes(agent, adapter.model);
     if (rows.some(row => this.blocked(row))) { this.pause(agent); this.refuse(agent, 'Token or monetary budget exhausted.'); }
@@ -138,7 +148,6 @@ export class TokenService {
     // that would have been allowed to reason.
     const payload = JSON.stringify({ provider: adapter.id, model: adapter.model, systemPrompt: options.systemPrompt, messages: options.messages, temperature: options.temperature, maxTokens: options.maxTokens, thinking: options.thinking ?? null });
     const hash = createHash('sha256').update(payload).digest('hex');
-    const createdAt = this.now();
     const inputEstimate = this.counter.count(JSON.stringify({ systemPrompt: options.systemPrompt, messages: options.messages }));
     let reservedCostUsd: number;
     try { reservedCostUsd = preflightCostUsd(price, inputEstimate, options.maxTokens, createdAt, this.policy.reservationTtlMs); }
@@ -150,7 +159,7 @@ export class TokenService {
     if (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costAccountedUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd)) { this.pause(agent); this.refuse(agent, 'Preflight reservation exceeds token or monetary budget.'); }
     // Synchronous reservation across all four scopes happens before any provider I/O.
     rows.forEach(row => { row.reserved += reservedTokens; row.costReservedUsd = money(row.costReservedUsd + reservedCostUsd); });
-    const reservation: Reservation = { id: `reservation-${++this.reservationSequence}`, agent, model: adapter.model, provider: adapter.id, tokens: reservedTokens, costUsd: reservedCostUsd, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, createdAt, expiresAt: null, status: 'inflight', rows };
+    const reservation: Reservation = { id: `reservation-${++this.reservationSequence}`, agent, model: adapter.model, provider: adapter.id, priceVersionId: selectedPrice.id, priceVersions, tokens: reservedTokens, costUsd: reservedCostUsd, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, createdAt, expiresAt: null, status: 'inflight', rows };
     this.reservations.set(reservation.id, reservation);
     if (previewEnabled()) options.onText = text => observeArtifact(agent, this.hooks.role?.(agent) ?? agent, text);
     let verdict: BillingVerdict = 'unverifiable';
@@ -167,10 +176,12 @@ export class TokenService {
       // and bill at the served model's rate. A served model with no operator-verified price cannot be
       // reconciled, and a call that already happened must not be released as if it were free.
       const billingModel = result.billingModel ?? adapter.model;
+      reservation.billingModel = billingModel;
       if (billingModel !== adapter.model) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.rerouted', severity: 'warning', payload: `Request for ${adapter.model} was served by ${billingModel}; reconciled at the served model price.` });
-      const billingPrice = Object.hasOwn(this.prices.models, billingModel) ? this.prices.models[billingModel] : undefined;
+      const billingPrice = Object.hasOwn(reservation.priceVersions, billingModel) ? reservation.priceVersions[billingModel].price : undefined;
       if (!billingPrice) this.refuse(agent, 'Served model has no verified price; usage stays unverifiable until reconciled manually.');
-      const actualCostUsd = reconciledCostUsd(billingPrice, usage, createdAt, responseAt);
+      const actualCostUsd = reconciledCostUsd(billingPrice, usage, createdAt, responseAt, true);
+      this.catalog.recordReconciliation([...new Set([adapter.model, billingModel])], Math.min(createdAt, responseAt), Math.max(createdAt, responseAt) + 1);
       for (const row of rows) {
         row.reserved -= reservedTokens; row.used += usage.total; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); row.costAccountedUsd = money(row.costAccountedUsd + actualCostUsd);
         const totals = approximate ? row.mock : row.actual;

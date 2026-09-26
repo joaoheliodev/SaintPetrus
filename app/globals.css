@@ -154,6 +154,20 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 .token-table th, .token-table td { padding: .5rem; border: 1px solid var(--border); text-align: left; }
 .token-table small { display: block; max-width: 18ch; overflow-wrap: anywhere; }
 .token-table input { width: 8rem; background: var(--background); color: var(--foreground); }
+.price-panel { display: grid; gap: 1rem; line-height: 1.5; }
+.price-panel p { max-width: 80ch; }
+.price-panel section, .price-panel fieldset { min-width: 0; border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; }
+.price-panel h3, .price-panel legend { font-weight: 600; }
+.price-panel form, .price-panel details, .price-panel label { display: grid; gap: .5rem; }
+.price-panel form { gap: 1rem; }
+.price-panel summary { cursor: pointer; font-weight: 500; }
+.price-panel input:not([type=checkbox]), .price-panel select, .price-panel textarea { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: .375rem; padding: .5rem; background: var(--background); color: var(--foreground); }
+.price-panel a { text-decoration: underline; overflow-wrap: anywhere; }
+.price-panel input:focus-visible, .price-panel select:focus-visible, .price-panel textarea:focus-visible, .price-panel summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.price-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .75rem; }
+.price-weekdays { display: flex; flex-wrap: wrap; gap: .75rem; }
+.price-weekdays label { display: inline-flex; align-items: center; gap: .25rem; }
+.price-warning { border-left: 3px solid var(--destructive); padding-left: .75rem; font-weight: 600; }
 
 .event-feed { padding: 1rem; border-top: 1px solid var(--border); }
 .event-feed label { display: inline-flex; gap: .5rem; margin-right: 1rem; }
