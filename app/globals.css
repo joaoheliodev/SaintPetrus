@@ -133,6 +133,12 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 18px; } h2 { font-size: 15px; } h3 
 .menu-separator { height: 1px; margin: 4px; background: var(--border); }
 .provider-badge { padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; white-space: nowrap; background: transparent; color: var(--foreground); font-size: 13px; }
 button.provider-badge:hover { background: var(--secondary); }
+.budget-meter { display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--foreground); font-size: 13px; white-space: nowrap; }
+.budget-meter:hover { background: var(--secondary); }
+.meter-track { width: 64px; height: 6px; border-radius: 3px; background: var(--secondary); overflow: hidden; }
+.meter-track > span { display: block; height: 100%; background: var(--status-green); }
+.budget-meter.is-warning { color: var(--status-amber); border-color: var(--status-amber); } .budget-meter.is-warning .meter-track > span { background: var(--status-amber); }
+.budget-meter.is-stopped { color: var(--status-red); border-color: var(--status-red); } .budget-meter.is-stopped .meter-track > span { background: var(--status-red); }
 .provider-badge.is-verified { color: var(--primary); border-color: var(--primary); }
 .provider-badge.is-rejected { color: var(--destructive); border-color: var(--destructive); }
 .provider-badge.is-configured { color: var(--muted-foreground); }

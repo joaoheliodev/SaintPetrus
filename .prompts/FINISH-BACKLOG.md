@@ -137,7 +137,7 @@ panel, nothing copied or loaded from it.
 | U1 | Vocabulary and status | No text contradicts another about mode, connection or status | done |
 | U2 | Demo kept apart | No single unconfirmed click replaces the graph | done |
 | U3 | Agent panel with Run and Details | Run an agent and read the answer without scrolling or changing tab | done |
-| U4 | Screen structure and navigation | Every current function reachable by mouse and keyboard; no route changes | in progress: structure done (U4a), top bar next (U4b) |
+| U4 | Screen structure and navigation | Every current function reachable by mouse and keyboard; no route changes | done |
 | U5 | Budgets | Summary, per-scope blocks, details table with every field and action | pending |
 | U6 | Activity | Drawer and full view, readable monospace lines, `agent.moved` hidden by default | pending |
 | U7 | First steps | Checklist derived from server state, dismissible in memory | pending |
@@ -172,6 +172,10 @@ panel, nothing copied or loaded from it.
   for its background and minimap. The optional feed and preview notices moved to Connection → Optional features;
   the preview is a tab of the drawer under the canvas. Leaving the Connection view unmounts the key field with its
   value, which replaces the dialog's "cleared on close".
+- U4b: the top bar holds the connection chip, the budget meter and Pause all agents. The meter is the fullest of the
+  global and session rows, used plus reserved over the limit in tokens or dollars (`lib/budget-summary.ts`), and it
+  takes warning and stop from the server's own row state; it reads the one token snapshot and opens Budgets. The
+  Ctrl+K hint arrives with the palette (U9).
 
 #### Questions for João
 

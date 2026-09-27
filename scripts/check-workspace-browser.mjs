@@ -122,7 +122,9 @@ try {
   assert.equal(exported, 'ok');
   console.log('PASS: graph export link downloads the server snapshot');
   // Budgets, Prices and Connection are views of the main column, reached from the sidebar; the canvas stays as it was.
-  await until(() => click('Budgets'), 'Budgets view');
+  // The top-bar meter reads the same snapshot and leads to Budgets.
+  assert.match(await until(() => evaluate(`document.querySelector('.budget-meter')?.textContent.match(/^Budget \\d+%/)?.[0]`), 'budget meter'), /^Budget \d+%/);
+  await evaluate(`document.querySelector('.budget-meter').click()`);
   await until(() => evaluate(`document.body.textContent.includes('Budgets and consumption') && document.querySelectorAll('.token-table tbody tr').length > 0`), 'token table');
   assert.ok(await evaluate(`document.body.textContent.includes('No held or expired reservations.')`), 'empty reservation state is explicit');
   assert.deepEqual(await unnamed(), [], 'budget controls are named');

@@ -3,6 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TokenSnapshot } from '../lib/tokens/service';
 import { Button } from './ui/button';
 import { PricePanel } from './price-panel';
+import { Gauge } from 'lucide-react';
+import { budgetMeter } from '../lib/budget-summary';
+import { cn } from '../lib/utils';
 // The one GET reader for accounting evidence: the token snapshot and the receipts behind it.
 export function readAccounting(path: '/api/tokens', signal?: AbortSignal): Promise<TokenSnapshot>;
 export function readAccounting(path: '/api/receipts', signal?: AbortSignal): Promise<unknown>;
@@ -59,6 +62,15 @@ export type TokenSource = ReturnType<typeof useTokenSnapshot>;
 export function PauseAllButton({ tokens }: { tokens: TokenSource }) {
   const { pending, command } = tokens;
   return <Button variant="outline" disabled={pending} onClick={() => { if (window.confirm('Pause every agent? A provider call in flight is cancelled and stays unverifiable until its reservation expires.')) void command({ action: 'kill' }); }}>Pause all agents</Button>;
+}
+const meterStates: Record<string, string> = { available: '', warning: ' · warning', stopped: ' · stopped' };
+// The top-bar meter, from the same snapshot as Budgets: the fullest of the global and session scopes.
+export function BudgetMeter({ snapshot, open }: { snapshot: Pick<TokenSnapshot, 'rows' | 'stopped'> | undefined; open: () => void }) {
+  const meter = snapshot ? budgetMeter(snapshot.rows) : undefined;
+  const text = !snapshot ? 'Budget …' : snapshot.stopped ? 'Budget · all paused' : meter ? `Budget ${meter.percent}%${meterStates[meter.state] ?? ''}` : 'Budget —';
+  return <button type="button" className={cn('budget-meter', meter && `is-${snapshot?.stopped ? 'stopped' : meter.state}`)} onClick={open} title={meter ? `Fullest budget: ${meter.scope}, in ${meter.dimension}. Open Budgets.` : 'Open Budgets.'}>
+    <Gauge size={15} aria-hidden="true" /><span>{text}</span><span className="meter-track" aria-hidden="true"><span style={{ width: `${Math.min(100, meter?.percent ?? 0)}%` }} /></span>
+  </button>;
 }
 export function BudgetsView({ tokens }: { tokens: TokenSource }) {
   const { data, error, pending, command } = tokens;

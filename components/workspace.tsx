@@ -12,7 +12,7 @@ import { connectionFeedback, type Agent, type Graph } from '@/lib/orchestrator';
 import { useProjection } from '@/lib/store';
 import { useGraphTransport } from '@/lib/use-graph-transport';
 import { AgentInspector } from './agent-inspector';
-import { BudgetsView, PauseAllButton, PricesView, useTokenSnapshot } from './token-panel';
+import { BudgetMeter, BudgetsView, PauseAllButton, PricesView, useTokenSnapshot } from './token-panel';
 import { AgentStatusBadge } from './agent-status-badge';
 import { agentPlacement } from '@/lib/agent-status';
 import { ArtifactPreview } from './artifact-preview';
@@ -197,7 +197,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       </div>
     </aside>
     <div className="main-column">
-      <header className="topbar"><ConnectionChip source={connection} open={() => setView('connection')} /><div className="topbar-actions"><PauseAllButton tokens={tokens} /></div></header>
+      <header className="topbar"><ConnectionChip source={connection} open={() => setView('connection')} /><BudgetMeter snapshot={tokens.data} open={() => setView('budgets')} /><div className="topbar-actions"><PauseAllButton tokens={tokens} /></div></header>
       {/* The canvas stays laid out under the other views: React Flow measures nodes and draws its background from its own size. */}
       <div className={cn('workspace-view', view !== 'workspace' && 'is-away')} inert={view !== 'workspace'}><div className="center-panel"><div className="canvas-toolbar"><span>Canvas · {graph.agents.length} {graph.agents.length === 1 ? 'agent' : 'agents'} · {graph.edges.length} {graph.edges.length === 1 ? 'connection' : 'connections'}</span><div className="project-actions">
       <Button disabled={pending} onClick={() => openDraft({ parentId: null })}><Plus />Add agent</Button>
