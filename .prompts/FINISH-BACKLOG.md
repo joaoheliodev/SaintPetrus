@@ -87,7 +87,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | --- | --- | --- | --- | --- | --- |
 | Q1 | Coverage for critical modules | Token, credential, event and preview routes have uncovered branches | New tests with mocked transport only; coverage recorded | no | done (this commit; `tests/route-boundaries.test.ts`: token, price, provider, credential, graph and artifact-stream route boundaries; non-test line coverage 94.4% (baseline 93%), branches 91.9%, functions 87.7%, measured with `--experimental-test-coverage --test-coverage-exclude='tests/**'`) |
 | Q2 | Browser end-to-end smoke check | Chromium is preinstalled in this environment | Dependency-free CDP script for the main flow in mock mode, outside the gate; run result recorded | no | in progress (`scripts/check-workspace-browser.mjs` added with S4; extended with Phase 3) |
-| Q3 | Basic accessibility | Keyboard, labels, visible focus, contrast | Focus-visible styles, labelled controls, keyboard paths checked; contrast of tokens measured | no | in progress (contrast measured and field edges fixed in d6a0a59, D-08; arrow-key moves and multi-card drags saved in this commit) |
+| Q3 | Basic accessibility | Keyboard, labels, visible focus, contrast | Focus-visible styles, labelled controls, keyboard paths checked; contrast of tokens measured | no | done (this commit; contrast and field edges d6a0a59, D-08; arrow-key and group moves saved 3aa99bc; focus on cards and connections made visible and a keyboard path to connect agents added here, D-09; the browser check names every control in four states and walks 35 Tab stops in dev, 29 in production, all visibly focused. Not done: no screen-reader session, React Flow live-region announcements unverified) |
 | Q4 | Dead code | Only when unused is proven | Removals backed by search evidence, or none | no | pending |
 
 ### Phase 5 — documentation and DX (P3)
@@ -203,6 +203,10 @@ The commit is documentation only and carries no secret or leaky instruction.
 | Q3 | newest queued position dropped | killed by the same test |
 | Q3 | refused move left as unconfirmed | killed by "Q3 a refused move stops sending…" |
 | Q3 | canvas ignores settled moves (the old drag-stop-only wiring) | killed by the browser check ("Timed out: keyboard move saved by the server"), outside the gate |
+| Q3 | inspector offers the selected agent as its own target | killed by "Q3 the inspector offers a keyboard path to connect…" |
+| Q3 | Connect enabled before a target is chosen | killed by the same test |
+| Q3 | inspector select edge drawn with `--border` | killed by "Q3 field edges and the focus ring keep 3:1…" |
+| Q3 | card and connection focus override removed | killed by "Q3 cards and connections show keyboard focus…"; before the fix the browser check listed the three cards and the edge as invisible focus stops |
 
 ## Phase 2 security findings
 
@@ -256,6 +260,10 @@ The commit is documentation only and carries no secret or leaky instruction.
   edges drew with the decorative `--border` at 2.43:1 on cards, under the 3:1 that identifies a field. The
   `--input` token now holds `#637682` (3.20:1 on card, 3.78:1 on background) and only field rules use it;
   dividers keep `--border`. Visual and reversible.
+- **D-09 Keyboard paths.** Connecting two agents needed a pointer drag, so the inspector gained a labelled
+  "Connect to" list and a Connect button that call the canvas's own `connect` (same client feedback, same
+  server validation). It is an accessible path to an existing function, not a new feature. Focused cards and
+  connections, which React Flow's stylesheet leaves without an outline, now show the ring. Reversible.
 
 ## Perguntas para o João (questions for the operator)
 
@@ -280,3 +288,7 @@ The commit is documentation only and carries no secret or leaky instruction.
 
 - Phase 0 inventory complete; this backlog written before any implementation.
 - Phase 1 complete: V0–V11 done (V11 added by the review of V2). Floor 338 → 360.
+- Phase 2 complete: S1–S6 done (Forget key UI, CSP and headers, key lifecycle table). Floor 360 → 366.
+- Phase 3 complete except F7 (blocked on Q-03/Q-04): mock by default in dev, edit, Run once, confirmations,
+  empty and unavailable states, export link. Floor 366 → 372.
+- Phase 4: Q1 route boundaries (01f4faa), Q3 contrast, keyboard moves, focus and keyboard connect. Floor → 384.

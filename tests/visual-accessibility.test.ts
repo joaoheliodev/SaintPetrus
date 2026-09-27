@@ -40,3 +40,10 @@ test('Q3 field edges and the focus ring keep 3:1 against the surfaces around the
   for (const [, selector, body] of fieldRules) assert.match(body, /(^|[;\s])border: 1px solid var\(--input\)/, `${selector.trim()} draws its edge with --input`);
   assert.match(css, /:focus-visible \{ outline: 2px solid var\(--ring\); outline-offset: 2px; \}/, 'every focusable element shows the ring');
 });
+
+test('Q3 cards and connections show keyboard focus although React Flow strips the outline', () => {
+  assert.match(css, /\.react-flow \.react-flow__node-agent\.selectable:focus-visible \{ outline: 2px solid var\(--ring\); outline-offset: 2px; \}/, 'a focused card is outlined');
+  assert.match(css, /\.react-flow \.react-flow__edge\.selectable:focus-visible \.react-flow__edge-path[^{]*\{ stroke: var\(--ring\); stroke-width: 3; \}/, 'a focused connection is drawn thicker in the ring colour');
+  const library = readFileSync('node_modules/@xyflow/react/dist/style.css', 'utf8');
+  assert.match(library, /\.react-flow__node\.selectable:focus-visible \{\s*outline: none;/, 'if React Flow stops removing the outline, this override can go');
+});

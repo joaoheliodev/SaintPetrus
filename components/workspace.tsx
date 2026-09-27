@@ -175,7 +175,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         {lonely && <div className="canvas-hint"><p><strong>Two ways to grow the graph</strong></p><p>Drag from the dot on the right edge of a card and release on empty canvas — that creates a subagent already connected.</p><p>Or double-click anywhere empty to drop a standalone agent there.</p></div>}
       </div>
       <section className="event-panel" aria-label="Graph events"><div className="panel-title">Server events · revision {graph.revision}</div><div className="event-list">{events.length ? events.map(event => <p key={event.id}>{event.type} — {event.message}</p>) : <p>Ready. Add an agent to create your first connection.</p>}</div></section>
-    </div><AgentInspector key={selected.id} agent={selected} pending={pending} command={command} /></div>
+    </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} /></div>
     <div className="aux-panels">
       {feedEnabled ? <EventFeed /> : <p className="helper">Live feed disabled on server. Enable SAINTPETRUS_FEED and restart.</p>}
       {previewPort ? <ArtifactPreview port={previewPort} /> : <p className="helper">Preview disabled: it executes LLM-generated code in an isolated sandbox. Enable SAINTPETRUS_PREVIEW on the server and restart.</p>}

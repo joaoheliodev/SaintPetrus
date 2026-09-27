@@ -47,8 +47,24 @@ try {
   // A real key press always ends with keyup; React Flow matches shortcuts against the keys still held.
   const press = async key => { for (const phase of ['keydown', 'keyup']) { await evaluate(`document.dispatchEvent(new KeyboardEvent('${phase}', { key: '${key}', code: '${key}', bubbles: true }))`); await new Promise(resolve => setTimeout(resolve, 150)); } };
   // Trusted key presses from the browser's own input pipeline, so Tab moves focus as it does for a person.
-  const keyCodes = { Tab: 9, Enter: 13, Escape: 27, ArrowRight: 39 };
-  const key = async name => { for (const type of ['rawKeyDown', 'keyUp']) await call('Input.dispatchKeyEvent', { type, key: name, code: name, windowsVirtualKeyCode: keyCodes[name] }, session); await new Promise(resolve => setTimeout(resolve, 120)); };
+  const keyCodes = { Tab: 9, Enter: 13, Escape: 27, ArrowRight: 39, ArrowDown: 40 }; const keyText = { Enter: '\r' };
+  const key = async name => {
+    const base = { key: name, code: name, windowsVirtualKeyCode: keyCodes[name] };
+    await call('Input.dispatchKeyEvent', keyText[name] ? { ...base, type: 'keyDown', text: keyText[name] } : { ...base, type: 'rawKeyDown' }, session);
+    await call('Input.dispatchKeyEvent', { ...base, type: 'keyUp' }, session); await new Promise(resolve => setTimeout(resolve, 120));
+  };
+  // Every visible control needs a name a screen reader can announce.
+  const unnamed = () => evaluate(`(() => {
+    const visible = element => { const box = element.getBoundingClientRect(); const style = getComputedStyle(element); return box.width > 0 && box.height > 0 && style.visibility !== 'hidden' && style.display !== 'none'; };
+    const nameOf = element => {
+      const label = element.getAttribute('aria-label')?.trim(); if (label) return label;
+      const by = element.getAttribute('aria-labelledby'); if (by) { const text = by.split(/\\s+/).map(id => document.getElementById(id)?.textContent ?? '').join(' ').trim(); if (text) return text; }
+      if (element.labels?.length) { const text = Array.from(element.labels).map(item => item.textContent).join(' ').trim(); if (text) return text; }
+      if (element.matches('button, a, summary, [role=tab]')) { const text = element.textContent.trim(); if (text) return text; }
+      return element.getAttribute('title')?.trim() ?? '';
+    };
+    return Array.from(document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, summary, [role=tab]')).filter(visible).filter(element => !nameOf(element)).map(element => element.outerHTML.slice(0, 160));
+  })()`);
   const type = (selector, value) => evaluate(`(() => { const field = document.querySelector(${JSON.stringify(selector)}); const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), 'value').set; setter.call(field, ${JSON.stringify(value)}); field.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
   await call('Page.navigate', { url: `http://127.0.0.1:${port}` }, session);
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 1 && document.body.textContent.includes('Coordinator')`), 'canvas with the coordinator');
@@ -56,8 +72,10 @@ try {
   const header = name => Object.entries(documentHeaders).find(([key]) => key.toLowerCase() === name)?.[1] ?? '';
   assert.match(header('content-security-policy'), /frame-ancestors 'none'/); assert.equal(header('x-frame-options'), 'DENY');
   console.log('PASS: page rendered under the security headers');
+  assert.deepEqual(await unnamed(), [], 'main page controls are named');
   await until(() => click('Add agent'), 'Add agent button');
   await until(() => evaluate(`!!document.querySelector('[role=dialog] textarea')`), 'add agent dialog');
+  assert.deepEqual(await unnamed(), [], 'add agent dialog controls are named');
   await type('[role=dialog] input', 'Smoke agent'); await type('[role=dialog] textarea', 'Exercise the main flow in a real browser.');
   await until(() => click('Create agent'), 'Create agent button');
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 2`), 'second node on the canvas');
@@ -104,10 +122,12 @@ try {
   await until(() => click('Tokens'), 'Tokens button');
   await until(() => evaluate(`document.body.textContent.includes('Budgets and consumption') && document.querySelectorAll('.token-table tbody tr').length > 0`), 'token table');
   assert.ok(await evaluate(`document.body.textContent.includes('No held or expired reservations.')`), 'empty reservation state is explicit');
+  assert.deepEqual(await unnamed(), [], 'token and price controls are named');
   await press('Escape');
   console.log('PASS: token controls loaded from the server');
   await until(() => click('Connect AI'), 'Connect AI button');
   await until(() => evaluate(`document.body.textContent.includes('Keys go only to this local backend')`), 'connection panel');
+  assert.deepEqual(await unnamed(), [], 'connection controls are named');
   console.log('PASS: connection panel opened');
   await press('Escape');
   await until(() => evaluate(`!document.body.textContent.includes('Keys go only to this local backend')`), 'connection panel closed');
@@ -128,6 +148,29 @@ try {
   await until(async () => await edges() === 0, 'confirmed deletion');
   assert.ok(edgeId, 'the edge had an identity');
   console.log('PASS: connection deletion asks first and honours the answer');
+  // Connect two existing agents without a mouse: pick the target in the inspector, Tab to Connect, press Enter.
+  await until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('.agent-list-open')).find(b => b.textContent.includes('Renamed smoke agent')); item?.click(); return document.querySelector('.inspector h2')?.textContent === 'Renamed smoke agent'; })()`), 'smoke agent selected');
+  await evaluate(`document.querySelector('section[aria-label="Connect this agent"] select').focus()`);
+  await key('ArrowDown');
+  await until(() => evaluate(`document.querySelector('section[aria-label="Connect this agent"] select').value !== ''`), 'target chosen from the keyboard');
+  await key('Tab'); assert.equal(await evaluate(`document.activeElement?.textContent`), 'Connect');
+  await key('Enter');
+  await until(async () => await edges() === 1, 'connection created from the keyboard');
+  console.log('PASS: two agents connected from the keyboard');
+  // Walk the whole page with Tab from a fresh load; every stop, cards and connections included, must show where focus is.
+  await call('Page.reload', {}, session);
+  await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 3 && document.querySelectorAll('.react-flow__edge').length === 1`), 'canvas after reload');
+  const hidden = []; let stops = 0;
+  for (; stops < 150; stops++) {
+    await key('Tab');
+    const focus = await evaluate(`(() => { const element = document.activeElement; if (!element || element === document.body || element.dataset.tabStop) return null; element.dataset.tabStop = 'seen'; if (element.localName === 'nextjs-portal') return { id: 'development overlay', shown: true }; const style = getComputedStyle(element); const path = element.matches('.react-flow__edge') ? element.querySelector('.react-flow__edge-path') : null; const shown = path ? parseFloat(getComputedStyle(path).strokeWidth) >= 3 : (style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) >= 2) || style.boxShadow !== 'none'; return { id: element.outerHTML.slice(0, 160), shown }; })()`);
+    if (!focus) break;
+    if (!focus.shown) hidden.push(focus.id);
+  }
+  await evaluate(`document.querySelectorAll('[data-tab-stop]').forEach(element => delete element.dataset.tabStop)`);
+  assert.ok(stops > 20, `Tab reached ${stops} stops`);
+  assert.deepEqual(hidden, [], 'every focus stop is visible');
+  console.log(`PASS: ${stops} Tab stops, each with a visible focus indicator`);
   decisions.push(false); await until(() => click('Reset graph'), 'Reset graph button'); await until(() => dialogs.some(text => text.startsWith('Reset the graph?')), 'reset question');
   await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await nodes(), 3, 'a refused reset keeps the graph');
   await until(() => click('Reset graph'), 'Reset graph button'); await until(async () => await nodes() === 1, 'graph reset after confirmation');

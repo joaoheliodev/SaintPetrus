@@ -121,6 +121,9 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 .node-output { margin-top: 12px; color: var(--primary); }
 .agent-card-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; border-top: 1px solid var(--border); }
 .react-flow__handle { width: 14px; height: 14px; background: var(--primary); border: 2px solid var(--background); }
+/* React Flow's own stylesheet removes the outline from focused cards and edges; keyboard users still need to see focus. */
+.react-flow .react-flow__node-agent.selectable:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.react-flow .react-flow__edge.selectable:focus-visible .react-flow__edge-path, .react-flow .react-flow__edge.selected .react-flow__edge-path { stroke: var(--ring); stroke-width: 3; }
 .event-panel { height: 180px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .event-list { height: 126px; overflow: auto; padding: 10px 16px; color: var(--muted-foreground); }
 .event-list p { margin-bottom: 6px; }
@@ -129,6 +132,7 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 .inspector .status { margin-bottom: 18px; } .inspector h3 { margin: 18px 0 8px; } .inspector p, .inspector pre { max-width: 80ch; overflow-wrap: anywhere; }
 .inspector pre { white-space: pre-wrap; line-height: 1.6; margin-top: 16px; }
 .context-note { display: flex; gap: 10px; padding: 12px; margin-top: 22px; background: var(--accent); border-radius: 6px; }
+.inspector select { display: block; width: 100%; margin: 8px 0 12px; padding: 10px; color: var(--foreground); background: var(--background); border: 1px solid var(--input); border-radius: 6px; }
 .context-note svg { flex-shrink: 0; }
 .statusbar { min-height: 32px; display: flex; justify-content: space-between; padding: 6px 18px; border-top: 1px solid var(--border); color: var(--muted-foreground); }
 .notice { position: fixed; bottom: 45px; left: 50%; transform: translateX(-50%); z-index: 60; max-width: 90vw; display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--card); color: var(--foreground); border: 1px solid var(--destructive); border-radius: 8px; }

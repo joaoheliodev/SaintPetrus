@@ -32,7 +32,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 382 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 384 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
