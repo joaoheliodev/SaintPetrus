@@ -38,7 +38,7 @@ const badges: Record<ConnectionState, (status: ProviderStatusSnapshot) => string
 };
 export const connectionLabel = (status: ProviderStatusSnapshot) => badges[status.state](status);
 // Exported so the distinct meaning of each failure is pinned by a test, not only by the panel.
-export const verificationMessage = (status: number) => failures[status] ?? 'Connection verification failed.';
+export const verificationMessage = (status: number, code?: unknown) => (typeof code === 'string' ? codeFailures[code] : undefined) ?? failures[status] ?? 'Connection verification failed.';
 const failures: Record<number, string> = {
   401: 'The provider rejected the credential or model. Check the API key and model ID.',
   402: 'The provider account has no balance left. The key is valid and the service is up, so the connection is not rejected: top up the account and test again.',
@@ -48,6 +48,9 @@ const failures: Record<number, string> = {
   429: 'The provider rate limited the request. Try again shortly.',
   502: 'Provider communication failed. The credential was neither verified nor rejected.',
   504: 'The provider request timed out. The credential was neither verified nor rejected.',
+};
+const codeFailures: Record<string, string> = {
+  served_model_unpriced: 'The provider answered with a model that has no verified price. The call may have been billed, so its reservation stays held and the agent is paused. Add that model in Tokens → Prices, then reconcile the expired estimate with provider-confirmed usage.',
 };
 const configurationFailures: Record<string, string> = {
   invalid_model_format: 'Invalid model ID format. Use the provider model ID; Gemini also accepts the models/… prefix.',
@@ -109,7 +112,7 @@ export function ProviderStatus() {
     await refresh('explicit');
     setResult(response.ok
       ? `${mocked ? 'Mock verified' : 'Connection verified'} · ${data.latencyMs} ms`
-      : verificationMessage(response.status));
+      : verificationMessage(response.status, data?.error));
   }
   async function run(action: 'connect' | 'test' | 'disconnect') {
     setPending(true); setResult('');

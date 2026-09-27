@@ -136,12 +136,16 @@ credits/free tier and rounding; a locally priced usage result is not an invoice.
 ## Served identity and usage contracts
 
 - **DeepSeek:** `response.model` becomes `billingModel`. Register `R` plus each
-  possible canonical `response.model` as a price key **before dispatch**. If `S`
-  is absent from the captured catalog, the local response is 409, actual totals
-  stay unchanged, both holds remain, and the agent pauses. Later adding `S` does
-  not retrofit that reservation. After expiry use provider-confirmed manual
-  reconciliation. Do not treat the earlier `provider.rerouted` wording
-  “reconciled” as success: it is emitted before price validation.
+  possible canonical `response.model` as a price key **before dispatch**.
+- **Any provider, unpriced `S`:** if the served model is absent from the captured
+  catalog, the local response is 409 with `error: served_model_unpriced`,
+  `requestedModel`, `servedModel` and `reservationId`. Actual totals stay
+  unchanged, both holds remain, the agent pauses and the feed gets
+  `provider.unpriced`; the reservation shows its `servedModel`. The requested
+  tariff is never used and nothing is released. Later adding `S` does not
+  retrofit that reservation. After expiry use provider-confirmed manual
+  reconciliation. `provider.rerouted` only records the divergence; it makes no
+  reconciliation claim.
 - **Gemini:** `promptTokenCount → prompt`;
   `candidatesTokenCount + thoughtsTokenCount → completion`;
   `totalTokenCount → total`. Thoughts are therefore charged at the output rate.
@@ -306,7 +310,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
 | G2 | No successful per-call receipt, raw usage metadata, separate reasoning count, accounting timestamps or tariff IDs; proxy preflight differs from reservation input | Add a sanitized allowlist of numeric usage, identity, timing, reservation and price-version/cost metadata, never the raw response. Until then isolated deltas and provider records only partially establish the mapping |
 | G3 | No production upstream-dispatch counter; local browser cannot prove absence of server traffic | Approve no-payload host evidence, or add a server-owned dispatch counter/event immediately before transport with a correlation ID and no secrets |
 | G4 | No controllable upstream timeout in live configuration | Operator decides safe external impairment; otherwise leave live timeout unverified. Any future runtime control must be explicit and separately reviewed |
-| G5 | Feed tokens are message totals: omit billed output-limit responses, expiry/manual adjustments; reroute text claims reconciliation prematurely | Keep feed as activity evidence. Propose separate sanitized accounting events and emit reconciliation wording only after accounting succeeds |
+| G5 | Feed tokens are message totals: omit billed output-limit responses, expiry/manual adjustments. The reroute text no longer claims reconciliation, and an unpriced served model has its own `provider.unpriced` event | Keep feed as activity evidence; per-call accounting evidence belongs to receipts (G2) |
 | G6 | Token/price receipt export absent; graph export omits ledger, inflight reservations and captures | Propose sanitized accounting export carrying four scopes and captured tariff identities; save local snapshots meanwhile |
 | G7 | DeepSeek is absent from terminal helper's provider list | Use UI now; separately add its ID to the existing validated CLI contract with a regression test |
 | G8 | Zero live cached/thinking tokens cannot establish nonzero cases. The names-only diagnostic now covers Gemini usage failures and a missing usage object in both adapters | Obtain numeric provider evidence, or explicitly leave nonzero cases unverified. Do not manufacture billable coverage |

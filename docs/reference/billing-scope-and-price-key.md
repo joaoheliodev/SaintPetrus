@@ -48,3 +48,4 @@ providers can exceed either estimate, and narrowing removes that extra unrelated
 
 A divergence between requested and served publishes a `provider.rerouted` event. That event is the
 audit trail for the asymmetry, and it is the thing to look at before assuming a budget row is wrong.
+A served model without a captured price also publishes `provider.unpriced` and stays unverifiable.

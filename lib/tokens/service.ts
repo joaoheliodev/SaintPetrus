@@ -10,6 +10,10 @@ import { preflightCostUsd, reconciledCostUsd, worstCasePeakCostUsd } from './pri
 import { verificationThinking } from '../providers/thinking-policy';
 import { PriceCatalog } from '../prices/catalog';
 export class TokenFailure extends Error {}
+// The provider answered, so the call may have been billed, but the model it named has no captured tariff.
+export class UnpricedServedModel extends Error {
+  constructor(readonly requestedModel: string, readonly servedModel: string, readonly reservationId: string) { super(`Served model ${servedModel} has no verified price; usage stays unverifiable until reconciled manually.`); }
+}
 type Totals = { prompt: number; completion: number; total: number };
 type Scope = 'global' | 'agent' | 'model' | 'session';
 export type BillingVerdict = 'unbilled' | 'billed' | 'unverifiable';
@@ -178,9 +182,11 @@ export class TokenService {
       // reconciled, and a call that already happened must not be released as if it were free.
       const billingModel = result.billingModel ?? adapter.model;
       reservation.billingModel = billingModel;
-      if (billingModel !== adapter.model) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.rerouted', severity: 'warning', payload: `Request for ${adapter.model} was served by ${billingModel}; reconciled at the served model price.` });
+      // Published before pricing so the divergence stays on record even when the served model cannot be priced.
+      if (billingModel !== adapter.model) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.rerouted', severity: 'warning', payload: `Request for ${adapter.model} was served by ${billingModel}.` });
+      // Never the requested model's tariff: a served model without a captured price stays unverifiable.
       const billingPrice = Object.hasOwn(reservation.priceVersions, billingModel) ? reservation.priceVersions[billingModel].price : undefined;
-      if (!billingPrice) this.refuse(agent, 'Served model has no verified price; usage stays unverifiable until reconciled manually.');
+      if (!billingPrice) throw new UnpricedServedModel(adapter.model, billingModel, reservation.id);
       const actualCostUsd = reconciledCostUsd(billingPrice, usage, createdAt, responseAt, true);
       this.catalog.recordReconciliation([...new Set([adapter.model, billingModel])], Math.min(createdAt, responseAt), Math.max(createdAt, responseAt) + 1);
       for (const row of rows) {
@@ -202,13 +208,14 @@ export class TokenService {
       }
       return { ...result, usage, approximate, cached: false };
     } catch (error) {
-      eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'error', severity: 'error', payload: 'Provider execution failed.' });
+      if (error instanceof UnpricedServedModel) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.unpriced', severity: 'error', payload: `${error.servedModel} answered a request for ${error.requestedModel} and has no captured price. Reservation ${error.reservationId} stays unverifiable and the agent is paused; price that model, then reconcile the expired estimate with provider-confirmed usage.` });
+      else eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'error', severity: 'error', payload: 'Provider execution failed.' });
       // Names only. A shape we cannot parse pauses the agent, and the names are what makes the next
       // attempt a correction rather than a guess.
       if (error instanceof ProviderFailure && error.fields?.length) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.usage_unparsed', severity: 'warning', payload: `Unrecognized provider usage or served model shape. Field names received: ${error.fields.join(', ')}. No values recorded.` });
       // A proven rejection releases the reservation. Lost contact remains unverifiable because the
       // provider may have processed and billed a response that never reached us.
-      verdict = adapter.id === 'mock' ? 'unbilled' : failureBillingVerdict(error);
+      verdict = error instanceof UnpricedServedModel ? 'unverifiable' : adapter.id === 'mock' ? 'unbilled' : failureBillingVerdict(error);
       throw error;
     } finally {
       if (verdict !== 'billed') {

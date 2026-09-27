@@ -3,7 +3,7 @@ import { readJson } from '@/lib/server/read-json';
 import { safeJson } from '@/lib/security/redact';
 import { configuredAdapter, providerProxy, providerStatus, recordVerification } from '@/lib/providers/runtime';
 import { tokenService } from '@/lib/tokens/runtime';
-import { TokenFailure } from '@/lib/tokens/service';
+import { TokenFailure, UnpricedServedModel } from '@/lib/tokens/service';
 import { runtime as graphRuntime } from '@/lib/server/runtime';
 import { ProviderFailure } from '@/lib/providers/adapter';
 export const runtime = 'nodejs';
@@ -32,6 +32,8 @@ export async function POST(request: Request) {
     if (input.action === 'test' && !(result as { cached?: boolean }).cached) recordVerification(true);
     return safeJson({ ...result, status: providerStatus() });
   } catch (error) {
+    // The provider answered, but its model has no captured price: no verdict either way, the hold stays.
+    if (error instanceof UnpricedServedModel) return safeJson({ error: 'served_model_unpriced', requestedModel: error.requestedModel, servedModel: error.servedModel, reservationId: error.reservationId }, 409);
     // A budget refusal never reached the provider, so it must not mark the credential as rejected.
     if (error instanceof TokenFailure) return safeJson({ error: error.message }, 409);
     const code = error instanceof ProviderFailure ? error.code : 'invalid_request';

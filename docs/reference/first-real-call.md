@@ -32,8 +32,10 @@ made against each provider, not to the first call of a session.
 ## What to watch
 
 - `provider.rerouted`: the served model differs from the requested one. The call is priced at the
-  served model's rate; if that model has no verified price, the call stays unverifiable and the agent
-  pauses.
+  served model's rate. The event records the divergence only; it does not claim reconciliation.
+- `provider.unpriced`: the served model has no captured price. The call stays unverifiable, its
+  reservation shows the served model, the agent pauses and the request answers 409
+  `served_model_unpriced`. The requested model's tariff is never used instead.
 - `provider.usage_unparsed`: the usage shape or the served model identity is outside the adapter's
   contract. The event lists field names, never values. The parser fails closed and pauses the agent;
   that is the intended behavior, not a defect. Correct the parser from those names in one change

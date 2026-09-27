@@ -406,3 +406,29 @@ test('A DeepSeek response without a usage object reports its own field names, no
     assert.equal(service.snapshot().rows.find(row => row.scope === 'global')!.unverifiable, 1);
   });
 });
+
+test('The provider route reports an unpriced served model with its reservation and records no verdict', async () => {
+  const { POST: execute } = await import('../app/api/provider/route');
+  const { providerStatus, clearVerification } = await import('../lib/providers/runtime');
+  const { verificationMessage } = await import('../components/provider-status');
+  await withCredentials(async store => {
+    const keys = ['saintpetrusCredentials', 'saintpetrusSelection', 'saintpetrusTokens'];
+    const old = new Map(keys.map(key => [key, Reflect.get(globalThis, key)])); const transport = globalThis.fetch;
+    const tokens = new TokenService(policyFor({ mode: 'disabled' }), pricesFor(), { ids: () => ['root'], pause: () => {}, pauseAll: () => {} }, undefined, () => offPeakAt);
+    try {
+      Reflect.set(globalThis, 'saintpetrusCredentials', store); Reflect.set(globalThis, 'saintpetrusSelection', { provider: 'deepseek', model }); Reflect.set(globalThis, 'saintpetrusTokens', tokens); clearVerification();
+      globalThis.fetch = async () => Response.json({ ...completion, model: served });
+      const response = await execute(new Request('http://127.0.0.1:3100/api/provider', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3100', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test' }) }));
+      assert.equal(response.status, 409);
+      const body = await response.json();
+      const [held] = tokens.snapshot().reservations;
+      assert.deepEqual(body, { error: 'served_model_unpriced', requestedModel: model, servedModel: served, reservationId: held.id });
+      assert.equal(held.status, 'unverifiable');
+      assert.equal(providerStatus().state, 'configured', 'an answer that cannot be priced proves nothing about the connection');
+      assert.notEqual(verificationMessage(409, body.error), verificationMessage(409));
+      assert.match(verificationMessage(409, body.error), /Prices/);
+    } finally {
+      clearVerification(); for (const [key, value] of old) Reflect.set(globalThis, key, value); globalThis.fetch = transport;
+    }
+  });
+});
