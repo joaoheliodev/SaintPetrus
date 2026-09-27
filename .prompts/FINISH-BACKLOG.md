@@ -87,7 +87,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | --- | --- | --- | --- | --- | --- |
 | Q1 | Coverage for critical modules | Token, credential, event and preview routes have uncovered branches | New tests with mocked transport only; coverage recorded | no | done (this commit; `tests/route-boundaries.test.ts`: token, price, provider, credential, graph and artifact-stream route boundaries; non-test line coverage 94.4% (baseline 93%), branches 91.9%, functions 87.7%, measured with `--experimental-test-coverage --test-coverage-exclude='tests/**'`) |
 | Q2 | Browser end-to-end smoke check | Chromium is preinstalled in this environment | Dependency-free CDP script for the main flow in mock mode, outside the gate; run result recorded | no | in progress (`scripts/check-workspace-browser.mjs` added with S4; extended with Phase 3) |
-| Q3 | Basic accessibility | Keyboard, labels, visible focus, contrast | Focus-visible styles, labelled controls, keyboard paths checked; contrast of tokens measured | no | pending |
+| Q3 | Basic accessibility | Keyboard, labels, visible focus, contrast | Focus-visible styles, labelled controls, keyboard paths checked; contrast of tokens measured | no | in progress (contrast measured and field edges fixed in this commit, D-08) |
 | Q4 | Dead code | Only when unused is proven | Removals backed by search evidence, or none | no | pending |
 
 ### Phase 5 — documentation and DX (P3)
@@ -195,6 +195,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | Q1 | provider GET without the local-request check | killed by "Q1 the provider route refuses foreign requests…" |
 | Q1 | credentials POST without a client header | killed by "Q1 credential configuration refuses…" |
 | Q1 | artifact stream without the local-request check | killed by "Q1 the artifact stream is local only…" |
+| Q3 | `--input` back to the decorative border colour | killed by "Q3 field edges and the focus ring keep 3:1…" |
+| Q3 | price field edge drawn with `--border` | killed by the same test |
+| Q3 | muted text darkened to 3.6:1 | killed by "Q3 text tokens meet WCAG AA contrast…" |
 
 ## Phase 2 security findings
 
@@ -244,6 +247,10 @@ The commit is documentation only and carries no secret or leaky instruction.
   `config/prices.json`. Synthetic mock usage is no longer journaled; real reconciliation still is.
 - **D-04 Language.** Code, UI, docs and commits stay in English as `AGENTS.md` requires; the final
   session report to the operator is in Portuguese.
+- **D-08 Field edge contrast.** Measured text contrast passes WCAG AA everywhere (lowest 5.06:1), but field
+  edges drew with the decorative `--border` at 2.43:1 on cards, under the 3:1 that identifies a field. The
+  `--input` token now holds `#637682` (3.20:1 on card, 3.78:1 on background) and only field rules use it;
+  dividers keep `--border`. Visual and reversible.
 
 ## Perguntas para o João (questions for the operator)
 

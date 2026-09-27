@@ -56,7 +56,8 @@
   --secondary: #293238; --secondary-foreground: var(--foreground);
   --muted: var(--secondary); --muted-foreground: #acb8c0;
   --accent: #34434b; --accent-foreground: var(--foreground);
-  --border: #53636d; --input: var(--border); --ring: var(--primary);
+  /* Field edges identify the field, so --input keeps 3:1 against card and background; --border is decorative. */
+  --border: #53636d; --input: #637682; --ring: var(--primary);
   --destructive: #dab3a7; --radius: 0.5rem;
   --edge: #b6c4cc; --dots: #53636d;
 }
@@ -76,7 +77,7 @@
 body { margin: 0; font: 14px/1.5 Arial, Helvetica, sans-serif; }
 button, input, textarea { font: inherit; } button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
-input, textarea { display: block; width: 100%; margin: 8px 0 12px; padding: 10px; color: var(--foreground); background: var(--background); border: 1px solid var(--border); border-radius: 6px; }
+input, textarea { display: block; width: 100%; margin: 8px 0 12px; padding: 10px; color: var(--foreground); background: var(--background); border: 1px solid var(--input); border-radius: 6px; }
 textarea { min-height: 110px; resize: vertical; }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 { font-size: 15px; }
@@ -145,7 +146,7 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 .provider-panel label { display: grid; gap: .4rem; }
 .provider-panel input:not([type=checkbox]), .provider-panel select {
   width: 100%; min-height: 2.5rem; padding: .5rem;
-  background: var(--background); color: var(--foreground); border: 1px solid var(--border);
+  background: var(--background); color: var(--foreground); border: 1px solid var(--input);
 }
 
 .token-panel { width: min(72rem, 95vw); max-width: 95vw; max-height: 90vh; overflow-y: auto; line-height: 1.5; }
@@ -161,7 +162,7 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 .price-panel form, .price-panel details, .price-panel label { display: grid; gap: .5rem; }
 .price-panel form { gap: 1rem; }
 .price-panel summary { cursor: pointer; font-weight: 500; }
-.price-panel input:not([type=checkbox]), .price-panel select, .price-panel textarea { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: .375rem; padding: .5rem; background: var(--background); color: var(--foreground); }
+.price-panel input:not([type=checkbox]), .price-panel select, .price-panel textarea { width: 100%; min-width: 0; border: 1px solid var(--input); border-radius: .375rem; padding: .5rem; background: var(--background); color: var(--foreground); }
 .price-panel a { text-decoration: underline; overflow-wrap: anywhere; }
 .price-panel input:focus-visible, .price-panel select:focus-visible, .price-panel textarea:focus-visible, .price-panel summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .price-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .75rem; }
