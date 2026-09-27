@@ -127,6 +127,7 @@ export function ProviderStatus() {
   }
   return <div className="project-actions">
     <span role="status" className={`provider-badge ${status ? `is-${status.state}` : 'is-loading'}`}>{status ? connectionLabel(status) : '◌ Loading connection state'}</span>
+    {status?.validationTimeoutMs !== undefined && <span className="provider-badge is-incomplete" title="Set at server startup with SAINTPETRUS_VALIDATION_TIMEOUT_MS">⏱ Validation timeout · {status.validationTimeoutMs} ms</span>}
     <Dialog open={open} onOpenChange={toggle}>
       <DialogTrigger render={<Button variant="outline" />}>Connect AI</DialogTrigger>
       <DialogContent className="provider-panel">

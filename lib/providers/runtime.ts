@@ -5,13 +5,13 @@ import { mockEnabled } from '../server/runtime';
 import { MockLLMAdapter } from './mock-provider';
 import { OpenAIAdapter } from './openai';
 import { ProviderFailure, type ProviderAdapter } from './adapter';
-import { ProviderProxy } from './proxy';
+import { DEFAULT_PROVIDER_TIMEOUT_MS, ProviderProxy } from './proxy';
 import { isModelProvider, ModelIdError, normalizeModelId, type ModelProvider } from './model-id';
 import type { Credentials } from '../security/credentials';
 // Every provider except the synthetic one authenticates with a stored credential.
 export type KeyedProvider = Exclude<ModelProvider, 'mock'>;
 export type ConnectionState = 'disconnected' | 'configured' | 'verified' | 'rejected' | 'incomplete';
-export type ProviderStatusSnapshot = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable: boolean; verified: boolean; verifiedAt?: number; failureCode?: string; state: ConnectionState };
+export type ProviderStatusSnapshot = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable: boolean; verified: boolean; verifiedAt?: number; failureCode?: string; state: ConnectionState; validationTimeoutMs?: number };
 const keyedProvider = (value: unknown): value is KeyedProvider => isModelProvider(value) && value !== 'mock';
 const adapters: Record<KeyedProvider, new (model: string, credentials: Credentials) => ProviderAdapter> = { gemini: GeminiAdapter, openai: OpenAIAdapter, deepseek: DeepSeekAdapter };
 type ModelAllowlist = Readonly<Record<string, { provider: ModelProvider }>>;
@@ -20,7 +20,14 @@ export type ValidatedSelection = { provider: ModelProvider; model: string };
 // It is never inferred from the presence of a credential and never survives a credential change.
 type Verification = { provider: string; model: string; ok: boolean; at: number; code?: string };
 const state = globalThis as typeof globalThis & { saintpetrusProxy?: ProviderProxy; saintpetrusSelection?: { provider: string; model: string }; saintpetrusVerification?: Verification };
-export const providerProxy = () => state.saintpetrusProxy ??= new ProviderProxy();
+// Startup-only validation aid: a shorter proxy timeout forces the lost-contact path against a real provider. It is
+// never read from a request, and it applies inside the proxy, after preflight has already reserved the call.
+export function validationTimeoutMs(value = process.env.SAINTPETRUS_VALIDATION_TIMEOUT_MS): number | undefined {
+  if (value === undefined || value === '') return undefined;
+  if (!/^[0-9]{1,5}$/.test(value) || Number(value) < 1 || Number(value) >= DEFAULT_PROVIDER_TIMEOUT_MS) throw new Error(`SAINTPETRUS_VALIDATION_TIMEOUT_MS must be an integer from 1 to ${DEFAULT_PROVIDER_TIMEOUT_MS - 1}.`);
+  return Number(value);
+}
+export const providerProxy = () => state.saintpetrusProxy ??= new ProviderProxy(validationTimeoutMs() ?? DEFAULT_PROVIDER_TIMEOUT_MS);
 export function clearVerification() { state.saintpetrusVerification = undefined; }
 export function recordVerification(ok: boolean, code?: string) {
   const { provider, model } = providerStatus();
@@ -38,7 +45,8 @@ export function providerStatus(): ProviderStatusSnapshot {
   const proof = state.saintpetrusVerification;
   const current = proof && proof.provider === base.provider && proof.model === base.model ? proof : undefined;
   const state_: ConnectionState = !base.connected ? 'disconnected' : current?.code === 'output_limit' ? 'incomplete' : current?.ok ? 'verified' : current ? 'rejected' : 'configured';
-  return { ...base, mockAvailable, verified: current?.ok === true, verifiedAt: current?.ok ? current.at : undefined, failureCode: current && !current.ok ? current.code : undefined, state: state_ };
+  const { timeoutMs } = providerProxy();
+  return { ...base, mockAvailable, verified: current?.ok === true, verifiedAt: current?.ok ? current.at : undefined, failureCode: current && !current.ok ? current.code : undefined, state: state_, ...(timeoutMs === DEFAULT_PROVIDER_TIMEOUT_MS ? {} : { validationTimeoutMs: timeoutMs }) };
 }
 export function configuredAdapter(): ProviderAdapter {
   const status = providerStatus();

@@ -3,13 +3,14 @@ import { heuristicTokenCounter, type TokenCounter } from '../core/token-estimate
 import { redactText } from '../security/redact';
 import { DispatchLedger, type Dispatch } from './dispatch-ledger';
 // `correlationId` ties an upstream dispatch to the caller's record (the reservation) without carrying any payload.
+export const DEFAULT_PROVIDER_TIMEOUT_MS = 15000;
 export type DispatchTrace = { correlationId?: string; onDispatch?: (dispatch: Dispatch) => void };
 export class ProviderProxy {
   private active = false;
   private controller?: AbortController;
   readonly dispatches = new DispatchLedger();
   cancel() { this.controller?.abort(); }
-  constructor(private readonly timeoutMs = 15000, private readonly tokenCounter: TokenCounter = heuristicTokenCounter) {}
+  constructor(readonly timeoutMs = DEFAULT_PROVIDER_TIMEOUT_MS, private readonly tokenCounter: TokenCounter = heuristicTokenCounter) {}
   async execute(adapter: ProviderAdapter, input: unknown, parentSignal: AbortSignal, options?: RequestOptions, trace?: DispatchTrace) {
     if (typeof input !== 'string' || !input.trim() || input.length > 2000) throw new ProviderFailure('invalid_request');
     if (this.active) throw new ProviderFailure('busy');

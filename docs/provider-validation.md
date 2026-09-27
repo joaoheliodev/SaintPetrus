@@ -239,13 +239,20 @@ count must not change. Browser DevTools alone does not prove zero backend I/O.
 
 ### V2: timeout, expiry and manual reconciliation
 
-No existing UI/runtime flag forces a provider timeout. Approve an operator-owned,
-disposable, process-scoped network impairment that allows the request out but
-delays the response beyond 15 seconds, preserves TLS and records no payloads or
-headers; restore it immediately afterwards. Do not change endpoints, install a TLS
-interceptor, edit proxy code or throttle browser-to-localhost traffic as a substitute.
-If such a method is unavailable, V2 is **not verified**, not a simulated success.
-Cancelling locally tests `cancelled`, not `timeout`.
+Force the timeout with `SAINTPETRUS_VALIDATION_TIMEOUT_MS`, an integer from 1 to
+14999 read once at server startup (shell or `.env.local`); an invalid value stops
+the server from starting. The header then shows `⏱ Validation timeout`, and
+`GET /api/provider` reports `validationTimeoutMs`. It shortens only the proxy's
+timeout: preflight and all four budgets still run first, and no request body can set
+or change it. The dispatch ledger records the request before the abort, so the
+provider may still process and bill it; a value too small can abort before the
+request reaches the provider, which stays unverifiable all the same. The operator
+chooses a value below the model's usual latency. Because V1 must run with the
+normal timeout, restart with the flag only after V1 is reconciled, compared and its
+snapshots and receipts saved; then do not restart again until V2's reservation has
+expired and been reconciled, and restart without the flag before V3. An approved
+external network impairment remains an alternative. Cancelling locally tests
+`cancelled`, not `timeout`.
 
 Expect local 504 with `error: timeout`, a generic error event, paused agent and an
 `unverifiable` reservation. A connection error/5xx is a different case; do not label
@@ -313,7 +320,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
 | G1 | Resolved: Gemini prices the normalized `modelVersion`; a missing or malformed identity fails closed | Register every possible served ID with its price before dispatch; an unpriced served ID stays unverifiable |
 | G2 | Resolved: `GET /api/receipts` serves a bounded (200), newest-first journal of `call`, `cache`, `expiry` and `manual` receipts: requested and served model, captured price versions, reservation figures (`inputTokens` is the reservation input, unlike the proxy's `preflight.tokens`), dispatch, reported usage with cache split and reasoning, band, cost, verdict, outcome and the persisted journal interval. Numbers, identities and codes only | Process-local; eviction is reported, not hidden. Raw provider JSON is still never kept, so the wire mapping needs provider-side evidence |
 | G3 | Resolved: `GET /api/provider` returns `dispatches` (`total`, `byProvider`, the latest 50 with `sequence`, `provider`, `model`, `correlationId` = reservation ID, `at`), recorded by the proxy immediately before transport, never for a local refusal or cache hit | Process-local; restart clears it. It counts requests that left, not what the provider billed |
-| G4 | No controllable upstream timeout in live configuration | Operator decides safe external impairment; otherwise leave live timeout unverified. Any future runtime control must be explicit and separately reviewed |
+| G4 | Resolved: startup-only `SAINTPETRUS_VALIDATION_TIMEOUT_MS` (1–14999 ms) shortens the proxy timeout, is visible in the header and status, and never bypasses preflight or budgets | A local abort does not prove the provider received the request; pair it with the dispatch ledger and provider billing |
 | G5 | Feed tokens are message totals: omit billed output-limit responses, expiry/manual adjustments. The reroute text no longer claims reconciliation, and an unpriced served model has its own `provider.unpriced` event | Keep feed as activity evidence; per-call accounting evidence belongs to receipts (G2) |
 | G6 | Token/price receipt export absent; graph export omits ledger, inflight reservations and captures | Propose sanitized accounting export carrying four scopes and captured tariff identities; save local snapshots meanwhile |
 | G7 | DeepSeek is absent from terminal helper's provider list | Use UI now; separately add its ID to the existing validated CLI contract with a regression test |
