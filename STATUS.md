@@ -32,7 +32,7 @@ the branch (40 runs). Two independent reviewer agents audited `0662647..HEAD`; t
 - Step 1B also owes a forced real provider error with fragment checks, 429 and timeout if feasible, context export and enabled-feed credential scans, and sanitized real fixtures with a regression fix for each observed divergence.
 - DeepSeek has no model ID and no price in configuration, so selecting it is refused with `model_not_allowlisted` until the operator enters both from the browser.
 - The configured OpenAI and Gemini rates were verified on 2026-09-07. Account and model availability are unverified.
-- OpenAI is priced by the dated snapshot its response names, and only the alias has a price, so an OpenAI call stays `unverifiable` and pauses its agent until the operator registers the snapshot's price (Q-07).
+- OpenAI is not supported until the operator validates it: it is out of the allowlist and the panel does not offer it (Q-07). Once added back, it is priced by the dated snapshot its response names.
 - The response cache is off (`cacheTtlMs` 0) until a real key is validated, so the per-model determinism declarations are dormant.
 - Long-context tiers and cache-write pricing are not modeled; see `docs/reference/deferred-price-dimensions.md`.
 - The Responses streaming path and real error, quota and timeout handling are tested only with synthetic transport.

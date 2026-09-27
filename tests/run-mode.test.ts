@@ -42,3 +42,13 @@ test('A-01 the panel always shows MOCK or REAL and offers keyed providers only i
   assert.match(panel, /<option value="gemini" disabled=\{!realMode\}>/);
   assert.match(panel, /<option value="deepseek" disabled=\{!realMode\}>/);
 });
+
+test('A-07 OpenAI is not supported until validated: out of the allowlist and never offered', async () => {
+  const policy = JSON.parse(await readFile('config/token-policy.json', 'utf8'));
+  assert.deepEqual(Object.entries(policy.models).filter(([, model]) => Reflect.get(Object(model), 'provider') === 'openai'), []);
+  assert.match(await readFile('components/provider-status.tsx', 'utf8'), /<option value="openai" disabled>OpenAI \(not supported until validated\)<\/option>/);
+  await withRunMode('real', async () => {
+    const response = await configure({ action: 'set', provider: 'openai', model: 'gpt-5-nano', key: fakeKey() }, 'browser');
+    assert.equal(response.status, 400); assert.deepEqual(await response.json(), { error: 'model_not_allowlisted' });
+  });
+});

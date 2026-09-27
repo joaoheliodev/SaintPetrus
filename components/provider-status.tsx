@@ -150,7 +150,7 @@ export function ProviderStatus() {
         <DialogDescription>Keys go only to this local backend. Connecting makes one minimal call to prove the key works, and can incur provider charges. Memory only by default.</DialogDescription>
         <label>Provider<select value={provider} disabled={pending} onChange={event => { setProvider(event.target.value); setModel(''); setCustom(''); if (keyField.current) keyField.current.value = ''; setShow(false); }}>
           {status?.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
-          <option value="openai" disabled={!realMode}>OpenAI{realMode ? '' : ' (REAL mode only)'}</option><option value="gemini" disabled={!realMode}>Google Gemini{realMode ? '' : ' (REAL mode only)'}</option><option value="deepseek" disabled={!realMode}>DeepSeek{realMode ? '' : ' (REAL mode only)'}</option>
+          <option value="openai" disabled>OpenAI (not supported until validated)</option><option value="gemini" disabled={!realMode}>Google Gemini{realMode ? '' : ' (REAL mode only)'}</option><option value="deepseek" disabled={!realMode}>DeepSeek{realMode ? '' : ' (REAL mode only)'}</option>
         </select></label>
         <p>{realMode ? 'REAL mode: a connected provider is called for real and can charge you.' : 'MOCK mode: real providers are off and no key is stored. Restart with SAINTPETRUS_MODE=real to use one.'}</p>
         <label>Default model<select value={provider === 'mock' ? 'mock-v1' : model} disabled={pending || provider === 'mock'} onChange={event => setModel(event.target.value)}>

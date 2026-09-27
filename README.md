@@ -174,7 +174,8 @@ DeepSeek update it when the answer completes.
 
 ## Provider notes
 
-- **OpenAI** uses the Responses API with storage disabled. The price key is the response's `model`. Usage is parsed
+- **OpenAI** is **not supported until the operator validates it**: it is out of the policy allowlist and the panel does
+  not offer it. The adapter stays: it uses the Responses API with storage disabled. The price key is the response's `model`. Usage is parsed
   as strictly as for the others: input plus output must equal the total, and the reasoning share is only a count.
 - **Gemini** uses `generateContent` with the key only in the `x-goog-api-key` header and a zero thinking
   budget. `promptTokenCount` is input, `candidatesTokenCount + thoughtsTokenCount` is output, the total must

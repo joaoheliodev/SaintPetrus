@@ -146,7 +146,8 @@ credits/free tier and rounding; a locally priced usage result is not an invoice.
 
 - **DeepSeek:** `response.model` becomes `billingModel`. Register `R` plus each
   possible canonical `response.model` as a price key **before dispatch**.
-- **OpenAI:** `response.model`, or `response.model` inside the streamed
+- **OpenAI (not supported until validated):** it is out of the allowlist, so no OpenAI
+  call is possible; the contract below applies once the operator adds it back. `response.model`, or `response.model` inside the streamed
   `response.completed` event, becomes `billingModel`. It is usually a dated snapshot
   of the requested alias, so register that snapshot's price too; a missing identity
   fails closed with field names only. Usage is strict: `input_tokens → prompt`,

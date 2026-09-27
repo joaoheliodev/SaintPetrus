@@ -26,8 +26,7 @@ test('validation probe uses the low policy and documented nano payload without p
   const { loadConfig } = await import('../lib/tokens/config');
   const { policy, prices } = loadConfig();
   assert.equal(policy.global, 1024);
-  assert.equal(policy.models['gpt-5-nano'].max_tokens, 128);
-  assert.deepEqual(policy.models['gpt-5-nano'].thinking, { mode: 'enabled', effort: 'minimal' });
+  assert.equal(Object.values(policy.models).some(model => model.provider === 'openai'), false, 'OpenAI stays out of the allowlist until the operator validates it (Q-07)');
   assert.equal(policy.cacheTtlMs, 0);
   assert.equal(prices.models['gpt-5-nano'].peak.inputCacheMissPerMillion, 0.05);
   assert.equal(prices.models['gpt-5-nano'].peak.outputPerMillion, 0.4);
@@ -45,7 +44,7 @@ test('validation probe uses the low policy and documented nano payload without p
       assert.equal(payload.store, false);
       return Response.json({ model: 'gpt-5-nano', output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }], usage: { input_tokens: 12, output_tokens: 1, total_tokens: 13 } });
     });
-    const result = await adapter.complete('Reply OK.', signal(), { systemPrompt: '', messages: [{ role: 'user', content: 'Reply OK.' }], temperature: 1, maxTokens: 128, thinking: policy.models['gpt-5-nano'].thinking });
+    const result = await adapter.complete('Reply OK.', signal(), { systemPrompt: '', messages: [{ role: 'user', content: 'Reply OK.' }], temperature: 1, maxTokens: 128, thinking: { mode: 'enabled', effort: 'minimal' } });
     assert.equal(calls, 1); assert.deepEqual(result.usage, { prompt: 12, completion: 1, total: 13 });
   } finally { store.disconnect('openai'); secret.fill(0); await rm(dir, { recursive: true }); }
 });

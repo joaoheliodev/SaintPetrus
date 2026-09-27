@@ -21,16 +21,6 @@
         "mode": "disabled"
       }
     },
-    "gpt-5-nano": {
-      "provider": "openai",
-      "max_tokens": 128,
-      "temperature": 1,
-      "thinking": {
-        "mode": "enabled",
-        "effort": "minimal"
-      },
-      "deterministic": false
-    },
     "gemini-2.5-flash-lite": {
       "provider": "gemini",
       "max_tokens": 64,
