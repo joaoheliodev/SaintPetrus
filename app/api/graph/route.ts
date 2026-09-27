@@ -29,6 +29,6 @@ export async function POST(request: Request) {
     return json(dispatch(graph, mock, mockEnabled(), command));
   } catch (error) {
     // Never echo request contents, provider credentials or raw stack traces.
-    return json({ error: error instanceof GraphError ? error.message : 'Invalid request.' }, 400);
+    return json({ error: GraphError.is(error) ? error.message : 'Invalid request.' }, 400);
   }
 }

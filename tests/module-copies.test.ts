@@ -10,6 +10,7 @@ import { providerProxy } from '../lib/providers/runtime';
 import { TokenService, failureBillingVerdict } from '../lib/tokens/service';
 import type { TokenPolicy } from '../lib/tokens/config';
 import { fixedRatioTokenCounter } from '../lib/core/token-estimate';
+import { POST as graphPost } from '../app/api/graph/route';
 
 // The custom server loads lib/ through tsx while Next bundles its own copy, and both reach the same singletons through
 // globalThis. A copy of lib/ under another path is a second module graph in this process, exactly like that pair.
@@ -36,6 +37,7 @@ const policy: TokenPolicy = { global: 1000, perAgent: 1000, perModel: 1000, perS
 const isFailureClass = (value: unknown): value is new (code: string, fields?: string[]) => Error => typeof value === 'function';
 const isProxyClass = (value: unknown): value is new (timeoutMs?: number) => ProviderProxy => typeof value === 'function';
 const isTimeoutPin = (value: unknown): value is () => number | undefined => typeof value === 'function';
+const isRuntimeFactory = (value: unknown): value is () => { graph: { snapshot(): { agents: { id: string }[] } } } => typeof value === 'function';
 
 test('R1 a provider failure built by another copy of the modules keeps its code, fields and verdict', async () => {
   await withForeignCopy(async load => {
@@ -81,4 +83,19 @@ test('R1 the server pins the validation timeout as plain data and leaves the pro
   const server = await readFile('scripts/server.ts', 'utf8');
   assert.match(server, /pinnedValidationTimeoutMs\(\)/);
   for (const factory of ['providerProxy(', 'tokenService(', 'credentials(']) assert.ok(!server.includes(factory), `scripts/server.ts must not build ${factory}); the routes own it`);
+});
+
+test('R1 a refusal from the graph the server built reaches the browser with its own message', async () => {
+  await withGlobals(['saintpetrus'], () => withForeignCopy(async load => {
+    // As at startup: the server's copy builds the graph singleton that the route bundle then uses.
+    const { runtime: serverRuntime } = await load('server/runtime.ts');
+    assert.ok(isRuntimeFactory(serverRuntime));
+    const [root] = serverRuntime().graph.snapshot().agents;
+    const post = (body: object) => graphPost(new Request('http://127.0.0.1:3000/api/graph', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+    const refusals: [object, string][] = [[{ action: 'connect', source: root.id, target: root.id }, 'Self-connections are not allowed.'], [{ action: 'update', id: 'missing', name: 'x', objective: 'y' }, 'Agent not found.']];
+    for (const [body, message] of refusals) {
+      const response = await post(body);
+      assert.equal(response.status, 400); assert.deepEqual(await response.json(), { error: message });
+    }
+  }));
 });

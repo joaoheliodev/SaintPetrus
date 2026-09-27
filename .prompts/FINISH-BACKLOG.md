@@ -215,6 +215,8 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R1-01 | brand never set | killed by "R1 a provider failure built by another copy…" |
 | R1-01 | server builds the proxy again | killed by "R1 the server pins the validation timeout as plain data…" |
 | R1-01 | routes ignore the pinned value | killed by the same test |
+| R1-02 | graph route back to `instanceof` | killed by "R1 a refusal from the graph the server built…" and the ratchet |
+| R1-02 | graph brand never set | killed by "R1 a refusal from the graph the server built…" |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
@@ -223,8 +225,8 @@ parallel without editing the tree. Each finding is listed with its disposition.
 
 | ID | Severity | Finding | Disposition |
 | --- | --- | --- | --- |
-| R1-01 | blocking (both reviewers) | `scripts/server.ts` built the provider proxy at startup from its own tsx copy of `lib/`; Next's route bundle reused that instance through `globalThis`, so every `instanceof ProviderFailure` failed across the copies: 401/404/429/busy/timeout all became `unverifiable` + 400 `invalid_request`, no credential was marked rejected and field names were lost. Regression from 3e15849 | fixed (this commit): the server pins only the timeout value; `ProviderFailure` carries a `Symbol.for` brand checked by `ProviderFailure.is`; a test imports a second copy of `lib/`; a ratchet forbids `instanceof ProviderFailure`; verified against the real production bundle |
-| R1-02 | major, pre-existing | Same cause for `GraphError`: in the running server every graph refusal answered "Invalid request." (reproduced with curl: self-connection, missing agent) | pending |
+| R1-01 | blocking (both reviewers) | `scripts/server.ts` built the provider proxy at startup from its own tsx copy of `lib/`; Next's route bundle reused that instance through `globalThis`, so every `instanceof ProviderFailure` failed across the copies: 401/404/429/busy/timeout all became `unverifiable` + 400 `invalid_request`, no credential was marked rejected and field names were lost. Regression from 3e15849 | fixed (52f2be6): the server pins only the timeout value; `ProviderFailure` carries a `Symbol.for` brand checked by `ProviderFailure.is`; a test imports a second copy of `lib/`; a ratchet forbids `instanceof ProviderFailure`; verified against the real production bundle |
+| R1-02 | major, pre-existing | Same cause for `GraphError`: in the running server every graph refusal answered "Invalid request." (reproduced with curl: self-connection, missing agent) | fixed (this commit): `GraphError` carries the same kind of brand; the route test drives a graph built by another copy of `lib/`; the ratchet covers it; curl against a rebuilt production server returns the real messages |
 | R1-03 | major | `npm run test:e2e` clicks Send even when a keyed provider is connected, and resets and pauses whatever instance it is pointed at | pending |
 | R1-04 | minor | Browser check profiles live in `.audit/` and are not removed when Chromium dies or the run is interrupted (pending CDP calls never settle) | pending |
 | R1-05 | minor | Stale toolbar text "No API calls to LLMs." | pending |

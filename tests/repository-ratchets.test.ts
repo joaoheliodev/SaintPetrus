@@ -72,7 +72,7 @@ test('O2 direct fetch calls stay behind the provider boundary or the shrinking l
 
 test('R1 failures that cross module copies are recognized by their brand, never by instanceof', () => {
   // scripts/server.ts runs its own copy of lib/ beside the route bundle; instanceof between the copies is always false.
-  const branded = new Set(['ProviderFailure']);
+  const branded = new Set(['ProviderFailure', 'GraphError']);
   const found: string[] = [];
   for (const path of runtimeFiles) {
     visit(sourceFile(path), node => {

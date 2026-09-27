@@ -3,7 +3,13 @@ import { eventBus } from '../events/bus';
 // Server authority. Node imports prevent accidental use in the browser bundle.
 import { randomUUID } from 'node:crypto';
 import { createGraph, type Graph, type GraphEvent, type ExecutionBudget, type SpawnRequest, type Agent } from '../orchestrator';
-export class GraphError extends Error {}
+// Thrown by the graph the custom server builds from its own copy of lib/ and caught by the route bundle's copy, so it
+// is recognized by a Symbol.for brand, like ProviderFailure, never by instanceof.
+const graphErrorBrand = Symbol.for('saintpetrus.GraphError');
+export class GraphError extends Error {
+  constructor(message: string) { super(message); Object.defineProperty(this, graphErrorBrand, { value: true }); }
+  static is(value: unknown): value is GraphError { return value instanceof Error && Reflect.get(value, graphErrorBrand) === true; }
+}
 export class GraphService {
   private graph = createGraph();
   constructor() { this.record('agent.created', 'root', 'Coordinator created.'); }
