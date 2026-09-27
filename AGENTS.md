@@ -32,7 +32,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 427 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 432 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -115,6 +115,20 @@ Removing an agent asks first and is refused while the agent has an active, unver
 A graph import is untrusted input: strict schema, a size limit, unknown fields and credential-shaped text refused, and every model through the allowlist. The graph format names no model, so a `model` field is refused as unknown; a model field added later must be checked against `policy.models`. The export stays redacted, and accounting stays process-local.
 
 Run once goes through the same preflight and budgets as any call and asks first, showing the maximum cost it reserves. The quote and the call share `TokenService.plan`, so the quote cannot be cheaper or more permissive than the call; keep them on one code path. Run once stays because no other action sends an agent's own message and records its output.
+
+## Interface vocabulary
+
+The panel, the README and the tests use these words and no synonyms:
+
+- **Mode**: `MOCK` or `REAL`, as the server was started. Its badge stays visible next to the brand, with a tooltip.
+- **Connection**: the provider and model that Run once uses. It keeps the five states of `docs/reference/connection-state.md` with their meaning (configured is not verified); only the text may be shorter.
+- **Demo**: the fixed demonstration, loaded with **Load demo**, which warns that it replaces the canvas. Its fictitious spend is the **Demo cost**.
+- **Graph limits**: maximum depth and maximum number of agents.
+- **Roles**: Coordinator, Agent and Subagent, with the level written out ("level 1").
+- **Agent status**: Ready, Running, Completed, Paused and Blocked, each with its own icon, colour and text (`lib/agent-status.ts`). Status is never shown by colour alone.
+- **Budgets** and **Prices** are separate places. **Export graph** and **Import graph** are the pair for the graph file.
+
+The graph file keeps its `Unconfigured` and `Mock` provider labels; they are not shown on screen.
 
 ## Reuse before reimplementing
 

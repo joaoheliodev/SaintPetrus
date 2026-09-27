@@ -89,7 +89,7 @@ try {
   await mouse('mouseReleased', grip.x + 60, grip.y + 40);
   await until(async () => (await serverPosition(movedId))?.x > dropped.x + 10, 'mouse drag saved by the server');
   console.log('PASS: a dragged card is saved where it was dropped');
-  const mocked = await evaluate(`!document.querySelector('.statusbar')?.textContent.includes('Mock disabled')`);
+  const mocked = await evaluate(`document.querySelector('.mode-badge')?.textContent === 'MOCK'`);
   await type('section[aria-label="Run this agent"] textarea', 'Say something short.');
   // Run once asks first with the server's quote: refuse once, then accept.
   decisions.push(false); await until(() => click('Send (1 call)'), 'run button');
@@ -107,14 +107,14 @@ try {
   }
   const exported = await evaluate(`(async () => { const link = document.querySelector('a[href="/api/graph/export"][download]'); if (!link) return 'missing link'; const response = await fetch(link.href); const body = await response.json(); return response.status === 200 && Array.isArray(body.agents) ? 'ok' : 'bad export'; })()`);
   assert.equal(exported, 'ok');
-  console.log('PASS: context export link downloads the server snapshot');
-  await until(() => click('Tokens'), 'Tokens button');
+  console.log('PASS: graph export link downloads the server snapshot');
+  await until(() => click('Budgets'), 'Budgets button');
   await until(() => evaluate(`document.body.textContent.includes('Budgets and consumption') && document.querySelectorAll('.token-table tbody tr').length > 0`), 'token table');
   assert.ok(await evaluate(`document.body.textContent.includes('No held or expired reservations.')`), 'empty reservation state is explicit');
   assert.deepEqual(await unnamed(), [], 'token and price controls are named');
   await press('Escape');
   console.log('PASS: token controls loaded from the server');
-  await until(() => click('Connect AI'), 'Connect AI button');
+  await until(() => click('Connection'), 'Connection button');
   await until(() => evaluate(`document.body.textContent.includes('Keys go only to this local backend')`), 'connection panel');
   assert.deepEqual(await unnamed(), [], 'connection controls are named');
   console.log('PASS: connection panel opened');

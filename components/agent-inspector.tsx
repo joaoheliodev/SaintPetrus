@@ -1,10 +1,12 @@
 'use client';
 import { useState } from 'react';
-import { Bot, Check, GitBranch, Pencil, Send, ShieldCheck, Trash2 } from 'lucide-react';
+import { Bot, GitBranch, Pencil, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import type { Agent, Graph } from '../lib/orchestrator';
 import { postProviderAction, verificationMessage } from './provider-status';
+import { AgentStatusBadge } from './agent-status-badge';
+import { agentPlacement } from '../lib/agent-status';
 // The confirmation names the maximum the server will hold before sending; the call itself is checked again.
 export function runQuestion(quote: unknown): string {
   const field = (name: string) => quote !== null && typeof quote === 'object' ? Reflect.get(quote, name) : undefined;
@@ -14,7 +16,6 @@ export function runQuestion(quote: unknown): string {
   const price = provider === 'mock' ? 'the mock is free' : `at most $${cost.toFixed(6)} before sending`;
   return `Send one call to ${model}? It reserves ${tokens} tokens, ${price}. What the provider does not use is released when its usage is confirmed.`;
 }
-export const statusLabels = { paused: 'Paused', ready: 'Ready', running: 'Running', completed: 'Completed', blocked: 'Blocked' };
 type Props = { agent: Agent; agents: readonly Pick<Agent, 'id' | 'name'>[]; pending: boolean; command: (input: Record<string, unknown>) => Promise<Graph | null>; connect: (source: string, target: string) => Promise<void> };
 // Mount with `key={agent.id}` so drafts never carry over from another agent.
 export function AgentInspector({ agent, agents, pending, command, connect }: Props) {
@@ -47,7 +48,7 @@ export function AgentInspector({ agent, agents, pending, command, connect }: Pro
     } catch { setResult('Local server unavailable. The call was not confirmed.'); }
     finally { setRunning(false); }
   }
-  return <aside className="inspector" aria-label="Agent inspector"><div className="panel-title">Agent inspector</div><div className="inspector-profile"><Bot /><h2>{agent.name}</h2></div><p className="status"><Check size={15} />{statusLabels[agent.status]} · {agent.provider}</p>
+  return <aside className="inspector" aria-label="Agent inspector"><div className="panel-title">Agent inspector</div><div className="inspector-profile"><Bot /><h2>{agent.name}</h2></div><p className="inspector-meta"><AgentStatusBadge status={agent.status} /><span>{agentPlacement(agent)}</span></p>
     <Tabs defaultValue="context"><TabsList><TabsTrigger value="context">Context</TabsTrigger><TabsTrigger value="output">Output</TabsTrigger></TabsList>
       <TabsContent value="context">
         {editing ? <form aria-label="Edit agent" onSubmit={event => { event.preventDefault(); void save(); }}>

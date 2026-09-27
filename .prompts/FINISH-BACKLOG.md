@@ -126,6 +126,36 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | A-05 | P3 | Q-05 empty | The security contact placeholder stays | done (no change) |
 | A-06 | P3 | Q-06 empty | No LICENSE is created | done (no change) |
 
+### Phase 8 — UI round (2026-09-27)
+
+Presentation only: no route, API contract, graph file format, token/price/reservation logic, provider payload,
+configuration value, run mode, security header or CSP changes. Reference for structure and density: the Orca
+panel, nothing copied or loaded from it.
+
+| ID | Item | Acceptance criterion | Status |
+| --- | --- | --- | --- |
+| U1 | Vocabulary and status | No text contradicts another about mode, connection or status | done |
+| U2 | Demo kept apart | No single unconfirmed click replaces the graph | pending |
+| U3 | Agent panel with Run and Details | Run an agent and read the answer without scrolling or changing tab | pending |
+| U4 | Screen structure and navigation | Every current function reachable by mouse and keyboard; no route changes | pending |
+| U5 | Budgets | Summary, per-scope blocks, details table with every field and action | pending |
+| U6 | Activity | Drawer and full view, readable monospace lines, `agent.moved` hidden by default | pending |
+| U7 | First steps | Checklist derived from server state, dismissible in memory | pending |
+| U8 | In-app confirmations (P3) | Dialog instead of `window.confirm`, same texts, refuse-then-confirm in the browser check | pending |
+| U9 | Command palette (P3, optional) | Ctrl+K filterable list of existing actions | pending |
+| U10 | Finish | Dev indicator, README, CHANGELOG, STATUS, floor | pending |
+
+#### Decisions taken
+
+- U1: the connection chip names the model alone for the mock (`● Connected · mock-v1`) and `provider · model`
+  otherwise; the mode badge is the only place that says MOCK or REAL. Cards read the connection from a React
+  context rather than node data, so a connection change never recreates node objects.
+- U1: the provider-status and token readers are lifted into hooks inside the same files, because the fetch
+  ratchet pins direct `fetch` calls to those files.
+- U1: the palette's AA contrast for the status colours is a test that reads `app/globals.css`.
+
+#### Questions for João
+
 ## V0 review of Part 2 (`1445177`)
 
 Checked every section of `docs/provider-validation.md` and the `STATUS.md` change against the code.

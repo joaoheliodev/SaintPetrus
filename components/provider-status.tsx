@@ -29,11 +29,13 @@ export function createProviderStatusRefresher(
   };
 }
 // "Connected" must mean a real call succeeded. A stored credential alone only earns "configured".
+// The mode badge already says MOCK or REAL, so the chip names only what Run once uses: the mock by its model alone.
+export const connectionTarget = (s: Pick<ProviderStatusSnapshot, 'mocked' | 'provider' | 'model'>) => s.mocked ? s.model : `${s.provider} · ${s.model}`;
 const badges: Record<ConnectionState, (status: ProviderStatusSnapshot) => string> = {
-  verified: s => `● Connected · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
+  verified: s => `● Connected · ${connectionTarget(s)}`,
   rejected: s => `▲ Connection rejected · ${s.provider}`,
-  configured: s => `◐ Configured, not verified · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
-  incomplete: s => `△ ${s.failureCode === 'empty_output' ? 'No visible output' : 'Output budget exhausted'} · ${s.provider} · ${s.model}`,
+  configured: s => `◐ Configured, not verified · ${connectionTarget(s)}`,
+  incomplete: s => `△ ${s.failureCode === 'empty_output' ? 'No visible output' : 'Output budget exhausted'} · ${connectionTarget(s)}`,
   disconnected: () => '○ Disconnected',
 };
 export const connectionLabel = (status: ProviderStatusSnapshot) => badges[status.state](status);
@@ -43,19 +45,19 @@ const failures: Record<number, string> = {
   401: 'The provider rejected the credential or model. Check the API key and model ID.',
   402: 'The provider account has no balance left. The key is valid and the service is up, so the connection is not rejected: top up the account and test again.',
   404: 'The provider did not find this model. Check the model ID.',
-  409: 'Execution was paused or refused by the budget/model policy. Open Tokens.',
+  409: 'Execution was paused or refused by the budget/model policy. Open Budgets.',
   422: 'The provider spent the output budget without returning visible text. Usage was charged; increase the allowed output only after reviewing the model policy.',
   429: 'The provider rate limited the request. Try again shortly.',
   502: 'Provider communication failed. The credential was neither verified nor rejected.',
   504: 'The provider request timed out. The credential was neither verified nor rejected.',
 };
 const codeFailures: Record<string, string> = {
-  unconfigured: 'No provider is connected. Open Connect AI and connect one first.',
+  unconfigured: 'No provider is connected. Open Connection and connect one first.',
   disabled: 'Real providers are off in MOCK mode. Restart the server with SAINTPETRUS_MODE=real to use one.',
   // The proxy runs one call at a time; a second one is refused before it leaves and holds nothing.
   busy: 'Another provider call is still running. Nothing was sent or charged; try again when it finishes.',
   empty_output: 'The provider answered without visible text, so the connection is not verified. Usage was charged; check the model and prompt before testing again.',
-  served_model_unpriced: 'The provider answered with a model that has no verified price. The call may have been billed, so its reservation stays held and the agent is paused. Add that model in Tokens → Prices, then reconcile the expired estimate with provider-confirmed usage.',
+  served_model_unpriced: 'The provider answered with a model that has no verified price. The call may have been billed, so its reservation stays held and the agent is paused. Add that model in Prices, then reconcile the expired estimate with provider-confirmed usage.',
 };
 const configurationFailures: Record<string, string> = {
   invalid_model_format: 'Invalid model ID format. Use the provider model ID; Gemini also accepts the models/… prefix.',
@@ -67,16 +69,10 @@ export async function postProviderAction(body: string) {
   const response = await fetch('/api/provider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
   return { ok: response.ok, status: response.status, data: await response.json() };
 }
-export function ProviderStatus() {
+// The one reader of /api/provider status. The workspace holds it once and hands it to every view that shows the connection.
+export function useProviderStatus() {
   const [status, setStatus] = useState<ProviderStatusSnapshot>();
-  const [result, setResult] = useState(''); const [pending, setPending] = useState(false);
-  const [open, setOpen] = useState(false); const [provider, setProvider] = useState('openai');
-  const [model, setModel] = useState(''); const [custom, setCustom] = useState('');
-  const [show, setShow] = useState(false); const [remember, setRemember] = useState(false);
-  const realMode = status?.mode === 'real';
   const [unavailable, setUnavailable] = useState(false);
-  // Uncontrolled, transient field: no credential in React state or browser storage.
-  const keyField = useRef<HTMLInputElement>(null);
   const mounted = useRef(false); const refresher = useRef<ReturnType<typeof createProviderStatusRefresher> | null>(null);
   const refresh = useCallback((priority: RefreshPriority) => {
     if (!refresher.current) refresher.current = createProviderStatusRefresher(async signal => {
@@ -96,6 +92,18 @@ export function ProviderStatus() {
     };
     void poll(); return () => { mounted.current = false; clearTimeout(timer); refresher.current?.abort(); };
   }, [refresh]);
+  return { status, unavailable, refresh };
+}
+export type ProviderStatusSource = ReturnType<typeof useProviderStatus>;
+export function ProviderStatus({ source }: { source: ProviderStatusSource }) {
+  const { status, unavailable, refresh } = source;
+  const [result, setResult] = useState(''); const [pending, setPending] = useState(false);
+  const [open, setOpen] = useState(false); const [provider, setProvider] = useState('openai');
+  const [model, setModel] = useState(''); const [custom, setCustom] = useState('');
+  const [show, setShow] = useState(false); const [remember, setRemember] = useState(false);
+  const realMode = status?.mode === 'real';
+  // Uncontrolled, transient field: no credential in React state or browser storage.
+  const keyField = useRef<HTMLInputElement>(null);
   function toggle(value: boolean) {
     if (keyField.current) keyField.current.value = '';
     setShow(false); setRemember(false); setOpen(value);
@@ -144,9 +152,9 @@ export function ProviderStatus() {
     <span role="status" className={`provider-badge ${status ? `is-${status.state}` : 'is-loading'}`}>{status ? connectionLabel(status) : unavailable ? '○ Local server unavailable' : '◌ Loading connection state'}{status && unavailable ? ' · server unreachable' : ''}</span>
     {status?.validationTimeoutMs !== undefined && <span className="provider-badge is-incomplete" title="Set at server startup with SAINTPETRUS_VALIDATION_TIMEOUT_MS">⏱ Validation timeout · {status.validationTimeoutMs} ms</span>}
     <Dialog open={open} onOpenChange={toggle}>
-      <DialogTrigger render={<Button variant="outline" />}>Connect AI</DialogTrigger>
+      <DialogTrigger render={<Button variant="outline" />}>Connection</DialogTrigger>
       <DialogContent className="provider-panel">
-        <DialogTitle>Connect AI</DialogTitle>
+        <DialogTitle>Connection</DialogTitle>
         <DialogDescription>Keys go only to this local backend. Connecting makes one minimal call to prove the key works, and can incur provider charges. Memory only by default.</DialogDescription>
         <label>Provider<select value={provider} disabled={pending} onChange={event => { setProvider(event.target.value); setModel(''); setCustom(''); if (keyField.current) keyField.current.value = ''; setShow(false); }}>
           {status?.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}

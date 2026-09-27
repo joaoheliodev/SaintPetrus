@@ -54,9 +54,9 @@ export function TokenPanel() {
   const total = data?.rows.find(row => row.scope === 'global');
   return <div className="project-actions">
     <Button variant="outline" disabled={pending} onClick={() => { if (window.confirm('Pause every agent? A provider call in flight is cancelled and stays unverifiable until its reservation expires.')) void command({ action: 'kill' }); }}>Pause all agents</Button>
-    <Dialog><DialogTrigger render={<Button variant="outline" />}>Tokens</DialogTrigger>
+    <Dialog><DialogTrigger render={<Button variant="outline" />}>Budgets</DialogTrigger>
       <DialogContent className="token-panel">
-        <DialogTitle>Tokens and prices</DialogTitle>
+        <DialogTitle>Budgets and prices</DialogTitle>
         <DialogDescription>Server-enforced token and USD budgets. Preflight reserves peak, cache-miss cost; reported usage reconciles against the configured local table. Mock consumption is estimated separately.</DialogDescription>
         <p role="status">{!data ? 'Loading server token state…' : data.stopped ? '■ Global pause active' : '● Global execution enabled'} {error}</p>
         <Tabs defaultValue="budgets">

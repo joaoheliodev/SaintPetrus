@@ -60,6 +60,8 @@
   --border: #53636d; --input: #637682; --ring: var(--primary);
   --destructive: #dab3a7; --radius: 0.5rem;
   --edge: #b6c4cc; --dots: #53636d;
+  /* Status colours; each status also has its own icon and text. */
+  --status-neutral: #acb8c0; --status-blue: #93bdf0; --status-green: #9fd3a8; --status-amber: #e2c27d; --status-red: #f0a69c;
 }
 
 @layer base {
@@ -119,7 +121,10 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 .agent-card { width: 290px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
 .agent-card.is-selected { border: 2px solid var(--primary); }
 .agent-card-head { display: flex; align-items: center; gap: 10px; padding: 15px; border-bottom: 1px solid var(--border); }
-.agent-card-head>div { flex: 1; min-width: 0; } .agent-card-head small { color: var(--muted-foreground); font-size: 14px; }
+.agent-card-head>div { flex: 1; min-width: 0; } .agent-card-head small, .agent-card-foot small { display: block; color: var(--muted-foreground); font-size: 13px; }
+.status { display: inline-flex; align-items: center; gap: 6px; }
+.tone-neutral { color: var(--status-neutral); } .tone-blue { color: var(--status-blue); } .tone-green { color: var(--status-green); } .tone-amber { color: var(--status-amber); } .tone-red { color: var(--status-red); }
+.inspector-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 18px; color: var(--muted-foreground); }
 .agent-card-body { padding: 15px; } .agent-card-body p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .node-output { margin-top: 12px; color: var(--primary); }
 .agent-card-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; border-top: 1px solid var(--border); }
@@ -132,7 +137,7 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 .event-list p { margin-bottom: 6px; }
 .inspector { width: 270px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--card); overflow-y: auto; padding: 0 16px 18px; }
 .inspector .panel-title { padding-left: 0; } .inspector-profile { display: flex; align-items: center; gap: 10px; padding: 18px 0; }
-.inspector .status { margin-bottom: 18px; } .inspector h3 { margin: 18px 0 8px; } .inspector p, .inspector pre { max-width: 80ch; overflow-wrap: anywhere; }
+.inspector h3 { margin: 18px 0 8px; } .inspector p, .inspector pre { max-width: 80ch; overflow-wrap: anywhere; }
 .inspector pre { white-space: pre-wrap; line-height: 1.6; margin-top: 16px; }
 .context-note { display: flex; gap: 10px; padding: 12px; margin-top: 22px; background: var(--accent); border-radius: 6px; }
 .inspector select { display: block; width: 100%; margin: 8px 0 12px; padding: 10px; color: var(--foreground); background: var(--background); border: 1px solid var(--input); border-radius: 6px; }
