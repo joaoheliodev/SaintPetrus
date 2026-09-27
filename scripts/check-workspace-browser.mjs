@@ -46,6 +46,9 @@ try {
   const click = text => evaluate(`(() => { const target = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === ${JSON.stringify(text)} && !b.disabled); if (!target) return false; target.click(); return true; })()`);
   // A real key press always ends with keyup; React Flow matches shortcuts against the keys still held.
   const press = async key => { for (const phase of ['keydown', 'keyup']) { await evaluate(`document.dispatchEvent(new KeyboardEvent('${phase}', { key: '${key}', code: '${key}', bubbles: true }))`); await new Promise(resolve => setTimeout(resolve, 150)); } };
+  // Trusted key presses from the browser's own input pipeline, so Tab moves focus as it does for a person.
+  const keyCodes = { Tab: 9, Enter: 13, Escape: 27, ArrowRight: 39 };
+  const key = async name => { for (const type of ['rawKeyDown', 'keyUp']) await call('Input.dispatchKeyEvent', { type, key: name, code: name, windowsVirtualKeyCode: keyCodes[name] }, session); await new Promise(resolve => setTimeout(resolve, 120)); };
   const type = (selector, value) => evaluate(`(() => { const field = document.querySelector(${JSON.stringify(selector)}); const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), 'value').set; setter.call(field, ${JSON.stringify(value)}); field.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
   await call('Page.navigate', { url: `http://127.0.0.1:${port}` }, session);
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 1 && document.body.textContent.includes('Coordinator')`), 'canvas with the coordinator');
@@ -66,6 +69,23 @@ try {
   await until(() => click('Save'), 'save button');
   await until(() => evaluate(`Array.from(document.querySelectorAll('.react-flow__node h3')).some(h => h.textContent === 'Renamed smoke agent')`), 'renamed node card');
   console.log('PASS: agent edited through the server');
+  const serverPosition = id => evaluate(`fetch('/api/graph', { cache: 'no-store' }).then(r => r.json()).then(g => g.agents.find(a => a.id === ${JSON.stringify(id)})?.position ?? null)`);
+  const movedId = await evaluate(`Array.from(document.querySelectorAll('.react-flow__node')).find(n => n.textContent.includes('Renamed smoke agent'))?.getAttribute('data-id')`);
+  const start = await serverPosition(movedId);
+  await evaluate(`document.querySelector('.react-flow__node[data-id="${movedId}"]').focus()`);
+  await key('Enter');
+  await until(() => evaluate(`document.querySelector('.react-flow__node[data-id="${movedId}"]')?.classList.contains('selected')`), 'card selected from the keyboard');
+  for (let step = 0; step < 4; step++) await key('ArrowRight');
+  await until(async () => (await serverPosition(movedId))?.x === start.x + 20, 'keyboard move saved by the server');
+  console.log('PASS: a card moved with the arrow keys stays where it went');
+  const grip = await evaluate(`(() => { const r = document.querySelector('.react-flow__node[data-id="${movedId}"] .agent-card-head').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+  const mouse = (type, x, y) => call('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }, session);
+  const dropped = await serverPosition(movedId);
+  await mouse('mousePressed', grip.x, grip.y);
+  for (let step = 1; step <= 5; step++) await mouse('mouseMoved', grip.x + step * 12, grip.y + step * 8);
+  await mouse('mouseReleased', grip.x + 60, grip.y + 40);
+  await until(async () => (await serverPosition(movedId))?.x > dropped.x + 10, 'mouse drag saved by the server');
+  console.log('PASS: a dragged card is saved where it was dropped');
   const mocked = await evaluate(`!document.querySelector('.statusbar')?.textContent.includes('Mock disabled')`);
   await type('section[aria-label="Run this agent"] textarea', 'Say something short.');
   await until(() => click('Send (1 call)'), 'run button');
