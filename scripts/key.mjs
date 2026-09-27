@@ -1,9 +1,9 @@
 // Terminal-only credential entry: no browser form, argv secret or shell-history secret.
 import { stdin, stdout } from 'node:process';
-const [action, provider, flag] = process.argv.slice(2);
-if (!['set', 'disconnect', 'forget', 'restore'].includes(action) || !['gemini', 'openai', 'anthropic', 'openrouter'].includes(provider) || (flag && flag !== '--remember') || (flag && action !== 'set')) {
-  console.error('Usage: npm run key -- set|disconnect|forget|restore gemini|openai|anthropic|openrouter [--remember]'); process.exit(1);
-}
+import { keyUsage, parseKeyArguments } from './key-arguments.mjs';
+const parsed = parseKeyArguments(process.argv.slice(2));
+if (!parsed) { console.error(keyUsage); process.exit(1); }
+const { action, provider, remember } = parsed;
 const port = process.env.PORT || '3000';
 if (!/^\d+$/.test(port) || +port < 1024 || +port > 65535) { console.error('Invalid PORT.'); process.exit(1); }
 async function readSecret() {
@@ -24,7 +24,7 @@ async function readSecret() {
   });
 }
 try {
-  const body = { action, provider, remember: flag === '--remember' };
+  const body = { action, provider, remember };
   if (action === 'set') body.key = await readSecret();
   const origin = `http://127.0.0.1:${port}`;
   const result = await fetch(`${origin}/api/credentials`, { method: 'POST', redirect: 'error', headers: {

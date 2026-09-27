@@ -59,12 +59,13 @@ Fill this locally. No credential belongs in this document or the results table.
    must already be ready. Do not then click **Test again** as a setup step. The
    password field and local `/api/credentials` POST transiently carry the key;
    `/api/provider` requests never should. Never export that credential request.
-7. Alternative for Gemini: hidden interactive `npm run key -- set gemini`, with
-   non-secret provider/model selection configured at server startup and matching
+7. Alternative: hidden interactive `npm run key -- set gemini` or
+   `npm run key -- set deepseek`, with non-secret provider/model selection configured
+   at server startup (`SAINTPETRUS_PROVIDER`, `SAINTPETRUS_MODEL`) and matching
    `PORT`. Do not use `--remember`, argv, an environment variable or a file for the
-   key. This only configures the credential; the probe is a separate action.
-   The current terminal script **does not support DeepSeek**; use its UI. Verify
-   `GET /api/credentials` reports `remembered: false` without returning a key.
+   key; extra arguments are refused. This only configures the credential; the probe
+   is a separate action. Verify `GET /api/credentials` reports `remembered: false`
+   without returning a key.
 
 ## Code path and observable evidence
 
@@ -323,7 +324,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
 | G4 | Resolved: startup-only `SAINTPETRUS_VALIDATION_TIMEOUT_MS` (1–14999 ms) shortens the proxy timeout, is visible in the header and status, and never bypasses preflight or budgets | A local abort does not prove the provider received the request; pair it with the dispatch ledger and provider billing |
 | G5 | Feed tokens are message totals: omit billed output-limit responses, expiry/manual adjustments. The reroute text no longer claims reconciliation, and an unpriced served model has its own `provider.unpriced` event | Keep feed as activity evidence; per-call accounting evidence belongs to receipts (G2) |
 | G6 | Token/price receipt export absent; graph export omits ledger, inflight reservations and captures | Propose sanitized accounting export carrying four scopes and captured tariff identities; save local snapshots meanwhile |
-| G7 | DeepSeek is absent from terminal helper's provider list | Use UI now; separately add its ID to the existing validated CLI contract with a regression test |
+| G7 | Resolved: the terminal helper accepts `deepseek` under the same rules as the other providers, and a test pins its provider list to the backend credential store | None |
 | G8 | Zero live cached/thinking tokens cannot establish nonzero cases. The names-only diagnostic now covers Gemini usage failures and a missing usage object in both adapters | Obtain numeric provider evidence, or explicitly leave nonzero cases unverified. Do not manufacture billable coverage |
 | G9 | No safe arbitrary-key/fragment comparator for exported artifacts; short fragments not generally identifiable | Approve an ephemeral, nonlogging comparator and an explicit fragment criterion; Gitleaks alone is insufficient |
 | G10 | Counters/holds vanish on restart; input approximate; price-only reroutes beyond known candidates and unsupported price dimensions can exceed estimates | Preserve process/evidence during the run, select only supported pricing, approve residual exposure; durable receipts/accurate counting need a separate task |
