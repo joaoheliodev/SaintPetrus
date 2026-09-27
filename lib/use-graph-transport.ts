@@ -27,20 +27,23 @@ export function useGraphTransport(initialGraph: Graph) {
       },
     });
   }, [initialGraph]);
-  const command = useCallback(async (input: Record<string, unknown>) => {
+  const send = useCallback(async (endpoint: string, body: string, action: unknown) => {
     setPending(true);
     try {
-      const response = await fetch('/api/graph', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
       const result: unknown = await response.json();
       if (!response.ok) {
         useProjection.setState({ notice: commandError(result) });
         return null;
       }
-      const snapshot = applyGraphCommandResponse(result, input.action, event => useProjection.getState().apply(event));
+      const snapshot = applyGraphCommandResponse(result, action, event => useProjection.getState().apply(event));
       useProjection.setState({ notice: '' }); return snapshot;
     } catch {
       useProjection.setState({ notice: 'Local server unavailable. Command not confirmed.' }); return null;
     } finally { setPending(false); }
   }, []);
-  return { command, pending };
+  const command = useCallback((input: Record<string, unknown>) => send('/api/graph', JSON.stringify(input), input.action), [send]);
+  // The file goes to the server as it is; only the server decides whether it is a graph.
+  const importGraph = useCallback((file: string) => send('/api/graph/import', file, 'import'), [send]);
+  return { command, importGraph, pending };
 }

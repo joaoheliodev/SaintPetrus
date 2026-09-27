@@ -21,7 +21,7 @@ Each kind of state has exactly one server owner; read
 | --- | --- | --- |
 | Launch | `scripts/next.mjs`, `scripts/server.ts` | Loopback binding, telemetry off, the dev-only mock default, security headers, optional routes and the preview listener |
 | Local boundary | `lib/server/http.ts`, `lib/server/read-json.ts`, `lib/server/security-headers.ts` | Host, exact Origin and JSON checks, bounded request bodies, graph command dispatch, the content security policy |
-| Graph | `lib/orchestrator.ts`, `lib/server/graph-service.ts`, `lib/server/graph-http.ts`, `lib/server/runtime.ts`, `lib/providers/mock-provider.ts` | Agent and edge rules, the server-owned graph, its revisioned stream, the mock demonstration |
+| Graph | `lib/orchestrator.ts`, `lib/server/graph-service.ts`, `lib/server/graph-document.ts`, `lib/server/graph-store.ts`, `lib/server/graph-http.ts`, `lib/server/runtime.ts`, `lib/providers/mock-provider.ts` | Agent and edge rules, the server-owned graph, its revisioned stream, the strict file format for import and the saved copy, the mock demonstration |
 | Browser | `app/page.tsx`, `components/*`, `lib/store.ts`, `lib/graph-sync.ts`, `lib/use-graph-transport.ts`, `lib/node-moves.ts`, `lib/graph-deletion.ts` | The canvas and panels; a projection of server snapshots guarded by revision; commands; settled node moves; edge-only deletion |
 | Credentials | `lib/security/credentials.ts`, `lib/security/encrypted-vault.ts`, `lib/security/os-keyring.ts`, `lib/security/runtime.ts`, `app/api/credentials`, `scripts/key.mjs` | Keys in backend memory, opt-in encrypted copies under a keyring-held key, the terminal helper |
 | Redaction | `lib/security/redact.ts` | Secret-shaped text removed from inputs, outputs, events, exports and JSON responses |

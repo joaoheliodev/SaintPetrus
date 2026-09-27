@@ -95,6 +95,14 @@ export class GraphService {
     this.graph.edges = this.graph.edges.filter(e => e.source !== id && e.target !== id);
     this.emit('agent.removed', 'Agent removed.');
   }
+  // Takes a graph already rebuilt by parseGraphDocument. Accounting refusals are decided before this runs, as for remove.
+  replace(graph: Graph, reason: 'imported' | 'restored') {
+    if (this.graph.status === 'running' || this.graph.status === 'paused') throw new GraphError('Reset the mock run before importing a graph.');
+    // Revisions only move forward, so a client that saw a later revision still accepts the next event.
+    this.graph = { ...structuredClone(graph), revision: Math.max(this.graph.revision, graph.revision) };
+    this.record('graph.replaced', 'root', reason === 'imported' ? 'Graph imported from a file.' : 'Saved graph restored.');
+    this.emit(`graph.${reason}`, reason === 'imported' ? 'Graph imported.' : 'Graph restored.');
+  }
   update(id: string, changes: { name: string; objective: string }) {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) throw new GraphError('Agent not found.');

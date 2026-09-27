@@ -98,6 +98,11 @@ original. A file already present in the new place is never overwritten: the old 
 | Each provider call | A `Buffer` copy handed to the adapter, then the request header string | One provider request | The copy is zeroed; the header string cannot be zeroed in JavaScript |
 | Remembered (opt-in) | AES-256-GCM ciphertext in `vault/<provider>.json` under the OS user data directory; the master key stays in the OS keyring (on Windows, a DPAPI-wrapped master sits next to it) | Until forgotten | **Forget key** in Connect AI deletes the selected provider's file and clears its memory; `npm run key -- forget <provider>` does the same for any provider, including after a restart, when no key is in memory and the panel shows no saved copy |
 
+The saved graph, `graph.json`, sits in the same user data directory with the same permissions, written through the
+redactor like the export. It is read back at startup through the strict parser that checks an import, so a file
+edited outside the app is untrusted input like any other: unknown fields, credential-shaped text, foreign
+providers, oversize files and impossible graphs are refused, and a refused file is set aside, never overwritten.
+
 A legacy `data/` stays ignored by Git and refused by the pre-commit hook and CI's tracked-path
 check, even when forced. The vault directory is kept at 0700 and each file at 0600 where the
 platform supports it. There is no plaintext fallback: an unavailable keyring refuses persistence.

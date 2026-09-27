@@ -9,7 +9,8 @@ import { runtime } from '../lib/server/runtime';
 import { pinnedValidationTimeoutMs } from '../lib/providers/runtime';
 import { pinnedRunMode, retiredModeVariables } from '../lib/server/runtime';
 import { securityHeaders } from '../lib/server/security-headers';
-import { legacyVaultDirectory, vaultDirectory } from '../lib/server/user-data';
+import { legacyVaultDirectory, userDataDirectory, vaultDirectory } from '../lib/server/user-data';
+import { GraphStore } from '../lib/server/graph-store';
 import { migrateLegacyVault } from '../lib/security/vault-migration';
 const port = Number(process.env.PORT ?? 3000);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid local port.');
@@ -34,6 +35,15 @@ try {
   if (moved.length) console.warn(`Moved ${moved.length} remembered key file(s) from the checkout to the user data directory.`);
   if (kept.length) console.warn(`${kept.length} remembered key file(s) exist in both places; the copy in data/vault was left for you to compare and delete.`);
 } catch (error) { console.error(error instanceof Error ? error.message : 'Remembered keys could not be moved.'); await app.close(); process.exit(1); }
+// The saved graph is restored before the routes can read it; accounting is not saved and starts empty.
+let graphStore: GraphStore;
+try {
+  graphStore = new GraphStore(userDataDirectory(), message => console.warn(message));
+  const { restored, rejectedAs } = graphStore.restore(runtime().graph);
+  if (restored) console.warn('Restored the saved graph. Token accounting starts empty: it is kept for this process only.');
+  if (rejectedAs) console.warn(`The saved graph could not be read and was set aside as ${rejectedAs}; starting with a new graph.`);
+  graphStore.attach(runtime().graph);
+} catch (error) { console.error(error instanceof Error ? error.message : 'The saved graph could not be opened.'); await app.close(); process.exit(1); }
 const handle = app.getRequestHandler();
 // No Next route file exists for optional endpoints. Disabled means absent from this registry.
 const routes = new Map([...graphRoutes(runtime().graph), ...optionalEventRoutes(), ...optionalPreviewRoutes()]);
@@ -67,4 +77,4 @@ const server = createServer(async (req, res) => {
   } catch { if (!res.headersSent) res.writeHead(500); res.end(); }
 });
 server.listen(port, '127.0.0.1');
-for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { server.close(); previewServer?.close(); void app.close().finally(() => process.exit(0)); });
+for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { try { graphStore.flush(); } catch { console.warn('The last graph change could not be saved.'); } server.close(); previewServer?.close(); void app.close().finally(() => process.exit(0)); });

@@ -1,5 +1,6 @@
 import { runtime as getRuntime, mockEnabled } from '@/lib/server/runtime';
 import { localRequest, dispatch } from '@/lib/server/http';
+import { readBoundedText } from '@/lib/server/read-json';
 import { safeJson } from '@/lib/security/redact';
 import { tokenService } from '@/lib/tokens/runtime';
 import { GraphError } from '@/lib/server/graph-service';
@@ -13,16 +14,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!localRequest(request, true)) return json({ error: 'Same-origin local requests only.' }, 403);
   try {
-    const reader = request.body?.getReader();
-    if (!reader) return json({ error: 'Missing body.' }, 400);
-    let text = ''; const decoder = new TextDecoder(); let bytes = 0;
-    while (true) {
-      const { value, done } = await reader.read(); if (done) break;
-      bytes += value.byteLength;
-      if (bytes > 16384) { await reader.cancel(); return json({ error: 'Request too large.' }, 413); }
-      text += decoder.decode(value, { stream: true });
-    }
-    text += decoder.decode();
+    if (!request.body) return json({ error: 'Missing body.' }, 400);
+    const text = await readBoundedText(request, 16384);
+    if (text === null) return json({ error: 'Request too large.' }, 413);
     const { graph, mock } = getRuntime();
     const command = JSON.parse(text);
     if (['reset','start','resume','add','preview-mock'].includes(command?.action) && tokenService().isStopped()) return json({ error: 'Global kill switch is active.' }, 409);

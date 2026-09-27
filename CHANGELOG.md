@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: `night/provider-validation-ready` (2026-09-27)
 
 Everything that could be finished without a call to a real provider. No request with a real key was made.
-The test floor rose from 338 to 414.
+The test floor rose from 338 to 422.
 
 ### Provider validation
 
@@ -67,7 +67,11 @@ The test floor rose from 338 to 414.
 - **Remove** in the inspector deletes an agent and its connections after a confirmation. The route answers 409
   while the agent holds a reservation (in flight, unverifiable or awaiting reconciliation); the coordinator, a
   parent and an agent in a mock run are refused. Its accounting rows stay, marked as a removed agent.
-- Export context is reachable from the project bar.
+- Export context is reachable from the project bar. **Import graph** reads an exported file back as untrusted
+  input: at most 4 MiB, exact format with unknown fields refused, no credential-shaped text, providers limited to
+  `Unconfigured` and `Mock`, and only graphs the canvas could have built. Refused while accounting is unsettled.
+- The graph is saved to the user data directory (0700 directory, 0600 file, redacted, written atomically) and
+  restored at startup through the same parser; a file that fails it is set aside. Accounting stays process-local.
 - Reset, running the mock, pausing all agents, disconnecting or forgetting a key, deleting a connection,
   adding a price validity and applying confirmed usage all ask first.
 - Empty and unavailable states for the feed, the preview, reservations and the connection badge.

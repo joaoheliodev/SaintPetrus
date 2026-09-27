@@ -2,7 +2,7 @@
 // Adapted canvas geometry and interactions; all mutations go to the local server.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Position, MarkerType, useEdgesState, useNodesState, useReactFlow, type Edge, type EdgeChange, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
-import { Bot, Check, CornerDownRight, GitBranch, Maximize, Pause, Play, Plus, RotateCcw, ShieldCheck, Workflow, X } from 'lucide-react';
+import { Bot, Check, CornerDownRight, GitBranch, Maximize, Pause, Play, Plus, RotateCcw, ShieldCheck, Upload, Workflow, X } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
@@ -38,7 +38,8 @@ type Draft = { parentId: string | null; position?: { x: number; y: number } };
 type Props = { initialGraph: Graph; mockEnabled: boolean; feedEnabled?: boolean; previewPort?: number };
 function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previewPort }: Props) {
   const { graph, selectedId, notice, events, select } = useProjection();
-  const { command, pending } = useGraphTransport(initialGraph);
+  const { command, importGraph, pending } = useGraphTransport(initialGraph);
+  const importInput = useRef<HTMLInputElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentNodeType>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AgentEdgeType>([]);
   const [objective, setObjective] = useState(initialGraph.agents[0].context.objective);
@@ -148,6 +149,8 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
     <div className="projectbar"><h1>Agent workspace <small>M0</small></h1><div className="project-actions">
       <Button variant="outline" disabled={pending} onClick={() => { if (window.confirm('Reset the graph? Every agent except the coordinator, every connection and all output are removed. This cannot be undone.')) void command({ action: 'reset', objective }); }}><RotateCcw />Reset graph</Button>
       <a className={buttonVariants({ variant: 'outline' })} href="/api/graph/export" download>Export context</a>
+      <Button variant="outline" disabled={pending || active} onClick={() => importInput.current?.click()}><Upload />Import graph</Button>
+      <input ref={importInput} type="file" accept="application/json,.json" hidden aria-label="Graph file to import" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file && window.confirm(`Import ${file.name}? It replaces every agent, connection and output on the canvas. Token accounting is not part of the file and is unchanged.`)) void file.text().then(importGraph); }} />
       <Button disabled={pending} onClick={() => openDraft({ parentId: null })}><Plus />Add agent</Button>
       <Button variant="outline" disabled={pending || !selected} onClick={() => openDraft({ parentId: selected.id })}><CornerDownRight />Add subagent</Button>
       {mockEnabled && previewPort && <Button disabled={pending} onClick={() => { if (window.confirm('Run the preview mock? It replaces the current graph with a synthetic preview demonstration; your agents and connections are removed.')) void command({ action: 'preview-mock' }); }}>Run preview mock</Button>}
@@ -166,7 +169,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         <label>Mock cents<input type="number" min={1} max={10000} value={limits.maxCostCents} disabled={active} onChange={e => setLimits({ ...limits, maxCostCents: Number(e.target.value) })} /></label>
         <Button disabled={active || pending} variant="outline" onClick={() => command({ action: 'budget', depth: limits.maxDepth, nodes: limits.maxNodes, cents: limits.maxCostCents })}>Apply limits</Button>
       </section>}
-      <p className="helper setup-section">Local, in-memory graph; a server restart clears it. Only Run once and connection tests call a provider, and only when you click them.{mockEnabled && ' Run mock resets the graph to a fixed demonstration.'}</p>
+      <p className="helper setup-section">The graph is saved in your user data directory and restored when the server starts; token accounting is not. Only Run once and connection tests call a provider, and only when you click them.{mockEnabled && ' Run mock resets the graph to a fixed demonstration.'}</p>
     </aside><div className="center-panel"><div className="canvas-toolbar"><span>Canvas · {graph.agents.length} nodes · {graph.edges.length} connections</span><div className="project-actions">
       <Button variant="ghost" disabled={pending} onClick={() => openDraft({ parentId: null })}><Plus />Add agent</Button>
       <Button variant="ghost" onClick={() => flow.fitView({ padding: .2, maxZoom: 1, duration: 300 })}><Maximize />Fit all</Button>

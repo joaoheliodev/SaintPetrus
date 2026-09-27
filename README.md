@@ -72,14 +72,26 @@ fictitious budget: one cent per 30 characters, reserved before output is deliver
    under **Output**. With the mock it is free. With a real provider it is an ordinary budgeted call.
 7. **Watch** the server events panel, the connection badge in the header, and **Tokens** for budgets,
    reservations and receipts. An optional live feed is described below.
-8. **Export context** downloads the current graph as redacted JSON.
+8. **Export context** downloads the current graph as redacted JSON. **Import graph** reads such a file back and
+   replaces the canvas after a confirmation.
 9. **Delete a connection**: select it and press Delete or Backspace, then confirm. **Remove** in the inspector
    deletes an agent and its connections after a confirmation. It is refused for the coordinator, for an agent
    with subagents, during a mock run, and while the agent has a call in flight or usage that is unverifiable or
    awaiting reconciliation. Its accounting rows stay in **Tokens**, marked as a removed agent.
 10. **Reset graph** and **Pause all agents** ask before acting.
 
-The graph lives in server memory: every tab of the same process sees the same graph, and a restart resets it.
+The server owns the graph: every tab sees the same one. It is saved to `graph.json` in the user data directory
+(the same place as remembered keys, see `SECURITY.md`) and restored at startup, with every agent back at rest.
+Token accounting, reservations, receipts and the event feed are not saved: they are process-local, so a restart
+starts them empty. Settle every reservation in **Tokens** before stopping the server.
+
+An imported file is untrusted input. It must be at most 4 MiB and match the export format exactly: an unknown
+field at any level, a `model` field included, is refused, as is credential-shaped text, a provider other than
+`Unconfigured` or `Mock`, and a graph the canvas could not have built (wrong depths, cycles, dangling or duplicate
+connections, limits out of range). The graph format names no model, so nothing in a file can select one; models
+are chosen only through the policy allowlist. Import is refused during a mock run and while any current agent
+holds a reservation. A saved `graph.json` that fails the same checks at startup is renamed to
+`graph-rejected-<time>.json` and the server starts with a new graph.
 Snapshots arrive over a server-sent event stream, with 300 ms polling only while the stream is down.
 
 ## Connecting a provider
@@ -213,7 +225,7 @@ pauses every agent), so it refuses one that already holds work or has a keyed pr
 - No real provider call has been made. Parsers, accounting and error handling are proven against synthetic
   fixtures only; the first real call against each provider must be checked against its invoice before a second.
 - The input token count is an estimate; the budget is a guard, not a proof of what the invoice will say.
-- State is in memory and single-user: no database, no import.
+- Single-user. Only the graph is saved; token accounting is process-local and a restart clears it.
 - Keyring encryption was exercised on Linux only.
 - Accessibility was checked in Chromium (contrast, names, focus, keyboard paths), not with a screen reader.
 - The core health detectors in `lib/core` are integrated as a library; their orchestration is future work.
@@ -226,7 +238,7 @@ clones explicitly: `git remote set-url origin https://github.com/joaoheliodev/Sa
 ## Português (Brasil)
 
 SaintPetrus é um painel local para montar um grafo de agentes de LLM, conectá-los, executá-los por um proxy
-com orçamento e acompanhar o custo. Execute `npm ci` e `npm run dev` e abra http://127.0.0.1:3000: em
-desenvolvimento o mock vem ligado e o painel inteiro funciona sem chave. Nenhuma chamada com chave real foi
+com orçamento e acompanhar o custo. Execute `npm ci` e `npm run dev` e abra http://127.0.0.1:3000: o
+mock vem ligado por padrão e o painel inteiro funciona sem chave; provedores reais só com `SAINTPETRUS_MODE=real`. Nenhuma chamada com chave real foi
 feita; a primeira chamada real de cada provedor segue `docs/provider-validation.md`. Não publique chaves em
 issues, capturas de tela ou commits. Consulte `SECURITY.md`.
