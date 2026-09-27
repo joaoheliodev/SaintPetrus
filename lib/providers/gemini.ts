@@ -4,6 +4,7 @@ import { fieldNames, ProviderFailure, type Completion, type ProviderAdapter, typ
 import { ModelIdError, normalizeModelId } from './model-id';
 import { thinkingCallValid } from './thinking-policy';
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 export function geminiErrorCode(status: number): ProviderFailure['code'] {
   if (status === 400 || status === 401 || status === 403) return 'unauthorized';
   if (status === 404) return 'not_found';
@@ -11,18 +12,19 @@ export function geminiErrorCode(status: number): ProviderFailure['code'] {
   return 'upstream';
 }
 export function geminiUsage(value: unknown): Usage {
-  if (!value || typeof value !== 'object') throw new ProviderFailure('upstream');
-  const raw = value as Record<string, unknown>;
+  if (!record(value)) throw new ProviderFailure('upstream');
+  const raw = value;
+  const unparsed: () => never = () => { throw new ProviderFailure('upstream', fieldNames(raw)); };
   const prompt = raw.promptTokenCount; const candidates = raw.candidatesTokenCount ?? 0; const thoughts = raw.thoughtsTokenCount ?? 0; const cached = raw.cachedContentTokenCount ?? 0;
   const total = raw.totalTokenCount;
-  if (!integer(prompt) || !integer(candidates) || !integer(thoughts) || !integer(cached) || !integer(total) || cached > prompt) throw new ProviderFailure('upstream');
+  if (!integer(prompt) || !integer(candidates) || !integer(thoughts) || !integer(cached) || !integer(total) || cached > prompt) unparsed();
   // Google: total = prompt + thoughts + candidates. Thinking is billed at the output rate.
   // Cached tokens are already included in promptTokenCount; never add them again.
   // Cached prompt tokens use the full input rate as a conservative estimate. Tool pricing is
   // still unsupported and therefore fails closed instead of being silently mispriced.
-  if ((raw.toolUsePromptTokenCount ?? 0) !== 0) throw new ProviderFailure('upstream');
+  if ((raw.toolUsePromptTokenCount ?? 0) !== 0) unparsed();
   const completion = candidates + thoughts;
-  if (!Number.isSafeInteger(completion) || prompt + completion !== total) throw new ProviderFailure('upstream');
+  if (!Number.isSafeInteger(completion) || prompt + completion !== total) unparsed();
   return { prompt, completion, total, ...(cached > 0 ? { cachedPromptFullRate: cached, inputBreakdown: { cacheHit: cached, cacheMiss: prompt - cached } } : {}) };
 }
 export class GeminiAdapter implements ProviderAdapter {
@@ -53,7 +55,10 @@ export class GeminiAdapter implements ProviderAdapter {
         try {
           while (true) { const { value, done } = await reader.read(); if (done) break; bytes += value.byteLength; if (bytes > 262144) throw new ProviderFailure('upstream'); body += decoder.decode(value, { stream: true }); }
         } finally { await reader.cancel(); }
-        const payload = JSON.parse(body + decoder.decode()); const usage = geminiUsage(payload.usageMetadata);
+        const payload = JSON.parse(body + decoder.decode());
+        // Without a usage object, the names the response did carry are the diagnosis.
+        if (!record(payload?.usageMetadata)) throw new ProviderFailure('upstream', fieldNames(payload));
+        const usage = geminiUsage(payload.usageMetadata);
         const candidate = payload.candidates?.[0];
         if (payload.candidates && (!Array.isArray(payload.candidates) || payload.candidates.length > 1)) throw new ProviderFailure('upstream');
         const parts = candidate?.content?.parts ?? [];

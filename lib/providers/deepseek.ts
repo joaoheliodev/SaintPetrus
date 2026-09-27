@@ -70,6 +70,8 @@ export class DeepSeekAdapter implements ProviderAdapter {
         } finally { await reader.cancel(); }
         const payload: unknown = JSON.parse(body + decoder.decode());
         if (!record(payload)) throw new ProviderFailure('upstream');
+        // Without a usage object, the names the response did carry are the diagnosis.
+        if (!record(payload.usage)) throw new ProviderFailure('upstream', fieldNames(payload));
         const usage = deepseekUsage(payload.usage);
         if (!Array.isArray(payload.choices) || payload.choices.length !== 1 || !record(payload.choices[0])) throw new ProviderFailure('upstream');
         const choice = payload.choices[0];

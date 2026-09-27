@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { GeminiAdapter, geminiErrorCode, geminiUsage } from '../lib/providers/gemini';
+import { ProviderFailure } from '../lib/providers/adapter';
 import { ProviderProxy } from '../lib/providers/proxy';
 import { TokenService } from '../lib/tokens/service';
 import { loadConfig, type TokenPolicy } from '../lib/tokens/config';
@@ -159,6 +160,38 @@ test('Gemini prices the model named by modelVersion and fails closed without a u
       assert.ok(reported, `a missing identity must name the fields it saw: ${String(modelVersion)}`);
       assert.match(reported.payload, /usageMetadata\.promptTokenCount/);
       assert.doesNotMatch(reported.payload, new RegExp(`${marker}|\\b17\\b|\\b24\\b`), 'names only, never values');
+    }
+  } finally { store.disconnect('gemini'); secret.fill(0); await rm(dir, { recursive: true }); }
+});
+
+test('A Gemini usage shape it cannot read reports the field names it saw and none of their values', async () => {
+  const marker = 'VALUE-THAT-MUST-NOT-BE-RECORDED';
+  const strange = { promptTokenCount: 17, totalTokenCount: 24, candidateTokens: marker, detail: { hitBucket: marker } };
+  let caught: unknown;
+  try { geminiUsage(strange); } catch (error) { caught = error; }
+  assert.ok(caught instanceof ProviderFailure); assert.equal(caught.code, 'upstream');
+  assert.deepEqual(caught.fields, ['promptTokenCount', 'totalTokenCount', 'candidateTokens', 'detail', 'detail.hitBucket']);
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/gemini-names-');
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
+  const secret = Buffer.from(randomBytes(32).toString('hex'));
+  const policy: TokenPolicy = { global: 1024, perAgent: 1024, perModel: 1024, perSession: 1024, costLimitsUsd, cacheTtlMs: 0, reservationTtlMs: 300000, models: { [model]: { provider: 'gemini', max_tokens: 64, temperature: 0, thinking: { mode: 'disabled' } } } };
+  try {
+    await store.configure('gemini', secret);
+    const replies: [object, string[], string][] = [
+      [{ ...fixture, usageMetadata: strange }, ['candidateTokens', 'detail.hitBucket'], 'usageMetadata'],
+      // No usage object at all: the response's own names are what shows the field is missing.
+      [{ candidates: fixture.candidates, modelVersion: fixture.modelVersion }, ['candidates', 'modelVersion'], 'usageMetadata'],
+    ];
+    for (const [reply, expected, absent] of replies) {
+      const service = new TokenService(policy, { date: '2026-09-07', currency: 'USD', models: { [model]: geminiPrice } }, { ids: () => ['a'], pause: () => {}, pauseAll: () => {} });
+      const before = eventBus().snapshot().cursor;
+      await assert.rejects(service.execute(new ProviderProxy(), new GeminiAdapter(model, store, async () => Response.json(reply)), 'Reply OK.', new AbortController().signal, 'a', 'System'), /upstream/);
+      const reported = eventBus().snapshot(before).events.find(event => event.type === 'provider.usage_unparsed');
+      assert.ok(reported, 'an unreadable usage shape must say which names it saw');
+      for (const name of expected) assert.match(reported.payload, new RegExp(name.replace('.', '\\.')));
+      if (reply === replies[1][0]) assert.doesNotMatch(reported.payload, new RegExp(absent));
+      assert.doesNotMatch(reported.payload, new RegExp(`${marker}|\\b17\\b|\\b24\\b`), 'names only, never values');
+      assert.equal(service.snapshot().rows.find(row => row.scope === 'global')!.unverifiable, 1);
     }
   } finally { store.disconnect('gemini'); secret.fill(0); await rm(dir, { recursive: true }); }
 });

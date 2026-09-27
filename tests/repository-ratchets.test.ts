@@ -18,7 +18,7 @@ const directFetchAllowlist = new Map([
 const directFetchPin = 8;
 const reactFlowConsumerAllowlist = new Map([['components/workspace.tsx', 'nodes']]);
 const reactFlowConsumerPin = 1;
-const typeAssertionPin = 107;
+const typeAssertionPin = 106;
 const gitleaksSuppressionAllowlist = new Map([
   ['tests/core/token-estimate.test.ts', { fingerprint: 'heuristic-structural-v1', reason: 'Public deterministic counter name, not a credential.' }],
 ]);

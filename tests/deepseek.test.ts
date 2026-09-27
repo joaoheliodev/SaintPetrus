@@ -390,3 +390,19 @@ test('An unparsed usage shape reports the field names it saw and none of their v
   const row = service.snapshot().rows.find(item => item.scope === 'global')!;
   assert.equal(row.unverifiable, 1); assert.deepEqual(row.actual, { prompt: 0, completion: 0, total: 0 });
 });
+
+test('A DeepSeek response without a usage object reports its own field names, not its values', async () => {
+  const { eventBus } = await import('../lib/events/bus');
+  await withCredentials(async store => {
+    const { usage, ...withoutUsage } = completion; void usage;
+    const service = new TokenService(policyFor({ mode: 'disabled' }), pricesFor(), hooks, undefined, () => offPeakAt);
+    const before = eventBus().snapshot().cursor;
+    await assert.rejects(service.execute(new ProviderProxy(), new DeepSeekAdapter(model, store, async () => Response.json(withoutUsage)), 'Reply OK.', signal(), 'a', 'System'), /upstream/);
+    const reported = eventBus().snapshot(before).events.find(event => event.type === 'provider.usage_unparsed');
+    assert.ok(reported, 'a missing usage object must say which names the response carried');
+    const names = reported.payload.split('Field names received: ')[1]?.split('. No values')[0]?.split(', ');
+    assert.deepEqual(names, ['id', 'object', 'created', 'model', 'choices']);
+    assert.doesNotMatch(reported.payload, /CHAIN-OF-THOUGHT|synthetic-partial-cache-hit|deepseek-test-model/, 'names only, never values');
+    assert.equal(service.snapshot().rows.find(row => row.scope === 'global')!.unverifiable, 1);
+  });
+});

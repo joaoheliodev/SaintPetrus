@@ -146,8 +146,11 @@ credits/free tier and rounding; a locally priced usage result is not an invoice.
   `candidatesTokenCount + thoughtsTokenCount → completion`;
   `totalTokenCount → total`. Thoughts are therefore charged at the output rate.
   Cached input is already inside prompt; `cachedContentTokenCount` splits hit/miss
-  and is not added again. Missing candidates/thoughts/cache fields currently default
-  to zero; missing prompt/total, inconsistent totals or nonzero tool usage fail.
+  and is not added again. Missing candidates/thoughts/cache fields default to zero,
+  which stays safe: a missing output count breaks the total check, and a missing
+  cache split prices every input token at the dearer miss band. Missing
+  prompt/total, inconsistent totals or nonzero tool usage fail and publish
+  `provider.usage_unparsed` with field names only.
   **Served identity:** `modelVersion`, normalized without its `models/` prefix,
   becomes `billingModel` and the price key, as `response.model` does for DeepSeek.
   Register `R` and every possible served ID before dispatch. A missing or
@@ -306,7 +309,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
 | G5 | Feed tokens are message totals: omit billed output-limit responses, expiry/manual adjustments; reroute text claims reconciliation prematurely | Keep feed as activity evidence. Propose separate sanitized accounting events and emit reconciliation wording only after accounting succeeds |
 | G6 | Token/price receipt export absent; graph export omits ledger, inflight reservations and captures | Propose sanitized accounting export carrying four scopes and captured tariff identities; save local snapshots meanwhile |
 | G7 | DeepSeek is absent from terminal helper's provider list | Use UI now; separately add its ID to the existing validated CLI contract with a regression test |
-| G8 | Zero live cached/thinking tokens cannot establish nonzero cases; Gemini usage failures lack the field-name diagnostic supplied by DeepSeek | Obtain numeric provider evidence, or explicitly leave nonzero cases unverified; add names-only Gemini diagnostics separately. Do not manufacture billable coverage |
+| G8 | Zero live cached/thinking tokens cannot establish nonzero cases. The names-only diagnostic now covers Gemini usage failures and a missing usage object in both adapters | Obtain numeric provider evidence, or explicitly leave nonzero cases unverified. Do not manufacture billable coverage |
 | G9 | No safe arbitrary-key/fragment comparator for exported artifacts; short fragments not generally identifiable | Approve an ephemeral, nonlogging comparator and an explicit fragment criterion; Gitleaks alone is insufficient |
 | G10 | Counters/holds vanish on restart; input approximate; price-only reroutes beyond known candidates and unsupported price dimensions can exceed estimates | Preserve process/evidence during the run, select only supported pricing, approve residual exposure; durable receipts/accurate counting need a separate task |
 | G11 | Empty text without an output-limit finish reason can still mark a probe verified | Require visible output during manual validation; separately enforce that requirement without dropping billed usage |
