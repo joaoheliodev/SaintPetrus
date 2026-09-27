@@ -111,6 +111,21 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | R2 | Final gate and Gitleaks over the branch history | Recorded counts | done: `npm ci` and `npm audit` (0 vulnerabilities), lint, both typechecks, 400 tests in 29 suites (0 failures, 0 skips), build; `npm run test:e2e` in dev and production and `npm run test:browser` passed; Gitleaks clean on the full history (75 commits), `0662647..HEAD` (40 commits) and the directory |
 | R3 | STATUS, NIGHT-LOG, handoff, Checklist do João | Updated in the final commit | done (this commit) |
 
+### Phase 7 — operator answers to Q-01 to Q-10 (section 13, 2026-09-27)
+
+| ID | Priority | Decision | Acceptance criterion | Status |
+| --- | --- | --- | --- | --- |
+| A-08 | P0 | Q-08 yes | Remembered keys move to the OS user data directory (dir 0700, files 0600); a legacy vault in the checkout is copied, verified and only then deleted; tests and docs | pending |
+| A-10 | P0 | Q-10 yes | Expiry of an unpriced served model converts at max(estimate, reported) per dimension, at least at the requested model's peak/cache-miss rate; stays an estimate; never reduced automatically; agent stays paused until manual reconciliation; tests | pending |
+| A-01 | P0 | Q-01 yes | Mock is the default in every mode; real providers only with an explicit startup opt-in; the UI always shows MOCK or REAL | pending |
+| A-07 | P0 | Q-07 | OpenAI removed from the allowlist and documented as unsupported until validated; no snapshot or price registered | pending |
+| A-03 | P1 | Q-03 yes | Removal with confirmation; refused while the agent has an active, unverifiable or unreconciled reservation; its `agent/A` accounting stays, marked removed | pending |
+| A-04 | P1 | Q-04 yes | Graph persisted in the user data directory; import as untrusted input (strict schema, size limit, unknown fields and credentials refused, models through the allowlist); export stays redacted; accounting documented as process-local | pending |
+| A-09 | P1 | Q-09 | Run once kept only through the same preflight and budgets, with a confirmation that shows the maximum reserved cost; removed if it duplicates another action | pending |
+| A-02 | — | Q-02 | The operator validates locally; nothing to implement | done (no change) |
+| A-05 | P3 | Q-05 empty | The security contact placeholder stays | done (no change) |
+| A-06 | P3 | Q-06 empty | No LICENSE is created | done (no change) |
+
 ## V0 review of Part 2 (`1445177`)
 
 Checked every section of `docs/provider-validation.md` and the `STATUS.md` change against the code.

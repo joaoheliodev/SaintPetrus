@@ -100,6 +100,22 @@ The connection probe switches reasoning off wherever the wire protocol has an of
 
 RF-03 and RF-04 are out of scope. Do not start them.
 
+## Operator decisions (2026-09-27)
+
+The mock is the default in every mode. Real providers are enabled only by an explicit opt-in at startup (`SAINTPETRUS_MODE=real`), read once and pinned for the life of the process; the UI always shows whether it runs MOCK or REAL.
+
+OpenAI is not supported until the operator has validated it. It stays out of the policy allowlist, and no agent registers an OpenAI snapshot or price.
+
+Remembered keys and the persisted graph live in the operator's OS user data directory, never in the checkout, with the directory at 0700 and files at 0600. A legacy vault found in the checkout is copied, the copy verified, and only then the original deleted.
+
+When a provider answers with a served model that has no captured price, a reservation that expires converts at the greater of the estimate and the reported usage in each dimension (input, output, reasoning), priced at least at the requested model's peak, cache-miss rate. It stays an estimate, is never reduced automatically, and the agent stays paused until manual reconciliation.
+
+Removing an agent asks first and is refused while the agent has an active, unverifiable or unreconciled reservation. Its `agent` accounting rows stay, marked as a removed agent.
+
+A graph import is untrusted input: strict schema, a size limit, unknown fields and credential-shaped text refused, and every model through the allowlist. The export stays redacted, and accounting stays process-local.
+
+Run once goes through the same preflight and budgets as any call and asks first, showing the maximum cost it reserves.
+
 ## Reuse before reimplementing
 
 Before writing new logic at any scale, look for an existing implementation and extend it. Search in proportion to the work: a quick look for something trivial, a real search before a subsystem.
