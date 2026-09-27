@@ -6,16 +6,17 @@ import { previewEnabled } from '../lib/preview/store';
 import { optionalEventRoutes } from '../lib/events/http';
 import { graphRoutes } from '../lib/server/graph-http';
 import { runtime } from '../lib/server/runtime';
-import { providerProxy, validationTimeoutMs } from '../lib/providers/runtime';
+import { pinnedValidationTimeoutMs } from '../lib/providers/runtime';
 import { securityHeaders } from '../lib/server/security-headers';
 const port = Number(process.env.PORT ?? 3000);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid local port.');
 const app = next({ dev: process.argv[2] === 'dev', hostname: '127.0.0.1', port });
 await app.prepare();
-// Read once, after Next has loaded .env files: the proxy created now keeps this timeout for the process lifetime.
+// Pinned once, after Next has loaded .env files; the proxy the routes build later keeps it for the process lifetime.
+// Only the value: this file runs its own copy of the modules, so it must not build the proxy (lib/providers/runtime.ts).
 // Next already traps uncaught errors here, so an invalid value has to end the process explicitly.
 let validationTimeout: number | undefined;
-try { validationTimeout = validationTimeoutMs(); providerProxy(); }
+try { validationTimeout = pinnedValidationTimeoutMs(); }
 catch (error) { console.error(error instanceof Error ? error.message : 'Invalid validation timeout.'); await app.close(); process.exit(1); }
 if (validationTimeout !== undefined) console.warn(`Validation timeout active: provider calls abort after ${validationTimeout} ms and stay unverifiable.`);
 const handle = app.getRequestHandler();

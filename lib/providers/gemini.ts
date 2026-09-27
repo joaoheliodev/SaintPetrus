@@ -74,7 +74,7 @@ export class GeminiAdapter implements ProviderAdapter {
         return { text, usage, billingModel, ...(outcome ? { outcome } : {}) };
       } catch (error) {
         if (signal.aborted) throw new ProviderFailure('cancelled');
-        if (error instanceof ProviderFailure) throw error;
+        if (ProviderFailure.is(error)) throw error;
         throw new ProviderFailure('upstream');
       }
     });

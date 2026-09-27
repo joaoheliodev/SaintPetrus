@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       else throw new Error();
       return safeJson(store.status(provider));
     } catch (error) {
-      if (error instanceof ProviderFailure && (error.code === 'invalid_model_format' || error.code === 'model_not_allowlisted')) return safeJson({ error: error.code }, 400);
+      if (ProviderFailure.is(error) && (error.code === 'invalid_model_format' || error.code === 'model_not_allowlisted')) return safeJson({ error: error.code }, 400);
       return safeJson({ error: 'Credential operation failed. For persistence, verify that the OS keyring is available and unlocked.' }, 400);
     }
     finally { secret?.fill(0); }

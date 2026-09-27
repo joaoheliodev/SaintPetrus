@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     if (error instanceof UnpricedServedModel) return safeJson({ error: 'served_model_unpriced', requestedModel: error.requestedModel, servedModel: error.servedModel, reservationId: error.reservationId }, 409);
     // A budget refusal never reached the provider, so it must not mark the credential as rejected.
     if (error instanceof TokenFailure) return safeJson({ error: error.message }, 409);
-    const code = error instanceof ProviderFailure ? error.code : 'invalid_request';
+    const code = ProviderFailure.is(error) ? error.code : 'invalid_request';
     if (['unauthorized', 'not_found'].includes(code)) recordVerification(false, code);
     return safeJson({ error: code }, code === 'unconfigured' || code === 'busy' ? 409 : code === 'timeout' ? 504 : code === 'upstream' ? 502 : code === 'unauthorized' ? 401 : code === 'insufficient_balance' ? 402 : code === 'not_found' ? 404 : code === 'rate_limited' ? 429 : 400);
   }

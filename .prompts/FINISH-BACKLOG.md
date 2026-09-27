@@ -106,7 +106,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 
 | ID | Title | Acceptance criterion | Status |
 | --- | --- | --- | --- |
-| R1 | Independent review of `0662647..HEAD` | Reviewer subagent that did not implement; confirmed findings fixed, discarded ones recorded with reason | pending |
+| R1 | Independent review of `0662647..HEAD` | Reviewer subagent that did not implement; confirmed findings fixed, discarded ones recorded with reason | in progress (two reviewers reported; findings R1-01 to R1-14 below) |
 | R2 | Final gate and Gitleaks over the branch history | Recorded counts | pending |
 | R3 | STATUS, NIGHT-LOG, handoff, Checklist do João | Updated in the final commit | pending |
 
@@ -210,6 +210,33 @@ The commit is documentation only and carries no secret or leaky instruction.
 | D5 | floor check off by one | killed by "D5 a shrinking, skipping, failing or unreadable run is refused" |
 | D5 | one skipped test tolerated | killed by the same test |
 | D5 | CI step without `shell: bash` (no pipefail) | killed by "D5 CI holds every run to the floor…" |
+| R1-01 | proxy back to `instanceof` | killed by "R1 a provider failure built by another copy…" and the ratchet |
+| R1-01 | verdict back to `instanceof` | killed by the same two tests |
+| R1-01 | brand never set | killed by "R1 a provider failure built by another copy…" |
+| R1-01 | server builds the proxy again | killed by "R1 the server pins the validation timeout as plain data…" |
+| R1-01 | routes ignore the pinned value | killed by the same test |
+
+## R1 independent review (two reviewer subagents over `0662647..HEAD`)
+
+Two read-only reviewers, one on money and providers and one on security, UI and documentation, worked in
+parallel without editing the tree. Each finding is listed with its disposition.
+
+| ID | Severity | Finding | Disposition |
+| --- | --- | --- | --- |
+| R1-01 | blocking (both reviewers) | `scripts/server.ts` built the provider proxy at startup from its own tsx copy of `lib/`; Next's route bundle reused that instance through `globalThis`, so every `instanceof ProviderFailure` failed across the copies: 401/404/429/busy/timeout all became `unverifiable` + 400 `invalid_request`, no credential was marked rejected and field names were lost. Regression from 3e15849 | fixed (this commit): the server pins only the timeout value; `ProviderFailure` carries a `Symbol.for` brand checked by `ProviderFailure.is`; a test imports a second copy of `lib/`; a ratchet forbids `instanceof ProviderFailure`; verified against the real production bundle |
+| R1-02 | major, pre-existing | Same cause for `GraphError`: in the running server every graph refusal answered "Invalid request." (reproduced with curl: self-connection, missing agent) | pending |
+| R1-03 | major | `npm run test:e2e` clicks Send even when a keyed provider is connected, and resets and pauses whatever instance it is pointed at | pending |
+| R1-04 | minor | Browser check profiles live in `.audit/` and are not removed when Chromium dies or the run is interrupted (pending CDP calls never settle) | pending |
+| R1-05 | minor | Stale toolbar text "No API calls to LLMs." | pending |
+| R1-06 | minor | Forget key acts only on the selected provider, and the saved-copy note disappears after Disconnect or a restart | pending |
+| R1-07 | minor | DeepSeek throws without field names when the served model is missing | pending |
+| R1-08 | minor | OpenAI usage is not parsed strictly: bad usage loses the served model and the field names | pending |
+| R1-09 | minor, plausible | A probe admitted while a new key is being configured can stamp its verdict on the new pair | pending |
+| R1-10 | minor, pre-existing | Expiry of an unpriced served model converts the preflight estimate even when the provider reported more usage | pending |
+| R1-11 | nit, latent | A throw after settlement re-runs failure bookkeeping (double release on the mock, stuck unverifiable count) | pending |
+| R1-12 | nit, latent | `billingModel ?? adapter.model` would price a keyed adapter that omits the served model at the requested tariff | pending |
+| R1-13 | nit | Docs: CHANGELOG floor, "200 settled calls" (the 200 are all receipt kinds), first-real-call names claim, 409 `busy` shown as a budget refusal, the floor parser reads only TAP | pending |
+| R1-14 | nit | `AGENTS.md` says `.prompts/` vanishes in a fresh clone, but this backlog is force-tracked (D-02) | pending |
 
 ## Phase 2 security findings
 

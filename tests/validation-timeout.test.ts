@@ -10,12 +10,12 @@ import { fixedRatioTokenCounter } from '../lib/core/token-estimate';
 const price = { effectiveAt: '1970-01-01', verifiedAt: '1970-01-01', peakWindowsUtc: [], offPeak: { inputCacheHitPerMillion: 1, inputCacheMissPerMillion: 1, outputPerMillion: 1 }, peak: { inputCacheHitPerMillion: 1, inputCacheMissPerMillion: 1, outputPerMillion: 1 } };
 
 async function withFreshProxy(value: string | undefined, run: () => Promise<void> | void) {
-  const previous = { proxy: Reflect.get(globalThis, 'saintpetrusProxy'), env: process.env.SAINTPETRUS_VALIDATION_TIMEOUT_MS };
-  Reflect.set(globalThis, 'saintpetrusProxy', undefined);
+  const previous = { proxy: Reflect.get(globalThis, 'saintpetrusProxy'), pin: Reflect.get(globalThis, 'saintpetrusTimeoutPin'), env: process.env.SAINTPETRUS_VALIDATION_TIMEOUT_MS };
+  Reflect.set(globalThis, 'saintpetrusProxy', undefined); Reflect.set(globalThis, 'saintpetrusTimeoutPin', undefined);
   if (value === undefined) delete process.env.SAINTPETRUS_VALIDATION_TIMEOUT_MS; else process.env.SAINTPETRUS_VALIDATION_TIMEOUT_MS = value;
   try { await run(); }
   finally {
-    Reflect.set(globalThis, 'saintpetrusProxy', previous.proxy);
+    Reflect.set(globalThis, 'saintpetrusProxy', previous.proxy); Reflect.set(globalThis, 'saintpetrusTimeoutPin', previous.pin);
     if (previous.env === undefined) delete process.env.SAINTPETRUS_VALIDATION_TIMEOUT_MS; else process.env.SAINTPETRUS_VALIDATION_TIMEOUT_MS = previous.env;
   }
 }

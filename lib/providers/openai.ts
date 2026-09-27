@@ -56,7 +56,7 @@ export class OpenAIAdapter implements ProviderAdapter {
         return { text: redactText(texts.join('\n')), usage, billingModel };
       } catch (error) {
         if (signal.aborted) throw new ProviderFailure('cancelled');
-        if (error instanceof ProviderFailure) throw error;
+        if (ProviderFailure.is(error)) throw error;
         throw new ProviderFailure('upstream');
       }
     });

@@ -19,7 +19,7 @@ export type ValidatedSelection = { provider: ModelProvider; model: string };
 // A verification is a fact about one (provider, model) pair that was proved by a real call.
 // It is never inferred from the presence of a credential and never survives a credential change.
 type Verification = { provider: string; model: string; ok: boolean; at: number; code?: string };
-const state = globalThis as typeof globalThis & { saintpetrusProxy?: ProviderProxy; saintpetrusSelection?: { provider: string; model: string }; saintpetrusVerification?: Verification };
+const state = globalThis as typeof globalThis & { saintpetrusProxy?: ProviderProxy; saintpetrusTimeoutPin?: { ms: number | undefined }; saintpetrusSelection?: { provider: string; model: string }; saintpetrusVerification?: Verification };
 // Startup-only validation aid: a shorter proxy timeout forces the lost-contact path against a real provider. It is
 // never read from a request, and it applies inside the proxy, after preflight has already reserved the call.
 export function validationTimeoutMs(value = process.env.SAINTPETRUS_VALIDATION_TIMEOUT_MS): number | undefined {
@@ -27,7 +27,10 @@ export function validationTimeoutMs(value = process.env.SAINTPETRUS_VALIDATION_T
   if (!/^[0-9]{1,5}$/.test(value) || Number(value) < 1 || Number(value) >= DEFAULT_PROVIDER_TIMEOUT_MS) throw new Error(`SAINTPETRUS_VALIDATION_TIMEOUT_MS must be an integer from 1 to ${DEFAULT_PROVIDER_TIMEOUT_MS - 1}.`);
   return Number(value);
 }
-export const providerProxy = () => state.saintpetrusProxy ??= new ProviderProxy(validationTimeoutMs() ?? DEFAULT_PROVIDER_TIMEOUT_MS);
+// Read once per process. The custom server pins it at startup as plain data and never builds the proxy: it runs its own
+// copy of these modules, and a proxy built there would reach the routes with classes from the wrong copy.
+export function pinnedValidationTimeoutMs() { return (state.saintpetrusTimeoutPin ??= { ms: validationTimeoutMs() }).ms; }
+export const providerProxy = () => state.saintpetrusProxy ??= new ProviderProxy(pinnedValidationTimeoutMs() ?? DEFAULT_PROVIDER_TIMEOUT_MS);
 export function clearVerification() { state.saintpetrusVerification = undefined; }
 export function recordVerification(ok: boolean, code?: string) {
   const { provider, model } = providerStatus();

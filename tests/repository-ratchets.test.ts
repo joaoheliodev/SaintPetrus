@@ -70,6 +70,18 @@ test('O2 direct fetch calls stay behind the provider boundary or the shrinking l
   assert.deepEqual(actual, directFetchAllowlist, 'A direct fetch appeared outside the provider boundary. Migrate it; never extend the allowlist.');
 });
 
+test('R1 failures that cross module copies are recognized by their brand, never by instanceof', () => {
+  // scripts/server.ts runs its own copy of lib/ beside the route bundle; instanceof between the copies is always false.
+  const branded = new Set(['ProviderFailure']);
+  const found: string[] = [];
+  for (const path of runtimeFiles) {
+    visit(sourceFile(path), node => {
+      if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword && ts.isIdentifier(node.right) && branded.has(node.right.text)) found.push(`${path}: ${node.getText()}`);
+    });
+  }
+  assert.deepEqual(found, [], 'Use the class\'s static is(); instanceof fails across the server and route copies.');
+});
+
 test('O2 authored code has zero browser storage references', () => {
   const forbidden = ['local' + 'Storage', 'session' + 'Storage'];
   for (const path of authoredFiles) {

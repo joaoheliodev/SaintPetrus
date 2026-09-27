@@ -33,7 +33,7 @@ export class ProviderProxy {
     } catch (error) {
       if (timedOut) throw new ProviderFailure('timeout');
       if (controller.signal.aborted) throw new ProviderFailure('cancelled');
-      throw error instanceof ProviderFailure ? error : new ProviderFailure('upstream');
+      throw ProviderFailure.is(error) ? error : new ProviderFailure('upstream');
     } finally { clearTimeout(timer); parentSignal.removeEventListener('abort', cancel); this.active = false; this.controller = undefined; }
   }
 }

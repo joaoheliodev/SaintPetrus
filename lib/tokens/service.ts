@@ -28,7 +28,7 @@ type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => str
 const failureVerdicts = {
   unconfigured: 'unbilled', disabled: 'unverifiable', invalid_request: 'unbilled', invalid_model_format: 'unverifiable', model_not_allowlisted: 'unverifiable', unauthorized: 'unbilled', insufficient_balance: 'unbilled', not_found: 'unbilled', rate_limited: 'unbilled', upstream: 'unverifiable', timeout: 'unverifiable', cancelled: 'unverifiable', busy: 'unbilled',
 } satisfies Record<ProviderFailureCode, Exclude<BillingVerdict, 'billed'>>;
-export function failureBillingVerdict(error: unknown): Exclude<BillingVerdict, 'billed'> { return error instanceof ProviderFailure ? failureVerdicts[error.code] : 'unverifiable'; }
+export function failureBillingVerdict(error: unknown): Exclude<BillingVerdict, 'billed'> { return ProviderFailure.is(error) ? failureVerdicts[error.code] : 'unverifiable'; }
 const zero = (): Totals => ({ prompt: 0, completion: 0, total: 0 });
 const money = (value: number) => Math.round(value * 1_000_000_000_000) / 1_000_000_000_000;
 export class TokenService {
@@ -230,11 +230,11 @@ export class TokenService {
       else eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'error', severity: 'error', payload: 'Provider execution failed.' });
       // Names only. A shape we cannot parse pauses the agent, and the names are what makes the next
       // attempt a correction rather than a guess.
-      if (error instanceof ProviderFailure && error.fields?.length) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.usage_unparsed', severity: 'warning', payload: `Unrecognized provider usage or served model shape. Field names received: ${error.fields.join(', ')}. No values recorded.` });
+      if (ProviderFailure.is(error) && error.fields?.length) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.usage_unparsed', severity: 'warning', payload: `Unrecognized provider usage or served model shape. Field names received: ${error.fields.join(', ')}. No values recorded.` });
       // A proven rejection releases the reservation. Lost contact remains unverifiable because the
       // provider may have processed and billed a response that never reached us.
       verdict = error instanceof UnpricedServedModel ? 'unverifiable' : adapter.id === 'mock' ? 'unbilled' : failureBillingVerdict(error);
-      outcome = error instanceof ProviderFailure ? error.code : error instanceof UnpricedServedModel ? 'served_model_unpriced' : error instanceof TokenFailure ? 'usage_unavailable' : 'error';
+      outcome = ProviderFailure.is(error) ? error.code : error instanceof UnpricedServedModel ? 'served_model_unpriced' : error instanceof TokenFailure ? 'usage_unavailable' : 'error';
       throw error;
     } finally {
       if (verdict !== 'billed') {

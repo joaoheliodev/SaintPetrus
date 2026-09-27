@@ -26,11 +26,15 @@ export function fieldNames(value: unknown): string[] | undefined {
 }
 export const providerFailureCodes = ['unconfigured', 'disabled', 'invalid_request', 'invalid_model_format', 'model_not_allowlisted', 'unauthorized', 'insufficient_balance', 'not_found', 'rate_limited', 'upstream', 'timeout', 'cancelled', 'busy'] as const;
 export type ProviderFailureCode = typeof providerFailureCodes[number];
+// The custom server runs its own copy of these modules (tsx) beside Next's route bundle, and both reach the same
+// singletons through globalThis, where `instanceof` fails across copies. A brand registered with Symbol.for does not.
+const providerFailureBrand = Symbol.for('saintpetrus.ProviderFailure');
 export class ProviderFailure extends Error {
   // Adapters translate their own HTTP semantics into this shared vocabulary. Provider error
   // bodies are never read, echoed or logged.
   // `fields` carries the names of the keys a response actually had when its shape could not be
   // parsed, and never a value. Names are not an error body: they are what turns a failed first call
   // into one correction instead of a blind second attempt.
-  constructor(readonly code: ProviderFailureCode, readonly fields?: readonly string[]) { super(code); }
+  constructor(readonly code: ProviderFailureCode, readonly fields?: readonly string[]) { super(code); Object.defineProperty(this, providerFailureBrand, { value: true }); }
+  static is(value: unknown): value is ProviderFailure { return value instanceof Error && Reflect.get(value, providerFailureBrand) === true; }
 }
