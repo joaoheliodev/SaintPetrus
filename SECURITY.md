@@ -1,19 +1,60 @@
 # Security policy
 
-## Reporting and revocation
+## Reporting a vulnerability
 
-Use GitHub private vulnerability reporting when available. Otherwise request a
-private channel from the maintainer without posting sensitive details publicly.
-Never attach keys, cookies, unredacted transcripts or screenshots to issues.
+Report privately. Use GitHub private vulnerability reporting on this repository (Security, then "Report a
+vulnerability") when it is enabled. Otherwise write to **[SECURITY CONTACT: placeholder, to be provided by the
+maintainer]** and wait for a private channel before sending details. Never attach keys, cookies, unredacted
+transcripts or screenshots to a public issue.
 
-If a credential leaks: revoke it with the provider FIRST; review usage; then
-coordinate history cleanup with maintainers. Renaming or changing repository
-visibility does not remove history. Contributors must not rewrite shared history
-without explicit authorization. This work does not rewrite or force-push history.
+## If a key leaks
+
+Revoke it with the provider first, then review the provider's usage and billing for the period it was
+exposed, then coordinate any history cleanup with the maintainers. Renaming the repository or changing its
+visibility does not remove history, and contributors must not rewrite shared history without explicit
+authorization. A key that reached a published commit is compromised even if the commit is later removed.
+
+## Threat model
+
+SaintPetrus is a single-user tool that runs on the operator's own machine. It protects two things above all:
+provider keys, and the money a key can spend.
+
+**Assets.** Provider API keys; the provider balance they draw on; the integrity of the operator's policy
+(`config/token-policy.json`) and price table (`config/prices.json`), which decide what may be spent; and the
+content of the graph (objectives, model answers, events, exports), which can hold whatever the operator typed.
+
+**Trust boundaries and threats.**
+
+| Boundary | Threat | Mitigation |
+| --- | --- | --- |
+| Other websites in the same browser | Cross-site requests to the local API, DNS rebinding, framing the panel to trick clicks | Loopback binding; Host check; every state-changing request needs the exact page Origin and a JSON content type; the credential route also needs a client header, plus same-origin Fetch Metadata from a browser; no CORS; `frame-ancestors 'none'` and `X-Frame-Options: DENY` |
+| The browser page | A key left in the page or its storage | The key lives only in an uncontrolled password field until one POST; no browser storage reference exists in the code, pinned at zero by a test |
+| Model output | Prompt injection, markup or script in answers, chain-of-thought echoing the prompt | Answers render as text, never HTML; reasoning text never enters events, previews, artifacts or the cache; generated code runs only in the isolated preview origin (see below); exports and events are redacted |
+| Provider APIs | Rerouting to a dearer model, unknown usage shapes, error bodies echoing input, redirects, huge or slow responses | The served model is the price key and an unpriced one stays `unverifiable`; usage parsers fail closed and record only field names; error bodies are never read; redirects are refused; bodies are bounded; one call at a time with a timeout |
+| The operator's budget | Concurrent calls passing the same ceiling, lost contact treated as free, underestimated input | Synchronous four-scope reservations at peak with no cache hits before any I/O; timeouts and 5xx never release the hold; expiry converts at the dearer of hold and eligible price; the first real call per provider is checked against the invoice |
+| The public repository | A key committed by accident | Gitleaks in the pre-commit hook (fails closed) and in CI; restricted paths such as `data/` refused even when forced; `.env*` ignored; tests use generated synthetic material only |
+
+**Out of scope, and residual risk.**
+
+- **Other processes of the same OS account are trusted.** The local API authenticates browsers, not programs:
+  any local process can send the right Host and Origin headers, configure a key and spend it. The same
+  account can also read process memory and, through its own keyring, decrypt a remembered key. Do not run
+  SaintPetrus on a shared account or expose its port through a tunnel or proxy.
+- JavaScript cannot erase strings. The request header built for each provider call holds the key until
+  garbage collection; application buffers are zeroed.
+- Remembered keys are stored as ciphertext under `data/vault` inside the checkout (question Q-08 in the
+  handoff proposes moving them to a per-user directory).
+- The content security policy allows inline scripts because Next.js hydrates with them; a nonce-based policy
+  is a possible later hardening.
+- The preview sandbox isolates origin and network, not CPU or memory: a runaway script can freeze its tab.
+- The input token count is approximate, so the ledger can undercount; that is why the first invoice matters.
+- Keyring integration was exercised on Linux only; macOS and Windows paths are covered by test doubles.
+- Dependencies are audited in CI (`npm audit --audit-level=high`) and installed from the lockfile; a
+  compromised upstream package is outside what this project can detect.
 
 ## Credentials
 
-Keys are entered through `npm run key -- set openai` in an interactive local
+Keys are entered through `npm run key -- set <provider>` in an interactive local
 terminal. Input is hidden, not accepted as argv, and sent to the loopback backend.
 Alternatively, Connect AI accepts a key in a transient password field. Only its
 same-origin local configuration POST may carry that key. The field is cleared on
@@ -72,7 +113,8 @@ origin only, frames only for the isolated preview origin), `X-Frame-Options: DEN
 Scripts keep `'unsafe-inline'` because Next hydrates with inline scripts, and development adds
 `'unsafe-eval'` and its reload socket; a nonce-based policy is a possible later hardening.
 `npm run test:e2e` checks the page against these headers in a disposable Chromium.
-LLM connectivity is not part of M1. M2 permits only the configured provider route.
+Provider traffic leaves only from the adapters, to each provider's fixed endpoint, and only
+for the selected provider.
 
 Application log, error, response and context-export serialization uses a shared
 redactor for registered secrets and key-shaped strings. ESLint prohibits direct
