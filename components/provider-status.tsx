@@ -89,8 +89,8 @@ export function ProviderStatus() {
     setShow(false); setRemember(false); setOpen(value);
     if (value) { setProvider(status?.mocked ? 'mock' : status && keyedProviders.includes(status.provider) ? status.provider : 'openai'); setModel(status && keyedProviders.includes(status.provider) ? status.model : ''); setResult(''); }
   }
-  async function configure(action: 'set' | 'disconnect') {
-    const selected = action === 'disconnect' ? status?.provider ?? 'none' : provider;
+  async function configure(action: 'set' | 'disconnect' | 'forget') {
+    const selected = action === 'set' ? provider : status?.provider ?? 'none';
     const body: Record<string, unknown> = { action, provider: selected };
     if (action === 'set') {
       body.model = selected === 'mock' ? 'mock-v1' : model || custom.trim();
@@ -115,10 +115,12 @@ export function ProviderStatus() {
       ? `${mocked ? 'Mock verified' : 'Connection verified'} · ${data.latencyMs} ms`
       : verificationMessage(response.status, data?.error));
   }
-  async function run(action: 'connect' | 'test' | 'disconnect') {
+  async function run(action: 'connect' | 'test' | 'disconnect' | 'forget') {
+    if (action === 'forget' && !window.confirm(`Forget the ${status?.provider ?? ''} key? This clears it from backend memory and deletes any encrypted copy saved on this machine. It cannot be undone.`)) return;
     setPending(true); setResult('');
     try {
       if (action === 'disconnect') { await configure('disconnect'); setResult('Disconnected. Credential removed from the backend.'); return; }
+      if (action === 'forget') { await configure('forget'); setResult('Key forgotten: cleared from memory and any saved encrypted copy deleted.'); return; }
       const selectedModel = provider === 'mock' ? 'mock-v1' : model || custom.trim();
       if (provider !== 'mock' && !keyField.current?.value && !status?.connected) { setResult('Enter an API key before connecting.'); return; }
       if (action === 'connect' || keyField.current?.value || !status?.connected || status.provider !== provider || status.model !== selectedModel) await configure('set');
@@ -151,6 +153,8 @@ export function ProviderStatus() {
         <Button disabled={pending} onClick={() => run('connect')}>{pending ? 'Verifying…' : 'Connect and verify (1 call)'}</Button>
         <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('test')}>Test again</Button>
         <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('disconnect')}>Disconnect</Button>
+        <Button variant="outline" disabled={pending || !status || !keyedProviders.includes(status.provider)} onClick={() => run('forget')}>Forget key</Button>
+        {status?.remembered && <p>An encrypted copy of this key is saved on this machine. Forget key deletes it.</p>}
         <p role="status">{result}</p>
       </DialogContent>
     </Dialog>

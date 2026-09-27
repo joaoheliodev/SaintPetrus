@@ -11,7 +11,7 @@ import type { Credentials } from '../security/credentials';
 // Every provider except the synthetic one authenticates with a stored credential.
 export type KeyedProvider = Exclude<ModelProvider, 'mock'>;
 export type ConnectionState = 'disconnected' | 'configured' | 'verified' | 'rejected' | 'incomplete';
-export type ProviderStatusSnapshot = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable: boolean; verified: boolean; verifiedAt?: number; failureCode?: string; state: ConnectionState; validationTimeoutMs?: number };
+export type ProviderStatusSnapshot = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable: boolean; verified: boolean; verifiedAt?: number; failureCode?: string; state: ConnectionState; validationTimeoutMs?: number; remembered?: boolean };
 const keyedProvider = (value: unknown): value is KeyedProvider => isModelProvider(value) && value !== 'mock';
 const adapters: Record<KeyedProvider, new (model: string, credentials: Credentials) => ProviderAdapter> = { gemini: GeminiAdapter, openai: OpenAIAdapter, deepseek: DeepSeekAdapter };
 type ModelAllowlist = Readonly<Record<string, { provider: ModelProvider }>>;
@@ -38,7 +38,7 @@ export function providerStatus(): ProviderStatusSnapshot {
   const selected = state.saintpetrusSelection?.provider ?? process.env.SAINTPETRUS_PROVIDER ?? (mockAvailable ? 'mock' : 'none');
   const base = (() => {
     if (selected === 'mock') return { provider: 'mock', model: 'mock-v1', connected: mockAvailable, mocked: true };
-    if (keyedProvider(selected)) { const model = state.saintpetrusSelection?.model ?? process.env.SAINTPETRUS_MODEL ?? ''; return { provider: selected, model, connected: credentials().status(selected).connected && !!model, mocked: false }; }
+    if (keyedProvider(selected)) { const model = state.saintpetrusSelection?.model ?? process.env.SAINTPETRUS_MODEL ?? ''; const stored = credentials().status(selected); return { provider: selected, model, connected: stored.connected && !!model, mocked: false, remembered: stored.remembered }; }
     return { provider: 'none', model: '', connected: false, mocked: false };
   })();
   // A stale verification must never be shown as current: it only counts for the exact pair it proved.

@@ -56,18 +56,18 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | V7 | Empty visible output never verifies a probe (G11) | `connection-state.md` requires usable output; empty text with a non-limit finish reason is marked verified | Empty-text probe keeps billed usage, does not verify, reports a distinct error; badge not "Connected" | no | done (7c97951; state `incomplete`, 422 `empty_output`) |
 | V11 | OpenAI served identity | Found while closing V2: `AGENTS.md` makes the response `model` the price key, but the OpenAI adapter ignored it (plain and streamed) | `billingModel` from `response.model`; missing identity fails closed with names; unpriced snapshot follows V2 | confirm (Q-07) | done (812a244) |
 | V8 | Gemini usage failures report field names only (G8, second half) | `AGENTS.md` requires names-only diagnostics for an unparsed usage shape; only DeepSeek has them | Gemini parse failure publishes the field names it saw and never a value; a missing usage object reports the response's names in both adapters | no | done (35a8022) |
-| V9 | Update `docs/provider-validation.md` | Protocol must describe the new receipts, counter, timeout, identity and terminal support | Gaps table updated (resolved vs still open); steps use the new evidence sources | no | done (this commit; V0 imprecisions corrected) |
+| V9 | Update `docs/provider-validation.md` | Protocol must describe the new receipts, counter, timeout, identity and terminal support | Gaps table updated (resolved vs still open); steps use the new evidence sources | no | done (aa7bf5c; V0 imprecisions corrected) |
 
 ### Phase 2 — security (P0)
 
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
-| S1 | Key lifecycle audit | Operator asked for where a key travels, how long it lives and how remembered keys are stored and erased | Documented path (field, POST, memory buffers, per-call copies, header), remembered ciphertext location/permissions/erasure verified; gaps fixed or recorded | no | pending |
+| S1 | Key lifecycle audit | Operator asked for where a key travels, how long it lives and how remembered keys are stored and erased | Documented path (field, POST, memory buffers, per-call copies, header), remembered ciphertext location/permissions/erasure verified; gaps fixed or recorded | no | done (this commit; lifecycle table in `SECURITY.md`; UI Forget key added) |
 | S2 | Leak audit | Logs, errors, feed, export and API responses must carry no secret or raw provider payload | Each sink checked and tested; findings fixed or recorded | no | pending |
 | S3 | API route hardening audit | Loopback, Origin, content type, input and response bounds | Every route checked; gaps fixed with tests | no | pending |
 | S4 | Security headers for the local app | No CSP, framing or referrer policy on the main app | Headers on every main-listener response, tested, and the app verified working in Chromium in dev and production | no | pending |
-| S5 | `npm audit` | Operator requirement | Non-breaking fixes applied; remainder recorded | no | pending |
-| S6 | `.gitignore` coverage | `.env*`, remembered credentials, logs and build artifacts | Patterns cover each class; check-staged and CI still pass | no | pending |
+| S5 | `npm audit` | Operator requirement | Non-breaking fixes applied; remainder recorded | no | done (this commit; 0 vulnerabilities, nothing to fix; patch/minor updates available but not applied, see findings) |
+| S6 | `.gitignore` coverage | `.env*`, remembered credentials, logs and build artifacts | Patterns cover each class; check-staged and CI still pass | no | done (this commit) |
 
 ### Phase 3 — core function (P1)
 
@@ -170,6 +170,21 @@ The commit is documentation only and carries no secret or leaky instruction.
 | V11 | OpenAI drops `billingModel` | killed by the OpenAI snapshot test |
 | V11 | stream drops `billingModel` | killed by the same test |
 | V11 | missing identity without names | killed by the same test |
+| S1 | forget no longer cancels the call in flight | killed by "S1 the browser can forget a remembered key…" |
+| S1 | status stops reporting a remembered key | killed by the same test |
+
+## Phase 2 security findings
+
+- **S1 key lifecycle.** Traced end to end (table in `SECURITY.md`). Fixed: the UI had no way to delete a
+  remembered key's ciphertext (Disconnect clears memory only), so Connect AI now has a confirmed **Forget key**,
+  shows when an encrypted copy exists, and forget cancels a call in flight like Disconnect. Recorded, not
+  changed: no idle expiry of the in-memory key; JavaScript strings (request body, header) cannot be zeroed; the
+  vault lives in the ignored `data/vault` inside the checkout, outside Git but inside the folder (Q-08).
+- **S5 dependencies.** `npm audit` (all and production): 0 vulnerabilities. Available but not applied, with no
+  security driver: next/eslint-config-next 16.3.4 → 16.3.6, tsx 4.23.15, lucide-react 1.48, react/react-dom
+  19.3, @xyflow/react 12.12, tailwind 4.3. Pinned versions were deliberate; upgrading is an operator choice.
+- **S6 ignore rules.** `.env*` (not only `.env` and `.env.*`), `*.log`, `*.p12`, `*.pfx`, `/out/`, `/build/`
+  added; `.env.example` stays tracked.
 
 ## Decisões tomadas (decisions taken)
 
@@ -204,6 +219,8 @@ The commit is documentation only and carries no secret or leaky instruction.
   process-local by design). Wanted?
 - **Q-05** Security contact for `SECURITY.md` (placeholder left).
 - **Q-06** LICENSE: none exists; which one, if any?
+- **Q-08** Remembered keys are encrypted under the ignored `data/vault` inside the checkout. Move the vault to a
+  per-user data directory outside the project folder (existing remembered keys would need re-entry)?
 - **Q-07** OpenAI now prices the served snapshot (D-05). Which dated IDs and prices should be registered
   before any OpenAI use, or should OpenAI be removed from the allowlist until then?
 

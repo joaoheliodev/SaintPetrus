@@ -49,7 +49,7 @@ export async function POST(request: Request) {
           selectProvider(selection);
         }
       } else if (data.action === 'disconnect') { providerProxy().cancel(); clearVerification(); store.disconnect(provider); }
-      else if (data.action === 'forget') { clearVerification(); await store.forget(provider); }
+      else if (data.action === 'forget') { providerProxy().cancel(); clearVerification(); await store.forget(provider); }
       else if (data.action === 'restore') { clearVerification(); await store.restore(provider); }
       else throw new Error();
       return safeJson(store.status(provider));

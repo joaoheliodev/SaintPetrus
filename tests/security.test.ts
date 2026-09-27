@@ -133,3 +133,29 @@ test('RS-02 configured secret never appears in status or API errors', async () =
     assert.equal((await readdir(f.dir)).length, 0);
   } finally { f.store.disconnect('openai'); host.saintpetrusCredentials = previous; await f.cleanup(); }
 });
+
+test('S1 the browser can forget a remembered key: memory, saved ciphertext and the call in flight all end', async () => {
+  const f = await fixture(); const key = randomBytes(32).toString('hex');
+  const { providerStatus } = await import('../lib/providers/runtime');
+  const { ProviderProxy } = await import('../lib/providers/proxy');
+  const keys = ['saintpetrusCredentials', 'saintpetrusSelection', 'saintpetrusProxy'];
+  const old = new Map(keys.map(name => [name, Reflect.get(globalThis, name)]));
+  const url = 'http://127.0.0.1:3000/api/credentials';
+  const post = (body: unknown, client: 'terminal' | 'browser') => configure(new Request(url, { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json', 'X-SaintPetrus-Client': client, ...(client === 'browser' ? { 'Sec-Fetch-Site': 'same-origin' } : {}) }, body: JSON.stringify(body) }));
+  try {
+    const proxy = new ProviderProxy();
+    Reflect.set(globalThis, 'saintpetrusCredentials', f.store); Reflect.set(globalThis, 'saintpetrusSelection', { provider: 'openai', model: 'test-model' }); Reflect.set(globalThis, 'saintpetrusProxy', proxy);
+    assert.equal((await post({ action: 'set', provider: 'openai', key, remember: true }, 'terminal')).status, 200);
+    assert.deepEqual(await readdir(f.dir), ['openai.json']);
+    assert.equal(providerStatus().remembered, true, 'the panel must be able to say an encrypted copy exists');
+    // A call still in flight when the key is forgotten is cancelled, as Disconnect already does.
+    const inflight = proxy.execute({ id: 'openai', model: 'test-model', complete: (_input, signal) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })) }, 'Hi', new AbortController().signal);
+    const outcome = Promise.race([inflight.then(() => 'resolved', (error: unknown) => String(error)), new Promise(resolve => setTimeout(() => resolve('still running'), 500))]);
+    const forgotten = await post({ action: 'forget', provider: 'openai' }, 'browser');
+    assert.equal(forgotten.status, 200); assert.ok(!(await forgotten.text()).includes(key));
+    assert.match(String(await outcome), /cancelled/);
+    assert.deepEqual(await readdir(f.dir), [], 'the saved ciphertext is deleted');
+    assert.equal(f.store.status('openai').connected, false);
+    assert.equal(providerStatus().remembered, false);
+  } finally { f.store.disconnect('openai'); for (const [name, value] of old) Reflect.set(globalThis, name, value); await f.cleanup(); }
+});

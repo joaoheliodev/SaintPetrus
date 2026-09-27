@@ -1,17 +1,24 @@
-.env
-.env.*
+# Local configuration and credentials: any .env variant, key material, remembered (encrypted) keys.
+.env*
 !.env.example
 *.key
 *.pem
+*.p12
+*.pfx
 /data/
-/logs/
 /config/secrets*
+# Logs.
+/logs/
+*.log
+npm-debug.log*
+# Dependencies and build or test artifacts.
 node_modules/
 .next/
+/out/
+/build/
 coverage/
 *.tsbuildinfo
 next-env.d.ts
-npm-debug.log*
 .DS_Store
 
 # AGENTS.md and CLAUDE.md are project sources: they carry the permanent rules and must be

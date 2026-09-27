@@ -42,6 +42,24 @@ Native platform integration requires verification on each supported OS.
 Ciphertext lives under ignored data/vault with restrictive file permissions where
 supported. It is tied to the OS account/keyring and is not a portable backup.
 
+## Key lifecycle (audited 2026-09-27)
+
+| Stage | Where the key is | How long | How it ends |
+| --- | --- | --- | --- |
+| UI entry | Uncontrolled password field; never React state or browser storage | Until submit or close | The field is cleared on both |
+| Terminal entry | `npm run key -- set <provider>` reads hidden TTY input; argv and extra arguments are refused | Until the local POST is sent | Nothing is kept or printed |
+| Transport | One loopback POST to `/api/credentials` with the exact Origin, JSON and a client header | One request | Body never logged or echoed |
+| Backend memory | A `Buffer` per provider in `Credentials`, registered with the redactor | Until Disconnect, Forget key, a replacement key or process exit; there is no idle expiry | The buffer is zeroed |
+| Each provider call | A `Buffer` copy handed to the adapter, then the request header string | One provider request | The copy is zeroed; the header string cannot be zeroed in JavaScript |
+| Remembered (opt-in) | AES-256-GCM ciphertext in `data/vault/<provider>.json` inside the checkout; the master key stays in the OS keyring (on Windows, a DPAPI-wrapped master sits next to it) | Until forgotten | **Forget key** in Connect AI or `npm run key -- forget <provider>` deletes the file and clears memory |
+
+`data/` is ignored by Git and refused by the pre-commit hook and CI's tracked-path check,
+even when forced. The directory is created 0700 and the file 0600 where the platform
+supports it. There is no plaintext fallback: an unavailable keyring refuses persistence.
+Disconnect clears memory only; Forget key also deletes the saved copy and cancels a call in
+flight. A key never reaches browser storage, cookies, URLs, logs, API responses, events,
+exports, receipts or the dispatch ledger.
+
 ## Local network and output boundaries
 
 Launchers bind only 127.0.0.1 and reject override arguments. Next telemetry and
