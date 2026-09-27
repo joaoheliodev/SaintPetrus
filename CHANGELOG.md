@@ -46,7 +46,8 @@ The test floor rose from 338 to 384.
   and an explicit `SAINTPETRUS_MOCK` always wins.
 - The inspector edits an agent's name and objective, connects the agent to another from the keyboard, and
   **Run once** sends one budgeted call whose answer becomes the agent's output.
-- **Forget key** in the connection panel clears a key from memory and deletes its remembered ciphertext.
+- **Forget key** in the connection panel clears the selected provider's key from memory and deletes its remembered
+  ciphertext; the terminal helper covers any provider.
 - Export context is reachable from the project bar.
 - Reset, running the mock, pausing all agents, disconnecting or forgetting a key, deleting a connection,
   adding a price validity and applying confirmed usage all ask first.

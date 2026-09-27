@@ -92,7 +92,7 @@ supported. It is tied to the OS account/keyring and is not a portable backup.
 | Transport | One loopback POST to `/api/credentials` with the exact Origin, JSON and a client header | One request | Body never logged or echoed |
 | Backend memory | A `Buffer` per provider in `Credentials`, registered with the redactor | Until Disconnect, Forget key, a replacement key or process exit; there is no idle expiry | The buffer is zeroed |
 | Each provider call | A `Buffer` copy handed to the adapter, then the request header string | One provider request | The copy is zeroed; the header string cannot be zeroed in JavaScript |
-| Remembered (opt-in) | AES-256-GCM ciphertext in `data/vault/<provider>.json` inside the checkout; the master key stays in the OS keyring (on Windows, a DPAPI-wrapped master sits next to it) | Until forgotten | **Forget key** in Connect AI or `npm run key -- forget <provider>` deletes the file and clears memory |
+| Remembered (opt-in) | AES-256-GCM ciphertext in `data/vault/<provider>.json` inside the checkout; the master key stays in the OS keyring (on Windows, a DPAPI-wrapped master sits next to it) | Until forgotten | **Forget key** in Connect AI deletes the selected provider's file and clears its memory; `npm run key -- forget <provider>` does the same for any provider, including after a restart, when no key is in memory and the panel shows no saved copy |
 
 `data/` is ignored by Git and refused by the pre-commit hook and CI's tracked-path check,
 even when forced. The directory is created 0700 and the file 0600 where the platform

@@ -106,7 +106,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 
 | ID | Title | Acceptance criterion | Status |
 | --- | --- | --- | --- |
-| R1 | Independent review of `0662647..HEAD` | Reviewer subagent that did not implement; confirmed findings fixed, discarded ones recorded with reason | in progress (two reviewers reported; findings R1-01 to R1-14 below) |
+| R1 | Independent review of `0662647..HEAD` | Reviewer subagent that did not implement; confirmed findings fixed, discarded ones recorded with reason | done (two reviewers; 16 findings: 12 fixed, 1 documented with follow-up, 1 blocked on Q-10, 1 left to the operator, 1 open observation; see below) |
 | R2 | Final gate and Gitleaks over the branch history | Recorded counts | pending |
 | R3 | STATUS, NIGHT-LOG, handoff, Checklist do João | Updated in the final commit | pending |
 
@@ -244,15 +244,15 @@ parallel without editing the tree. Each finding is listed with its disposition.
 | R1-03 | major | `npm run test:e2e` clicks Send even when a keyed provider is connected, and resets and pauses whatever instance it is pointed at | fixed (this commit): before any action the check reads `/api/provider`, `/api/graph` and `/api/tokens` in the page and refuses a connected keyed provider or an instance that is not fresh; verified against local stand-ins for both cases |
 | R1-04 | minor | Browser check profiles live in `.audit/` and are not removed when Chromium dies or the run is interrupted (pending CDP calls never settle) | fixed (this commit): both checks share `scripts/disposable-chromium.mjs`, which puts the profile under the OS temporary directory, rejects pending calls when Chromium exits or the socket closes, and cleans up on SIGINT/SIGTERM |
 | R1-05 | minor | Stale toolbar text "No API calls to LLMs." | fixed (this commit): the setup text says only Run once and connection tests call a provider |
-| R1-06 | minor | Forget key acts only on the selected provider, and the saved-copy note disappears after Disconnect or a restart | pending |
+| R1-06 | minor | Forget key acts only on the selected provider, and the saved-copy note disappears after Disconnect or a restart | documented (this commit): SECURITY.md, README and CHANGELOG now say the panel acts on the selected provider and `npm run key -- forget <provider>` covers any provider, also after a restart. Extending the panel is follow-up F-02 |
 | R1-07 | minor | DeepSeek throws without field names when the served model is missing | fixed (this commit): it names the fields like Gemini and OpenAI |
 | R1-08 | minor | OpenAI usage is not parsed strictly: bad usage loses the served model and the field names | fixed in part (this commit): `lib/providers/openai-usage.ts` parses usage strictly on both paths, fails closed with field names and reports the reasoning count. Not done: carrying the served model inside a usage failure so receipts and manual reconciliation can name it; that is true of every adapter and is recorded as follow-up F-01 |
 | R1-09 | minor, plausible | A probe admitted while a new key is being configured can stamp its verdict on the new pair | fixed (this commit): every credential or selection change starts a new verification generation; the provider route records a verdict only for the generation it started under, as `connection-state.md` requires ("a stale result cannot restore it") |
-| R1-10 | minor, pre-existing | Expiry of an unpriced served model converts the preflight estimate even when the provider reported more usage | pending |
+| R1-10 | minor, pre-existing | Expiry of an unpriced served model converts the preflight estimate even when the provider reported more usage | blocked (operator decision, Q-10): it changes spend accounting, which `AGENTS.md` reserves for the operator. Until then the agent stays paused and Apply confirmed usage replaces the estimate |
 | R1-11 | nit, latent | A throw after settlement re-runs failure bookkeeping (double release on the mock, stuck unverifiable count) | fixed (this commit): the `billed` verdict, outcome and price are recorded the moment counters settle, and the failure path rethrows at once for a settled call |
 | R1-12 | nit, latent | `billingModel ?? adapter.model` would price a keyed adapter that omits the served model at the requested tariff | fixed (this commit): only the mock may fall back, in the proxy and in the service; a keyed answer without a served model is `upstream` and stays `unverifiable`. Thirteen test doubles in four files now name their served model as every real adapter does; no assertion changed |
-| R1-13 | nit | Docs: CHANGELOG floor, "200 settled calls" (the 200 are all receipt kinds), first-real-call names claim, 409 `busy` shown as a budget refusal, the floor parser reads only TAP | pending |
-| R1-14 | nit | `AGENTS.md` says `.prompts/` vanishes in a fresh clone, but this backlog is force-tracked (D-02) | pending |
+| R1-13 | nit | Docs: CHANGELOG floor, "200 settled calls" (the 200 are all receipt kinds), first-real-call names claim, 409 `busy` shown as a budget refusal, the floor parser reads only TAP | fixed: README receipts wording and `busy` message in 9dde12b, floor parser in c250efe; the first-real-call claim became true with 5e63ee1; the CHANGELOG floor is updated in the closing commit |
+| R1-14 | nit | `AGENTS.md` says `.prompts/` vanishes in a fresh clone, but this backlog is force-tracked (D-02) | left for the operator: the sentence stays true for everything else in `.prompts/`; whether this file stays tracked on `main` is in the Checklist do João |
 | R1-15 | major, found while fixing R1-04 | `npm run test:browser` hung since f42e1e1: "Run preview mock" now asks first and the preview check never answered the dialog | fixed (this commit): the check accepts and asserts the question; passes again |
 | R1-16 | open observation | In `npm run dev` only, about 1 run in 15 the Tab walk found the canvas cards and edge focused (`:focus-visible` true) without the override outline, while every other stop kept its ring; never in production (every run passed). The compiled CSS contains the rule; the cause is unproven (a stale dev stylesheet is the leading suspect). The check now reports whether the override was loaded when it fails | open |
 
@@ -261,6 +261,8 @@ Follow-ups recorded by the review, not done in this branch:
 - **F-01** When a usage shape cannot be parsed, every adapter throws before returning, so the served model the
   response did name is lost: receipts show `servedModel: null` and manual reconciliation journals only the requested
   model. Carrying the served model inside the `ProviderFailure` would fix it for all providers at once.
+- **F-02** The panel's Forget key reaches only the selected provider, and the saved-copy note shows only while the key
+  is in memory. Reporting saved copies per provider (names only) would let the panel forget any of them.
 
 ## Phase 2 security findings
 
@@ -335,6 +337,11 @@ Follow-ups recorded by the review, not done in this branch:
 - **Q-08** Remembered keys are encrypted under the ignored `data/vault` inside the checkout. Move the vault to a
   per-user data directory outside the project folder (existing remembered keys would need re-entry)?
 - **Q-09** Keep the inspector's Run once action (D-06), or restrict real-provider calls to the connection probe?
+- **Q-10** When a provider answers with a served model that has no price, the reservation later expires into the
+  preflight estimate even if the provider reported more usage (a review test: 4,000 input tokens against an estimate
+  of 19). Should expiry convert at the greater of the estimate and the reported usage, per dimension, at the dearest
+  captured tariff? Recommended: yes, since it only makes the guard stricter; it changes spend accounting, so it waits
+  for you. Meanwhile the agent stays paused and Apply confirmed usage replaces the estimate with invoice figures.
 - **Q-07** OpenAI now prices the served snapshot (D-05). Which dated IDs and prices should be registered
   before any OpenAI use, or should OpenAI be removed from the allowlist until then?
 

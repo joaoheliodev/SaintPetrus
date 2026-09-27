@@ -83,7 +83,8 @@ Click **Connect AI**, choose OpenAI, Google Gemini or DeepSeek (or the mock when
 provider's model ID and paste the key into the password field. **Connect and verify (1 call)** stores the key
 in backend memory and makes exactly one minimal provider call; with a real key that call costs money.
 **Test again** repeats the probe. **Disconnect** clears the key from memory and cancels a call in flight.
-**Forget key** also deletes any encrypted copy saved on this machine. Disconnect and Forget key ask first.
+**Forget key** also deletes the selected provider's encrypted copy saved on this machine; `npm run key -- forget
+<provider>` removes any provider's copy, including after a restart. Disconnect and Forget key ask first.
 
 The badge reports the backend's state: `● Connected` (verified), `◐ Configured, not verified`,
 `▲ Connection rejected`, `△ No visible output` or `△ Output budget exhausted` (the probe was billed but proved
