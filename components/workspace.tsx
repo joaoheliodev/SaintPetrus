@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Position, MarkerType, useEdgesState, useNodesState, useReactFlow, type Edge, type EdgeChange, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
 import { Bot, Check, CornerDownRight, GitBranch, Maximize, Pause, Play, Plus, RotateCcw, ShieldCheck, Workflow, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { connectionFeedback, type Agent, type Graph } from '@/lib/orchestrator';
@@ -92,6 +92,11 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
     // A remove change is only a request; deletion must be accepted and reflected by the server.
     onEdgesChange(items.filter(item => item.type === 'select'));
   }, [onEdgesChange]);
+  // Keyboard deletion reaches only selected connections, and only after the user confirms.
+  const confirmDeletion = useCallback(async (candidates: { nodes: AgentNodeType[]; edges: AgentEdgeType[] }) => {
+    const allowed = await allowSelectedEdgesOnly(candidates);
+    return allowed.edges.length > 0 && window.confirm(`Delete ${allowed.edges.length === 1 ? 'the selected connection' : `${allowed.edges.length} selected connections`}? This cannot be undone.`) ? allowed : false;
+  }, []);
   async function deleteEdges(items: AgentEdgeType[]) {
     for (const edge of items) await command({ action: 'disconnect', id: edge.id });
   }
@@ -140,11 +145,12 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   return <main className="app-shell">
     <header className="topbar"><div className="brand"><Workflow /><strong>SaintPetrus</strong></div><ProviderStatus /><TokenPanel /></header>
     <div className="projectbar"><h1>Agent workspace <small>M0</small></h1><div className="project-actions">
-      <Button variant="outline" disabled={pending} onClick={() => command({ action: 'reset', objective })}><RotateCcw />Reset graph</Button>
+      <Button variant="outline" disabled={pending} onClick={() => { if (window.confirm('Reset the graph? Every agent except the coordinator, every connection and all output are removed. This cannot be undone.')) void command({ action: 'reset', objective }); }}><RotateCcw />Reset graph</Button>
+      <a className={buttonVariants({ variant: 'outline' })} href="/api/graph/export" download>Export context</a>
       <Button disabled={pending} onClick={() => openDraft({ parentId: null })}><Plus />Add agent</Button>
       <Button variant="outline" disabled={pending || !selected} onClick={() => openDraft({ parentId: selected.id })}><CornerDownRight />Add subagent</Button>
-      {mockEnabled && previewPort && <Button disabled={pending} onClick={() => command({ action: 'preview-mock' })}>Run preview mock</Button>}
-      {mockEnabled && <Button disabled={pending} onClick={() => command({ action: graph.status === 'running' ? 'pause' : graph.status === 'paused' ? 'resume' : 'start', objective })}>{graph.status === 'running' ? <Pause /> : <Play />}{graph.status === 'running' ? 'Pause mock' : graph.status === 'paused' ? 'Resume mock' : 'Run mock'}</Button>}
+      {mockEnabled && previewPort && <Button disabled={pending} onClick={() => { if (window.confirm('Run the preview mock? It replaces the current graph with a synthetic preview demonstration; your agents and connections are removed.')) void command({ action: 'preview-mock' }); }}>Run preview mock</Button>}
+      {mockEnabled && <Button disabled={pending} onClick={() => { const action = graph.status === 'running' ? 'pause' : graph.status === 'paused' ? 'resume' : 'start'; if (action !== 'start' || window.confirm('Run the mock demonstration? It replaces the current graph with a fixed synthetic demo; your agents and connections are removed.')) void command({ action, objective }); }}>{graph.status === 'running' ? <Pause /> : <Play />}{graph.status === 'running' ? 'Pause mock' : graph.status === 'paused' ? 'Resume mock' : 'Run mock'}</Button>}
     </div></div>
     <div className="workspace-body"><aside className="setup-panel">
       <div className="panel-title"><GitBranch size={17} />Graph agents <span>{graph.agents.length}</span></div>
@@ -164,7 +170,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       <Button variant="ghost" disabled={pending} onClick={() => openDraft({ parentId: null })}><Plus />Add agent</Button>
       <Button variant="ghost" onClick={() => flow.fitView({ padding: .2, maxZoom: 1, duration: 300 })}><Maximize />Fit all</Button>
     </div></div>
-      <div className="canvas-area"><ReactFlow<AgentNodeType, AgentEdgeType> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={changes} onEdgesChange={edgeChanges} onBeforeDelete={allowSelectedEdgesOnly} onEdgesDelete={deleteEdges} onNodeClick={(_, n) => select(n.id)} onNodeDragStop={(_, n) => move(n.id, n.position)} onConnect={c => connect(c.source, c.target)} onConnectEnd={connectEnd} onPaneClick={() => useProjection.setState({ notice: '' })} onDoubleClick={paneDoubleClick} zoomOnDoubleClick={false} minZoom={.25} maxZoom={1.5} deleteKeyCode={['Backspace', 'Delete']} colorMode="dark" fitView fitViewOptions={{ maxZoom: 1, padding: .25 }} aria-label="Agent graph"><Background /><Controls showInteractive={false} /><MiniMap pannable zoomable style={MINIMAP} /></ReactFlow>
+      <div className="canvas-area"><ReactFlow<AgentNodeType, AgentEdgeType> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={changes} onEdgesChange={edgeChanges} onBeforeDelete={confirmDeletion} onEdgesDelete={deleteEdges} onNodeClick={(_, n) => select(n.id)} onNodeDragStop={(_, n) => move(n.id, n.position)} onConnect={c => connect(c.source, c.target)} onConnectEnd={connectEnd} onPaneClick={() => useProjection.setState({ notice: '' })} onDoubleClick={paneDoubleClick} zoomOnDoubleClick={false} minZoom={.25} maxZoom={1.5} deleteKeyCode={['Backspace', 'Delete']} colorMode="dark" fitView fitViewOptions={{ maxZoom: 1, padding: .25 }} aria-label="Agent graph"><Background /><Controls showInteractive={false} /><MiniMap pannable zoomable style={MINIMAP} /></ReactFlow>
         {lonely && <div className="canvas-hint"><p><strong>Two ways to grow the graph</strong></p><p>Drag from the dot on the right edge of a card and release on empty canvas — that creates a subagent already connected.</p><p>Or double-click anywhere empty to drop a standalone agent there.</p></div>}
       </div>
       <section className="event-panel" aria-label="Graph events"><div className="panel-title">Server events · revision {graph.revision}</div><div className="event-list">{events.length ? events.map(event => <p key={event.id}>{event.type} — {event.message}</p>) : <p>Ready. Add an agent to create your first connection.</p>}</div></section>

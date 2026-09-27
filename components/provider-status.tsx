@@ -70,6 +70,7 @@ export function ProviderStatus() {
   const [open, setOpen] = useState(false); const [provider, setProvider] = useState('openai');
   const [model, setModel] = useState(''); const [custom, setCustom] = useState('');
   const [show, setShow] = useState(false); const [remember, setRemember] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   // Uncontrolled, transient field: no credential in React state or browser storage.
   const keyField = useRef<HTMLInputElement>(null);
   const mounted = useRef(false); const refresher = useRef<ReturnType<typeof createProviderStatusRefresher> | null>(null);
@@ -84,8 +85,9 @@ export function ProviderStatus() {
   useEffect(() => {
     mounted.current = true; let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
-      try { await refresh('poll'); }
-      catch { /* Do not display raw network errors. */ }
+      try { await refresh('poll'); if (mounted.current) setUnavailable(false); }
+      // Raw network errors are never shown; an explicit refresh that retires this poll is not an outage.
+      catch (error) { if (mounted.current && !(error instanceof DOMException && error.name === 'AbortError')) setUnavailable(true); }
       if (mounted.current) timer = setTimeout(poll, 2000);
     };
     void poll(); return () => { mounted.current = false; clearTimeout(timer); refresher.current?.abort(); };
@@ -121,6 +123,7 @@ export function ProviderStatus() {
       : verificationMessage(status, data?.error));
   }
   async function run(action: 'connect' | 'test' | 'disconnect' | 'forget') {
+    if (action === 'disconnect' && !window.confirm(`Disconnect the ${status?.provider ?? ''} key? It is cleared from backend memory and a call in flight is cancelled.`)) return;
     if (action === 'forget' && !window.confirm(`Forget the ${status?.provider ?? ''} key? This clears it from backend memory and deletes any encrypted copy saved on this machine. It cannot be undone.`)) return;
     setPending(true); setResult('');
     try {
@@ -134,7 +137,7 @@ export function ProviderStatus() {
     finally { setPending(false); }
   }
   return <div className="project-actions">
-    <span role="status" className={`provider-badge ${status ? `is-${status.state}` : 'is-loading'}`}>{status ? connectionLabel(status) : '◌ Loading connection state'}</span>
+    <span role="status" className={`provider-badge ${status ? `is-${status.state}` : 'is-loading'}`}>{status ? connectionLabel(status) : unavailable ? '○ Local server unavailable' : '◌ Loading connection state'}{status && unavailable ? ' · server unreachable' : ''}</span>
     {status?.validationTimeoutMs !== undefined && <span className="provider-badge is-incomplete" title="Set at server startup with SAINTPETRUS_VALIDATION_TIMEOUT_MS">⏱ Validation timeout · {status.validationTimeoutMs} ms</span>}
     <Dialog open={open} onOpenChange={toggle}>
       <DialogTrigger render={<Button variant="outline" />}>Connect AI</DialogTrigger>

@@ -23,6 +23,7 @@ export function ArtifactPreview({ port }: { port: number }) {
     <h2>Artifact preview · {status}</h2>
     <p>Off by default because it executes LLM-generated code inside an isolated sandbox.</p>
     <p>Producer: {current?.role ?? 'No artifact'} · Version: {current?.id ?? '—'}</p>
+    {versions.length === 0 && <p>No artifact yet. Generated HTML, CSS or JavaScript appears here.</p>}
     <button onClick={pause}>{paused ? 'Resume updates' : 'Pause updates'}</button>
     <button onClick={() => setCode(!code)}>{code ? 'Show preview' : 'Show source'}</button>
     <button disabled={!current || !versions.some(v => v.id < current.id)} onClick={() => { const older = versions.find(v => current && v.id < current.id); if (older) select(older.id); }}>Previous version</button>

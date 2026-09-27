@@ -43,6 +43,7 @@ export function PricePanel({ catalog, pending, error, onAppend }: Props) {
     // Draft conversion is UX only; the server validates every field before writing.
     const number = (name: string) => { const value = data.get(name); return value === null || value === '' ? null : Number(value); };
     const band = (name: string) => Object.fromEntries(rateFields.map(field => [field.name, number(`${name}.${field.name}`)]));
+    if (!window.confirm('Add this price validity? It closes the open validity at the new effective date, and stored validities are never edited or deleted.')) return;
     setSaved(false);
     const accepted = await onAppend({ model: data.get('model'), price: {
       provider: data.get('provider'), effectiveAt: data.get('effectiveAt'), verifiedAt: data.get('verifiedAt'), sourceUrl: data.get('sourceUrl'),

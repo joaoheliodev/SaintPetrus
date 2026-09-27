@@ -12,7 +12,7 @@ const rootOnly = process.getuid?.() === 0 ? ['--no-sandbox'] : [];
 const child = spawn(process.env.CHROMIUM_PATH ?? '/usr/bin/chromium', [...rootOnly, '--headless', '--no-proxy-server', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-default-apps', '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
 let socket;
 const timeout = setTimeout(() => child.kill('SIGTERM'), 180000);
-const problems = []; const dialogs = []; let documentHeaders;
+const problems = []; const dialogs = []; const decisions = []; let documentHeaders;
 try {
   const endpoint = await new Promise((resolve, reject) => {
     let output = '';
@@ -31,8 +31,8 @@ try {
     if (method === 'Runtime.exceptionThrown') problems.push(`Exception: ${params.exceptionDetails.exception?.description ?? params.exceptionDetails.text}`);
     if (method === 'Runtime.consoleAPICalled' && params.type === 'error') problems.push(`console.error: ${params.args.map(arg => arg.value ?? arg.description ?? '').join(' ')}`);
     if (method === 'Network.responseReceived' && params.type === 'Document' && params.response.url.startsWith(`http://127.0.0.1:${port}/`)) documentHeaders = params.response.headers;
-    // Destructive actions ask first; the smoke check accepts and records each question.
-    if (method === 'Page.javascriptDialogOpening') { dialogs.push(params.message); void call('Page.handleJavaScriptDialog', { accept: true }, session); }
+    // Destructive actions ask first; the check records each question and answers from `decisions`, accepting by default.
+    if (method === 'Page.javascriptDialogOpening') { dialogs.push(params.message); void call('Page.handleJavaScriptDialog', { accept: decisions.length ? decisions.shift() : true }, session); }
   });
   const { targetId } = await call('Target.createTarget', { url: 'about:blank' });
   ({ sessionId: session } = await call('Target.attachToTarget', { targetId, flatten: true }));
@@ -44,6 +44,8 @@ try {
   };
   const until = async (fn, label) => { for (let i = 0; i < 300; i++) { const value = await fn(); if (value) return value; await new Promise(resolve => setTimeout(resolve, 100)); } throw new Error(`Timed out: ${label}`); };
   const click = text => evaluate(`(() => { const target = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === ${JSON.stringify(text)} && !b.disabled); if (!target) return false; target.click(); return true; })()`);
+  // A real key press always ends with keyup; React Flow matches shortcuts against the keys still held.
+  const press = async key => { for (const phase of ['keydown', 'keyup']) { await evaluate(`document.dispatchEvent(new KeyboardEvent('${phase}', { key: '${key}', code: '${key}', bubbles: true }))`); await new Promise(resolve => setTimeout(resolve, 150)); } };
   const type = (selector, value) => evaluate(`(() => { const field = document.querySelector(${JSON.stringify(selector)}); const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), 'value').set; setter.call(field, ${JSON.stringify(value)}); field.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
   await call('Page.navigate', { url: `http://127.0.0.1:${port}` }, session);
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 1 && document.body.textContent.includes('Coordinator')`), 'canvas with the coordinator');
@@ -76,13 +78,43 @@ try {
     assert.match(answer, /No provider is connected/);
     console.log('PASS: running without a provider explains what is missing');
   }
+  const exported = await evaluate(`(async () => { const link = document.querySelector('a[href="/api/graph/export"][download]'); if (!link) return 'missing link'; const response = await fetch(link.href); const body = await response.json(); return response.status === 200 && Array.isArray(body.agents) ? 'ok' : 'bad export'; })()`);
+  assert.equal(exported, 'ok');
+  console.log('PASS: context export link downloads the server snapshot');
   await until(() => click('Tokens'), 'Tokens button');
   await until(() => evaluate(`document.body.textContent.includes('Budgets and consumption') && document.querySelectorAll('.token-table tbody tr').length > 0`), 'token table');
-  await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  assert.ok(await evaluate(`document.body.textContent.includes('No held or expired reservations.')`), 'empty reservation state is explicit');
+  await press('Escape');
   console.log('PASS: token controls loaded from the server');
   await until(() => click('Connect AI'), 'Connect AI button');
   await until(() => evaluate(`document.body.textContent.includes('Keys go only to this local backend')`), 'connection panel');
   console.log('PASS: connection panel opened');
+  await press('Escape');
+  await until(() => evaluate(`!document.body.textContent.includes('Keys go only to this local backend')`), 'connection panel closed');
+  const nodes = () => evaluate(`document.querySelectorAll('.react-flow__node').length`);
+  const edges = () => evaluate(`document.querySelectorAll('.react-flow__edge').length`);
+  await until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('.agent-list-open')).find(b => b.textContent.includes('Coordinator')); item?.click(); return !!item; })()`), 'coordinator selected');
+  await until(() => click('Add subagent'), 'Add subagent button');
+  await until(() => evaluate(`!!document.querySelector('[role=dialog] textarea')`), 'add subagent dialog');
+  await type('[role=dialog] textarea', 'A delegated subtask.');
+  await until(() => click('Create subagent'), 'Create subagent button');
+  await until(async () => await nodes() === 3 && await edges() === 1, 'subagent with its delegation edge');
+  // Delete the connection from the keyboard: first refuse, then confirm.
+  const edgeId = await evaluate(`document.querySelector('.react-flow__edge')?.getAttribute('data-id')`);
+  const pressDelete = async () => { await evaluate(`document.querySelector('.react-flow__edge-path, .react-flow__edge-interaction')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`); await until(() => evaluate(`document.querySelector('.react-flow__edge.selected') !== null`), 'edge selected'); await press('Delete'); };
+  decisions.push(false); await pressDelete(); await until(() => dialogs.some(text => text.startsWith('Delete the selected connection')), 'deletion question');
+  await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await edges(), 1, 'a refused deletion keeps the connection');
+  const asked = dialogs.length; await pressDelete(); await until(() => dialogs.length > asked, 'second deletion question');
+  await until(async () => await edges() === 0, 'confirmed deletion');
+  assert.ok(edgeId, 'the edge had an identity');
+  console.log('PASS: connection deletion asks first and honours the answer');
+  decisions.push(false); await until(() => click('Reset graph'), 'Reset graph button'); await until(() => dialogs.some(text => text.startsWith('Reset the graph?')), 'reset question');
+  await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await nodes(), 3, 'a refused reset keeps the graph');
+  await until(() => click('Reset graph'), 'Reset graph button'); await until(async () => await nodes() === 1, 'graph reset after confirmation');
+  console.log('PASS: reset asks first and honours the answer');
+  await until(() => click('Pause all agents'), 'Pause all agents button'); await until(() => dialogs.some(text => text.startsWith('Pause every agent?')), 'pause question');
+  await until(() => evaluate(`document.querySelector('.react-flow__node .status')?.textContent.includes('Paused')`), 'agents paused');
+  console.log('PASS: pause all asks first and pauses every agent');
   await new Promise(resolve => setTimeout(resolve, 500));
   assert.deepEqual(problems, [], 'no CSP violation, uncaught exception or console error');
   console.log(`PASS: no CSP violations, exceptions or console errors${dialogs.length ? `; confirmations seen: ${dialogs.length}` : ''}.`);

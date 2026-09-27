@@ -24,6 +24,7 @@ export function EventFeed() {
     return () => source.close();
   }, []);
   useEffect(() => { if (!paused && list.current) list.current.scrollTop = 0; }, [events, paused]);
+  const visible = events.filter(e => (!agent || e.agent_id === agent) && (!type || e.type === type) && (!severity || e.severity === severity));
   return <section className="event-feed" aria-label="Live event feed">
     <header><strong>{connection}</strong> · Accumulated tokens: {tokens} <button onClick={() => setPaused(!paused)}>{paused ? 'Resume auto-scroll' : 'Pause auto-scroll'}</button></header>
     <p>Process-local history; restart clears it. Tokens include labeled mock estimates. The server owns the retained event window.</p>
@@ -31,7 +32,8 @@ export function EventFeed() {
     <label>Filter type<select value={type} onChange={e => setType(e.target.value)}><option value="">All types</option>{eventTypes.map(t => <option key={t}>{t}</option>)}</select></label>
     <label>Filter severity<select value={severity} onChange={e => setSeverity(e.target.value)}><option value="">All severities</option>{['info', 'warning', 'error'].map(s => <option key={s}>{s}</option>)}</select></label>
     <div ref={list} className="feed-list" onWheel={() => setPaused(true)} onTouchMove={() => setPaused(true)} onScroll={e => { if (e.currentTarget.scrollTop > 0) setPaused(true); }}>
-      {events.filter(e => (!agent || e.agent_id === agent) && (!type || e.type === type) && (!severity || e.severity === severity)).map(event => <EventRow key={event.id} event={event} select={select} />)}
+      {visible.map(event => <EventRow key={event.id} event={event} select={select} />)}
+      {visible.length === 0 && <p>{events.length === 0 ? 'No events yet.' : 'No events match these filters.'}</p>}
     </div>
   </section>;
 }

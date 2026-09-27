@@ -74,11 +74,11 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
 | F1 | Keyless mock by default in `npm run dev` | Definition of Done item 2 | `npm run dev` starts with the mock unless `SAINTPETRUS_MOCK` says otherwise; `npm start` unchanged (mock off) | confirm (D-03) | done (37605ba; verified by hand in dev with and without the override) |
-| F2 | Run one call for a selected agent from the inspector | `complete` action exists server-side with no UI; inspector output tab expects provider output | Inspector sends one budgeted call through the existing route for the selected agent; output recorded by the graph owner; works with the mock and no key | no | done (this commit; mock usage no longer rewrites `config/prices.json`) |
+| F2 | Run one call for a selected agent from the inspector | `complete` action exists server-side with no UI; inspector output tab expects provider output | Inspector sends one budgeted call through the existing route for the selected agent; output recorded by the graph owner; works with the mock and no key | no | done (1a51407; mock usage no longer rewrites `config/prices.json`) |
 | F3 | Edit agent name and objective | Operator's main flow lists editing | Server-validated `update` command with the create limits; UI in the inspector | no | done (a456256; browser check edits an agent) |
-| F4 | Confirm destructive actions | Operator requirement | Reset graph, run mock (resets), pause all (cancels in-flight work), disconnect credential, delete connection, add price validity and apply confirmed usage all require explicit confirmation | no | pending |
-| F5 | Loading, empty and error states | Operator requirement | Every panel shows all three where applicable | no | pending |
-| F6 | Export context from the UI | Export route exists without a UI entry | Download link to the existing endpoint; no new client fetch | no | pending |
+| F4 | Confirm destructive actions | Operator requirement | Reset graph, run mock (resets), pause all (cancels in-flight work), disconnect credential, delete connection, add price validity and apply confirmed usage all require explicit confirmation | no | done (this commit; plus Forget key from S1) |
+| F5 | Loading, empty and error states | Operator requirement | Every panel shows all three where applicable | no | done (this commit; feed, preview, reservations empty states; connection badge unavailable state) |
+| F6 | Export context from the UI | Export route exists without a UI entry | Download link to the existing endpoint; no new client fetch | no | done (this commit) |
 | F7 | Agent removal, graph import and persistence | Removal was deliberately blocked in `c01fb02`; import/persistence not planned in docs | Not implemented; questions Q-03 and Q-04 | yes | blocked (operator decision) |
 
 ### Phase 4 — quality (P2)
@@ -184,6 +184,8 @@ The commit is documentation only and carries no secret or leaky instruction.
 | F2 | recorded output unbounded | killed by "F2 a provider answer replaces only its agent output…" |
 | F2 | mock call journaled into the price file | killed by "F2 synthetic mock usage never rewrites the operator price file…" |
 | F2 | mock manual reconciliation journaled | killed by the every-provider served-model test |
+| F4 | Reset graph without its confirmation | killed by the browser check ("Timed out: reset question"); UI confirmations are verified by `npm run test:e2e`, outside the gate |
+| F5 | feed empty state hidden | killed by "F5 the feed and the preview say plainly…" |
 
 ## Phase 2 security findings
 

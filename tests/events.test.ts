@@ -91,3 +91,12 @@ test('SSE rejects cross-origin requests and replay reports gaps', () => {
   const handler = optionalEventRoutes(true, bus).get('/api/events')!;
   assert.equal(handler(new Request('http://127.0.0.1:3100/api/events', { headers: { Origin: 'null' } })).status, 403);
 });
+
+test('F5 the feed and the preview say plainly when they have nothing yet', async () => {
+  const React = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { EventFeed } = await import('../components/event-feed');
+  const { ArtifactPreview } = await import('../components/artifact-preview');
+  assert.match(renderToStaticMarkup(React.createElement(EventFeed)), /No events yet\./);
+  assert.match(renderToStaticMarkup(React.createElement(ArtifactPreview, { port: 3001 })), /No artifact yet\./);
+});
