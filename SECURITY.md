@@ -42,8 +42,8 @@ content of the graph (objectives, model answers, events, exports), which can hol
   SaintPetrus on a shared account or expose its port through a tunnel or proxy.
 - JavaScript cannot erase strings. The request header built for each provider call holds the key until
   garbage collection; application buffers are zeroed.
-- Remembered keys are stored as ciphertext under `data/vault` inside the checkout (question Q-08 in the
-  handoff proposes moving them to a per-user directory).
+- Remembered keys are ciphertext in the operator's user data directory, readable by that OS account; anyone with
+  the account and its keyring can decrypt them.
 - The content security policy allows inline scripts because Next.js hydrates with them; a nonce-based policy
   is a possible later hardening.
 - The preview sandbox isolates origin and network, not CPU or memory: a runaway script can freeze its tab.
@@ -80,8 +80,12 @@ manual Linux roundtrip was verified with synthetic material; Windows/macOS
 native execution remains unverified.
 Native platform integration requires verification on each supported OS.
 
-Ciphertext lives under ignored data/vault with restrictive file permissions where
-supported. It is tied to the OS account/keyring and is not a portable backup.
+Ciphertext lives in `vault/` under the OS user data directory, never in the checkout: `~/.local/share/saintpetrus`
+(or `$XDG_DATA_HOME/saintpetrus`) on Linux, `~/Library/Application Support/SaintPetrus` on macOS and
+`%APPDATA%\SaintPetrus` on Windows; `SAINTPETRUS_DATA_DIR` overrides it with an absolute path. It is tied to the
+OS account and keyring and is not a portable backup. Earlier versions kept it in `data/vault` inside the checkout;
+at startup the server copies each file to the new place, verifies the copy byte for byte and only then deletes the
+original. A file already present in the new place is never overwritten: the old copy stays and the server says so.
 
 ## Key lifecycle (audited 2026-09-27)
 
@@ -92,11 +96,11 @@ supported. It is tied to the OS account/keyring and is not a portable backup.
 | Transport | One loopback POST to `/api/credentials` with the exact Origin, JSON and a client header | One request | Body never logged or echoed |
 | Backend memory | A `Buffer` per provider in `Credentials`, registered with the redactor | Until Disconnect, Forget key, a replacement key or process exit; there is no idle expiry | The buffer is zeroed |
 | Each provider call | A `Buffer` copy handed to the adapter, then the request header string | One provider request | The copy is zeroed; the header string cannot be zeroed in JavaScript |
-| Remembered (opt-in) | AES-256-GCM ciphertext in `data/vault/<provider>.json` inside the checkout; the master key stays in the OS keyring (on Windows, a DPAPI-wrapped master sits next to it) | Until forgotten | **Forget key** in Connect AI deletes the selected provider's file and clears its memory; `npm run key -- forget <provider>` does the same for any provider, including after a restart, when no key is in memory and the panel shows no saved copy |
+| Remembered (opt-in) | AES-256-GCM ciphertext in `vault/<provider>.json` under the OS user data directory; the master key stays in the OS keyring (on Windows, a DPAPI-wrapped master sits next to it) | Until forgotten | **Forget key** in Connect AI deletes the selected provider's file and clears its memory; `npm run key -- forget <provider>` does the same for any provider, including after a restart, when no key is in memory and the panel shows no saved copy |
 
-`data/` is ignored by Git and refused by the pre-commit hook and CI's tracked-path check,
-even when forced. The directory is created 0700 and the file 0600 where the platform
-supports it. There is no plaintext fallback: an unavailable keyring refuses persistence.
+A legacy `data/` stays ignored by Git and refused by the pre-commit hook and CI's tracked-path
+check, even when forced. The vault directory is kept at 0700 and each file at 0600 where the
+platform supports it. There is no plaintext fallback: an unavailable keyring refuses persistence.
 Disconnect clears memory only; Forget key also deletes the saved copy and cancels a call in
 flight. A key never reaches browser storage, cookies, URLs, logs, API responses, events,
 exports, receipts or the dispatch ledger.

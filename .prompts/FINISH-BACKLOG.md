@@ -115,7 +115,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 
 | ID | Priority | Decision | Acceptance criterion | Status |
 | --- | --- | --- | --- | --- |
-| A-08 | P0 | Q-08 yes | Remembered keys move to the OS user data directory (dir 0700, files 0600); a legacy vault in the checkout is copied, verified and only then deleted; tests and docs | pending |
+| A-08 | P0 | Q-08 yes | Remembered keys move to the OS user data directory (dir 0700, files 0600); a legacy vault in the checkout is copied, verified and only then deleted; tests and docs | done (this commit; `lib/server/user-data.ts`, `lib/security/vault-migration.ts`, run by the server before it listens; mutations: overwrite allowed, original kept, file mode dropped and a relative override accepted are each killed) |
 | A-10 | P0 | Q-10 yes | Expiry of an unpriced served model converts at max(estimate, reported) per dimension, at least at the requested model's peak/cache-miss rate; stays an estimate; never reduced automatically; agent stays paused until manual reconciliation; tests | pending |
 | A-01 | P0 | Q-01 yes | Mock is the default in every mode; real providers only with an explicit startup opt-in; the UI always shows MOCK or REAL | pending |
 | A-07 | P0 | Q-07 | OpenAI removed from the allowlist and documented as unsupported until validated; no snapshot or price registered | pending |

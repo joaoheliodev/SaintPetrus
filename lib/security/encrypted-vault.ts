@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 export interface Keyring { loadOrCreate(): Promise<Buffer>; }
 export type ProviderId = 'gemini' | 'openai' | 'deepseek' | 'anthropic' | 'openrouter';
@@ -22,7 +22,8 @@ export class EncryptedVault {
       const cipher = createCipheriv('aes-256-gcm', key, iv); cipher.setAAD(aad);
       const ciphertext = Buffer.concat([cipher.update(secret), cipher.final()]);
       const record = { version: 1, salt: salt.toString('base64'), iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), ciphertext: ciphertext.toString('base64') };
-      await mkdir(this.directory, { recursive: true, mode: 0o700 });
+      // mkdir applies the mode only to directories it creates; an existing one is narrowed too.
+      await mkdir(this.directory, { recursive: true, mode: 0o700 }); await chmod(this.directory, 0o700);
       const file = join(this.directory, `${provider}.json`), temporary = `${file}.tmp`;
       await writeFile(temporary, JSON.stringify(record), { mode: 0o600 }); await rename(temporary, file);
     } finally { key.fill(0); }

@@ -8,6 +8,8 @@ import { graphRoutes } from '../lib/server/graph-http';
 import { runtime } from '../lib/server/runtime';
 import { pinnedValidationTimeoutMs } from '../lib/providers/runtime';
 import { securityHeaders } from '../lib/server/security-headers';
+import { legacyVaultDirectory, vaultDirectory } from '../lib/server/user-data';
+import { migrateLegacyVault } from '../lib/security/vault-migration';
 const port = Number(process.env.PORT ?? 3000);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid local port.');
 const app = next({ dev: process.argv[2] === 'dev', hostname: '127.0.0.1', port });
@@ -19,6 +21,12 @@ let validationTimeout: number | undefined;
 try { validationTimeout = pinnedValidationTimeoutMs(); }
 catch (error) { console.error(error instanceof Error ? error.message : 'Invalid validation timeout.'); await app.close(); process.exit(1); }
 if (validationTimeout !== undefined) console.warn(`Validation timeout active: provider calls abort after ${validationTimeout} ms and stay unverifiable.`);
+// Remembered keys leave the checkout before any request can read or write them; only counts are printed.
+try {
+  const { moved, kept } = await migrateLegacyVault(legacyVaultDirectory(), vaultDirectory());
+  if (moved.length) console.warn(`Moved ${moved.length} remembered key file(s) from the checkout to the user data directory.`);
+  if (kept.length) console.warn(`${kept.length} remembered key file(s) exist in both places; the copy in data/vault was left for you to compare and delete.`);
+} catch (error) { console.error(error instanceof Error ? error.message : 'Remembered keys could not be moved.'); await app.close(); process.exit(1); }
 const handle = app.getRequestHandler();
 // No Next route file exists for optional endpoints. Disabled means absent from this registry.
 const routes = new Map([...graphRoutes(runtime().graph), ...optionalEventRoutes(), ...optionalPreviewRoutes()]);
