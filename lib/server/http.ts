@@ -24,6 +24,7 @@ export function dispatch(graph: GraphService, mock: MockProvider, enabled: boole
       if (!enabled || !previewEnabled()) throw new GraphError('Preview mock disabled.');
       mock.startPreview(); break;
     case 'disconnect': graph.disconnect(string(data.id, 100)); break;
+    case 'remove-agent': graph.remove(string(data.id, 100)); break;
     case 'connect': graph.connect(string(data.source, 100), string(data.target, 100)); break;
     case 'add': {
       const parentId = data.parentId === undefined || data.parentId === null ? null : string(data.parentId, 100);

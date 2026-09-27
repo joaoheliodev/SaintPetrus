@@ -82,6 +82,19 @@ export class GraphService {
     if (parent) this.record('connection.created', parent.id, 'Delegation connection created.', { source: parent.id, destination: id });
     this.emit('agent.created', 'Agent created.'); return id;
   }
+  // Accounting refusals (a reservation not yet settled) are decided by the token service before this runs.
+  remove(id: string) {
+    const agent = this.graph.agents.find(a => a.id === id);
+    if (!agent) throw new GraphError('Agent not found.');
+    if (id === this.graph.agents[0].id) throw new GraphError('The coordinator cannot be removed.');
+    if (this.graph.status === 'running' || this.graph.status === 'paused') throw new GraphError('Reset the mock run before removing an agent.');
+    if (this.graph.agents.some(a => a.parentId === id)) throw new GraphError('Remove its subagents first.');
+    this.record('agent.removed', id, 'Agent removed.');
+    const [root, ...rest] = this.graph.agents;
+    this.graph.agents = [root, ...rest.filter(a => a.id !== id)];
+    this.graph.edges = this.graph.edges.filter(e => e.source !== id && e.target !== id);
+    this.emit('agent.removed', 'Agent removed.');
+  }
   update(id: string, changes: { name: string; objective: string }) {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) throw new GraphError('Agent not found.');

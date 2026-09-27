@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: `night/provider-validation-ready` (2026-09-27)
 
 Everything that could be finished without a call to a real provider. No request with a real key was made.
-The test floor rose from 338 to 400.
+The test floor rose from 338 to 414.
 
 ### Provider validation
 
@@ -64,6 +64,9 @@ The test floor rose from 338 to 400.
   **Run once** sends one budgeted call whose answer becomes the agent's output.
 - **Forget key** in the connection panel clears the selected provider's key from memory and deletes its remembered
   ciphertext; the terminal helper covers any provider.
+- **Remove** in the inspector deletes an agent and its connections after a confirmation. The route answers 409
+  while the agent holds a reservation (in flight, unverifiable or awaiting reconciliation); the coordinator, a
+  parent and an agent in a mock run are refused. Its accounting rows stay, marked as a removed agent.
 - Export context is reachable from the project bar.
 - Reset, running the mock, pausing all agents, disconnecting or forgetting a key, deleting a connection,
   adding a price validity and applying confirmed usage all ask first.

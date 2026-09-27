@@ -26,6 +26,8 @@ export async function POST(request: Request) {
     const { graph, mock } = getRuntime();
     const command = JSON.parse(text);
     if (['reset','start','resume','add','preview-mock'].includes(command?.action) && tokenService().isStopped()) return json({ error: 'Global kill switch is active.' }, 409);
+    // Removal would orphan accounting that is not settled yet; the operator settles it in Tokens first.
+    if (command?.action === 'remove-agent' && typeof command.id === 'string' && tokenService().holdsReservation(command.id)) return json({ error: 'This agent has a call in flight, or usage that is unverifiable or awaiting reconciliation. Settle it in Tokens before removing the agent.' }, 409);
     return json(dispatch(graph, mock, mockEnabled(), command));
   } catch (error) {
     // Never echo request contents, provider credentials or raw stack traces.

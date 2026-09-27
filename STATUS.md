@@ -37,7 +37,7 @@ the branch (40 runs). Two independent reviewer agents audited `0662647..HEAD`; t
 - Long-context tiers and cache-write pricing are not modeled; see `docs/reference/deferred-price-dimensions.md`.
 - The Responses streaming path and real error, quota and timeout handling are tested only with synthetic transport.
 - The full RF-02 panel is pending. RF-03 and RF-04 are out of scope.
-- Agent removal, graph import and persistence are not implemented; they wait on operator decisions (Q-03, Q-04).
+- Agent removal is implemented (Q-03); graph import and persistence wait on A-04 (Q-04).
 - There is no LICENSE file; choosing one is the operator's decision (Q-06). The security contact in `SECURITY.md` is a marked placeholder (Q-05).
 - Accessibility was checked in Chromium (contrast, control names, visible focus, keyboard paths), not with a screen reader.
 - An unpriced served model's reservation expires into the preflight estimate even when the provider reported more usage; converting at the reported usage waits on the operator (Q-10).

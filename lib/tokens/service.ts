@@ -89,6 +89,8 @@ export class TokenService {
   }
   kill() { this.stopped = true; this.hooks.ids().forEach(id => this.paused.add(id)); this.hooks.pauseAll(); }
   isStopped() { return this.stopped; }
+  // A call in flight, unverifiable usage or an estimate awaiting reconciliation still belongs to this agent.
+  holdsReservation(agent: string) { this.expireReservations(); return [...this.reservations.values()].some(item => item.agent === agent); }
   resume(agent?: string): string[] {
     this.expireReservations();
     if ([...this.rows.values()].some(row => row.unverifiable > 0)) throw new TokenFailure('Usage unverifiable; restart only after checking provider billing.');
@@ -141,11 +143,12 @@ export class TokenService {
   snapshot() {
     this.expireReservations();
     this.scopes(this.hooks.ids()[0] ?? 'none', Object.keys(this.policy.models)[0] ?? 'none');
-    for (const id of this.hooks.ids()) this.row('agent', id, this.policy.perAgent, this.policy.costLimitsUsd.perAgent);
+    const ids = this.hooks.ids();
+    for (const id of ids) this.row('agent', id, this.policy.perAgent, this.policy.costLimitsUsd.perAgent);
     for (const id of Object.keys(this.policy.models)) this.row('model', id, this.policy.perModel, this.policy.costLimitsUsd.perModel);
     const reservations = [...this.reservations.values()].filter(item => item.status !== 'inflight').map(item => ({ id: item.id, agent: item.agent, model: item.model, ...(item.billingModel ? { servedModel: item.billingModel } : {}), priceVersionId: item.priceVersionId, tokens: item.tokens, costUsd: item.costUsd, createdAt: item.createdAt, expiresAt: item.expiresAt, status: item.status }));
     const prices = Object.fromEntries(Object.entries(this.catalog.capture(this.now())).map(([model, version]) => [model, version.price]));
-    return { sessionId: this.sessionId, stopped: this.stopped, paused: [...this.paused], priceDate: this.prices.date, prices, catalog: this.catalog.snapshot(), models: this.policy.models, cacheTtlMs: this.policy.cacheTtlMs, reservationTtlMs: this.policy.reservationTtlMs, reservations, rows: [...this.rows.values()].map(row => ({ ...structuredClone(row), state: this.blocked(row) ? 'stopped' : this.warning(row) ? 'warning' : 'available' })) };
+    return { sessionId: this.sessionId, stopped: this.stopped, paused: [...this.paused], priceDate: this.prices.date, prices, catalog: this.catalog.snapshot(), models: this.policy.models, cacheTtlMs: this.policy.cacheTtlMs, reservationTtlMs: this.policy.reservationTtlMs, reservations, rows: [...this.rows.values()].map(row => ({ ...structuredClone(row), state: this.blocked(row) ? 'stopped' : this.warning(row) ? 'warning' : 'available', ...(row.scope === 'agent' && !ids.includes(row.id) ? { removed: true } : {}) })) };
   }
   private refuse(agent: string, message: string): never {
     eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'budget.refused', severity: 'warning', payload: message });
