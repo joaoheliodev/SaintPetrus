@@ -14,8 +14,8 @@ The test floor rose from 338 to 427.
   response's `model`, usually a dated snapshot of the alias. Requested and served models are both recorded,
   and a divergence publishes `provider.rerouted`.
 - A served model with no captured price is reported as `unverifiable`: the hold stays, the agent pauses, the
-  feed says why (`provider.unpriced`) and the route answers 409 `served_model_unpriced`. It is never priced at
-  the requested model's tariff and never released.
+  feed says why (`provider.unpriced`) and the route answers 409 `served_model_unpriced`. It is never settled at
+  the requested model's tariff and never released; that tariff is only a floor when the hold expires.
 - Unreadable usage shapes from Gemini and DeepSeek record the names of the fields the response carried, never
   a value. The reasoning share of completion tokens is reported as its own count when a provider states it.
 - Every settled call leaves a bounded, redacted receipt (last 200), readable at `GET /api/receipts`: verdict,
@@ -58,8 +58,14 @@ The test floor rose from 338 to 427.
 
 ### Added
 
-- `npm run dev` starts with the keyless mock, so the whole panel works without a key; `npm start` does not,
-  and an explicit `SAINTPETRUS_MOCK` always wins.
+- Every mode starts with the keyless mock, so the whole panel works without a key; `SAINTPETRUS_MODE=real` at
+  startup is the only way to real providers, and the header always shows MOCK or REAL. The former
+  `SAINTPETRUS_MOCK` variables stop the server at startup.
+- Remembered keys live in the OS user data directory; a legacy `data/vault` is moved there at startup, each
+  file copied and verified before the original is deleted.
+- OpenAI is out of the allowlist and not offered until the operator validates it.
+- An unpriced served model's expiry converts at the greater of the estimate and the reported usage in each
+  dimension, priced at least at the requested model's peak, cache-miss rate.
 - The inspector edits an agent's name and objective, connects the agent to another from the keyboard, and
   **Run once** sends one budgeted call whose answer becomes the agent's output. It asks first, showing the
   tokens and dollars the call reserves at most, quoted by `POST /api/provider` `{ action: 'quote' }` through the

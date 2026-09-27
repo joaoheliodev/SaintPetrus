@@ -5,7 +5,7 @@ Branch: `night/provider-validation-ready`, continuing `night/provider-validation
 ## Verification checkpoint (2026-09-27)
 
 Run in a cloud session without any API key: lint, both typechecks, the full suite at the floor stated in
-`AGENTS.md` (400 tests in 29 suites at the end) with zero failures or skips, and `npm run build` passed before
+`AGENTS.md` (427 tests in 29 suites at the end) with zero failures or skips, and `npm run build` passed before
 every commit of the finishing session. After a fresh `npm ci`, `npm audit` reported 0 vulnerabilities and the
 keyless `npm run dev` main flow passed the browser check. `npm run test:e2e` passed in development and in
 production and `npm run test:browser` passed. Gitleaks found nothing in the staged diff of any commit, in the
@@ -26,6 +26,24 @@ the branch (40 runs). Two independent reviewer agents audited `0662647..HEAD`; t
 - **Round C.** Orphan permanent rules moved into `AGENTS.md`, local refusal verdicts proven unreachable with a live reservation, and the deferred price dimensions and first real call protocol documented.
 - **Finishing session (2026-09-27).** Served-model price keys for Gemini and OpenAI; an unpriced served model stays `unverifiable`; unreadable usage names its fields; per-call receipts (`GET /api/receipts`) and an upstream dispatch counter; a startup-only validation timeout; DeepSeek in the terminal key helper; an empty probe never verifies. Forget key in the panel; a content security policy on every response. The panel works keyless in `npm run dev`; agents can be edited, run once and connected from the keyboard; destructive actions ask first; keyboard moves are saved; focus and field contrast meet WCAG AA. README, `docs/architecture.md`, the `SECURITY.md` threat model and `CHANGELOG.md` rewritten or added; CI holds the test floor. The review then fixed a regression of this branch in which the running app lost every provider failure's code (the custom server and the routes hold separate copies of the modules; failures now carry a `Symbol.for` brand), graph refusals that lost their message for the same reason, a browser check that could have made a real call, settled calls that could be failed again, lax OpenAI usage parsing and a verification race. The backlog, decisions and questions for the operator live in `.prompts/FINISH-BACKLOG.md`.
 
+## Operator decisions Q-01 to Q-10 (2026-09-27)
+
+- **Q-01** The mock is the default in every mode; `SAINTPETRUS_MODE=real` opts into real providers at startup and is
+  pinned for the process. The header always shows MOCK or REAL. The retired `SAINTPETRUS_MOCK*` variables stop startup.
+- **Q-02** Nothing implemented, as answered.
+- **Q-03** An agent can be removed after a confirmation, never while it holds an in-flight, unverifiable or
+  unreconciled reservation; its accounting rows stay, marked as a removed agent.
+- **Q-04** The graph is saved in the user data directory and restored at startup; import is untrusted input (strict
+  format, 4 MiB, unknown fields and credential-shaped text refused, no model in the format). The export stays
+  redacted; accounting stays process-local.
+- **Q-05, Q-06** No answer, so the security contact stays a marked placeholder and there is no LICENSE.
+- **Q-07** OpenAI is out of the allowlist and not offered until validated; no snapshot or price was added.
+- **Q-08** Remembered keys moved to the user data directory (0700/0600); a legacy `data/vault` is copied, verified
+  byte for byte and only then deleted, at startup.
+- **Q-09** Run once stays and asks first with the server's quote of the most it reserves, from the same checks.
+- **Q-10** An unpriced served model's expiry converts at the greater of estimate and reported usage per dimension,
+  at least at the requested model's peak, cache-miss rate; the agent waits for manual reconciliation.
+
 ## Not verified or pending
 
 - No provider has answered a real request. Gemini step 1B and DeepSeek D7 wait for explicit operator approval and follow `docs/reference/first-real-call.md`. `GET /models` is not approved.
@@ -38,15 +56,14 @@ the branch (40 runs). Two independent reviewer agents audited `0662647..HEAD`; t
 - The Responses streaming path and real error, quota and timeout handling are tested only with synthetic transport.
 - The full RF-02 panel is pending. RF-03 and RF-04 are out of scope.
 - Agent removal (Q-03), graph persistence and import (Q-04) are implemented; token accounting stays process-local.
-- There is no LICENSE file; choosing one is the operator's decision (Q-06). The security contact in `SECURITY.md` is a marked placeholder (Q-05).
+- There is no LICENSE file and the security contact in `SECURITY.md` is a marked placeholder: Q-05 and Q-06 came back empty.
 - Accessibility was checked in Chromium (contrast, control names, visible focus, keyboard paths), not with a screen reader.
-- An unpriced served model's reservation expires into the preflight estimate even when the provider reported more usage; converting at the reported usage waits on the operator (Q-10).
 - When usage cannot be parsed, the served model the response named is not carried into receipts or manual reconciliation (F-01). The panel's Forget key reaches only the selected provider; the terminal helper reaches any (F-02).
 - In `npm run dev` only, about one browser-check run in fifteen found the canvas cards focused without their outline; production never did. The cause is unproven (R1-16).
 
 ## Open debts and limits
 
-- Counters, budgets, reservations, graph, events and artifacts are process-local. Restarting clears them; this is not a durable ledger.
+- Counters, budgets, reservations, receipts, events and artifacts are process-local. Restarting clears them; this is not a durable ledger. Only the graph is saved.
 - An unresolved reservation converts after `reservationTtlMs` (300000 ms in the shipped policy) at the greater of the hold and the dearest eligible captured model at peak with no cache hits, using P3's provider rule, and stays marked as an expired estimate until manual reconciliation.
 - The input counter is approximate. The monetary ceiling is a guard, not a proof of the invoice.
 - Configured credential fragments of 12 or more characters are redacted; shorter substrings cannot be told apart from ordinary text.
