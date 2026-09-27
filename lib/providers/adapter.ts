@@ -1,6 +1,7 @@
 import type { ModelProvider } from './model-id';
 export type InputBreakdown = { cacheHit: number; cacheMiss: number };
-export type Usage = { prompt: number; completion: number; total: number; cachedPromptFullRate?: number; inputBreakdown?: InputBreakdown };
+// `reasoning` is the provider-reported part of `completion` spent thinking: a count, never the text.
+export type Usage = { prompt: number; completion: number; total: number; cachedPromptFullRate?: number; inputBreakdown?: InputBreakdown; reasoning?: number };
 export type ThinkingControl = { mode: 'disabled' } | { mode: 'enabled'; effort: 'minimal' | 'low' | 'high' | 'max' };
 export type RequestOptions = { onText?: (text: string) => void; systemPrompt: string; messages: { role: 'user' | 'assistant' | 'system'; content: string }[]; temperature: number; maxTokens: number; thinking?: ThinkingControl };
 // `billingModel` is what the provider says it served. It is the pricing key, because a provider

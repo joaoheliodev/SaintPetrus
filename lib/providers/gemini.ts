@@ -25,7 +25,7 @@ export function geminiUsage(value: unknown): Usage {
   if ((raw.toolUsePromptTokenCount ?? 0) !== 0) unparsed();
   const completion = candidates + thoughts;
   if (!Number.isSafeInteger(completion) || prompt + completion !== total) unparsed();
-  return { prompt, completion, total, ...(cached > 0 ? { cachedPromptFullRate: cached, inputBreakdown: { cacheHit: cached, cacheMiss: prompt - cached } } : {}) };
+  return { prompt, completion, total, ...(cached > 0 ? { cachedPromptFullRate: cached, inputBreakdown: { cacheHit: cached, cacheMiss: prompt - cached } } : {}), ...(raw.thoughtsTokenCount === undefined ? {} : { reasoning: thoughts }) };
 }
 export class GeminiAdapter implements ProviderAdapter {
   readonly id = 'gemini' as const;

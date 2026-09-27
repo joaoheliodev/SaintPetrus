@@ -41,7 +41,7 @@ test('Gemini fixture reconciles reported input, candidates plus thinking, total 
       return Response.json(fixture);
     });
     const result = await service.execute(new ProviderProxy(), adapter, 'Reply OK.', new AbortController().signal, 'a', 'Brief system prompt');
-    assert.equal(calls, 1); assert.equal(result.approximate, false); assert.deepEqual(result.usage, { prompt: 17, completion: 7, total: 24, cachedPromptFullRate: 4, inputBreakdown: { cacheHit: 4, cacheMiss: 13 } });
+    assert.equal(calls, 1); assert.equal(result.approximate, false); assert.deepEqual(result.usage, { prompt: 17, completion: 7, total: 24, cachedPromptFullRate: 4, inputBreakdown: { cacheHit: 4, cacheMiss: 13 }, reasoning: 5 });
     assert.equal(result.model, configuredModel); assert.equal(result.billingModel, model);
     const row = service.snapshot().rows.find(r => r.scope === 'global')!;
     assert.deepEqual(row.actual, { prompt: 17, completion: 7, total: 24 }); assert.equal(row.reserved, 0); assert.equal(row.conservativeCachedInput, 4);
@@ -112,14 +112,14 @@ test('Gemini RF-01 configuration selects the adapter through the existing API; e
     assert.equal(providerStatus().model, model);
     const req = request('provider', { action: 'test' }); assert.ok(!(await req.clone().text()).includes(secret)); assert.equal(req.headers.has('x-goog-api-key'), false);
     const limited = await execute(req); assert.equal(limited.status, 422); assert.equal(calls, 1);
-    const limitedBody = await limited.json(); assert.equal(limitedBody.error, 'output_limit'); assert.equal(limitedBody.outcome, 'output_limit'); assert.deepEqual(limitedBody.usage, { prompt: 17, completion: 64, total: 81 });
+    const limitedBody = await limited.json(); assert.equal(limitedBody.error, 'output_limit'); assert.equal(limitedBody.outcome, 'output_limit'); assert.deepEqual(limitedBody.usage, { prompt: 17, completion: 64, total: 81, reasoning: 64 });
     assert.equal(limitedBody.status.state, 'incomplete'); assert.equal(providerStatus().verified, false);
     assert.doesNotMatch(connectionLabel(limitedBody.status), /connected|conectado/i);
     const limitedRow = host.saintpetrusTokens!.snapshot().rows.find(row => row.scope === 'global')!;
     assert.deepEqual(limitedRow.actual, { prompt: 17, completion: 64, total: 81 }); assert.equal(limitedRow.reserved, 0); assert.equal(limitedRow.unverifiable, 0);
     providerReply = fixture;
     const response = await execute(request('provider', { action: 'test' })); assert.equal(response.status, 200); assert.equal(calls, 2);
-    const body = await response.json(); assert.deepEqual(body.usage, { prompt: 17, completion: 7, total: 24, cachedPromptFullRate: 4, inputBreakdown: { cacheHit: 4, cacheMiss: 13 } }); assert.equal(body.provider, 'gemini'); assert.equal(providerStatus().state, 'verified');
+    const body = await response.json(); assert.deepEqual(body.usage, { prompt: 17, completion: 7, total: 24, cachedPromptFullRate: 4, inputBreakdown: { cacheHit: 4, cacheMiss: 13 }, reasoning: 5 }); assert.equal(body.provider, 'gemini'); assert.equal(providerStatus().state, 'verified');
     assert.equal((await configure(request('credentials', { action: 'disconnect', provider: 'gemini' }))).status, 200);
     assert.equal(store.status('gemini').connected, false); assert.equal((await execute(request('provider', { action: 'test' }))).status, 409); assert.equal(calls, 2);
   } finally { store.disconnect('gemini'); host.saintpetrusCredentials = old.credentials; host.saintpetrusSelection = old.selection; host.saintpetrusTokens = old.tokens; globalThis.fetch = old.fetch; await rm(dir, { recursive: true }); }
@@ -194,4 +194,12 @@ test('A Gemini usage shape it cannot read reports the field names it saw and non
       assert.equal(service.snapshot().rows.find(row => row.scope === 'global')!.unverifiable, 1);
     }
   } finally { store.disconnect('gemini'); secret.fill(0); await rm(dir, { recursive: true }); }
+});
+
+test('Reasoning is a count inside completion, present only when the provider reports it', () => {
+  // An explicit zero is evidence that thinking was off; an absent field is not.
+  assert.equal('reasoning' in geminiUsage({ promptTokenCount: 10, candidatesTokenCount: 2, totalTokenCount: 12 }), false);
+  assert.deepEqual(geminiUsage({ promptTokenCount: 10, candidatesTokenCount: 2, thoughtsTokenCount: 0, totalTokenCount: 12 }), { prompt: 10, completion: 2, total: 12, reasoning: 0 });
+  const thinking = geminiUsage({ promptTokenCount: 10, candidatesTokenCount: 2, thoughtsTokenCount: 3, totalTokenCount: 15 });
+  assert.equal(thinking.reasoning, 3); assert.equal(thinking.completion, 5);
 });

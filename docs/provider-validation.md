@@ -148,7 +148,8 @@ credits/free tier and rounding; a locally priced usage result is not an invoice.
   reconciliation claim.
 - **Gemini:** `promptTokenCount → prompt`;
   `candidatesTokenCount + thoughtsTokenCount → completion`;
-  `totalTokenCount → total`. Thoughts are therefore charged at the output rate.
+  `totalTokenCount → total`. Thoughts are therefore charged at the output rate, and a reported
+  `thoughtsTokenCount` is also returned alone as `usage.reasoning`.
   Cached input is already inside prompt; `cachedContentTokenCount` splits hit/miss
   and is not added again. Missing candidates/thoughts/cache fields default to zero,
   which stays safe: a missing output count breaks the total check, and a missing
@@ -163,7 +164,8 @@ credits/free tier and rounding; a locally priced usage result is not an invoice.
 - **DeepSeek usage:** `prompt_tokens`, `completion_tokens`, `total_tokens` must
   agree; cache hit + miss must equal prompt. Optional cached detail must equal
   cache hits. Reasoning detail, when present, must not exceed completion; it is
-  already included in completion and must **not** be added twice. Raw reasoning
+  already included in completion and must **not** be added twice; it is returned
+  alone as `usage.reasoning`, a count only. Raw reasoning
   text is discarded. Unknown usage retains the hold and may emit field names only.
 - A probe disables thinking where supported. A zero reasoning/cache count does
   not prove a nonzero real response case. Do not enable thinking or add calls to

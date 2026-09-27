@@ -26,11 +26,15 @@ export function deepseekUsage(value: unknown): Usage {
   if (prompt + completion !== total || cacheHit + cacheMiss !== prompt) unparsed();
   // This schema is documented but unverified against a live account. Optional detail objects are
   // accepted only in the one shape we can reconcile, and contradicting counts fail closed.
+  let reasoning: number | undefined;
   const completionDetails = value.completion_tokens_details;
   if (completionDetails !== undefined) {
     if (!record(completionDetails)) unparsed();
-    const reasoning = completionDetails.reasoning_tokens;
-    if (reasoning !== undefined && (!integer(reasoning) || reasoning > completion)) unparsed();
+    const reported = completionDetails.reasoning_tokens;
+    if (reported !== undefined) {
+      if (!integer(reported) || reported > completion) unparsed();
+      reasoning = reported;
+    }
   }
   const promptDetails = value.prompt_tokens_details;
   if (promptDetails !== undefined) {
@@ -38,7 +42,7 @@ export function deepseekUsage(value: unknown): Usage {
     const cached = promptDetails.cached_tokens;
     if (cached !== undefined && (!integer(cached) || cached !== cacheHit)) unparsed();
   }
-  return { prompt, completion, total, inputBreakdown: { cacheHit, cacheMiss } };
+  return { prompt, completion, total, inputBreakdown: { cacheHit, cacheMiss }, ...(reasoning === undefined ? {} : { reasoning }) };
 }
 export class DeepSeekAdapter implements ProviderAdapter {
   readonly id = 'deepseek' as const;

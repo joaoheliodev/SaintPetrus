@@ -64,7 +64,7 @@ test('DeepSeek reconciles the reported cache split at the off-peak bands through
     const service = new TokenService(policyFor({ mode: 'disabled' }), pricesFor(), hooks, undefined, () => offPeakAt);
     const result = await service.execute(new ProviderProxy(), adapter, 'Reply OK.', signal(), 'a', 'Brief system prompt');
     assert.equal(calls, 1);
-    assert.deepEqual(result.usage, { prompt: 24, completion: 12, total: 36, inputBreakdown: { cacheHit: 16, cacheMiss: 8 } });
+    assert.deepEqual(result.usage, { prompt: 24, completion: 12, total: 36, inputBreakdown: { cacheHit: 16, cacheMiss: 8 }, reasoning: 0 });
     const row = service.snapshot().rows.find(item => item.scope === 'global')!;
     assert.deepEqual(row.actual, { prompt: 24, completion: 12, total: 36 });
     assert.equal(row.reserved, 0); assert.equal(row.unverifiable, 0);
@@ -82,7 +82,7 @@ test('DeepSeek reconciles the reported cache split at the off-peak bands through
 });
 
 test('DeepSeek usage parsing fails closed on an unconfirmed shape instead of assuming zero', () => {
-  assert.deepEqual(deepseekUsage(completion.usage), { prompt: 24, completion: 12, total: 36, inputBreakdown: { cacheHit: 16, cacheMiss: 8 } });
+  assert.deepEqual(deepseekUsage(completion.usage), { prompt: 24, completion: 12, total: 36, inputBreakdown: { cacheHit: 16, cacheMiss: 8 }, reasoning: 0 });
   assert.deepEqual(deepseekUsage(cacheMiss.usage), { prompt: 24, completion: 12, total: 36, inputBreakdown: { cacheHit: 0, cacheMiss: 24 } });
   const base = { prompt_tokens: 24, completion_tokens: 12, total_tokens: 36, prompt_cache_hit_tokens: 16, prompt_cache_miss_tokens: 8 };
   for (const usage of [
@@ -172,7 +172,7 @@ test('DeepSeek refuses to run on the provider thinking default and reports an ou
     assert.equal(calls, 0, 'an undeclared or inexpressible thinking mode must not reach the transport');
     const limited = await adapter.complete('Hi', signal(), { ...options, thinking: { mode: 'disabled' } });
     assert.equal(calls, 1); assert.equal(limited.outcome, 'output_limit'); assert.equal(limited.text, '');
-    assert.deepEqual(limited.usage, { prompt: 24, completion: 128, total: 152, inputBreakdown: { cacheHit: 0, cacheMiss: 24 } });
+    assert.deepEqual(limited.usage, { prompt: 24, completion: 128, total: 152, inputBreakdown: { cacheHit: 0, cacheMiss: 24 }, reasoning: 128 });
     const effortAdapter = new DeepSeekAdapter(model, store, async (_url, init) => {
       const body = JSON.parse(String(init?.body));
       assert.equal(body.reasoning_effort, 'high'); assert.equal('thinking' in body, false);
@@ -307,7 +307,7 @@ test('D6 DeepSeek is selectable end to end and an exhausted balance never reject
       assert.equal(ok.status, 200);
       const body = await ok.json();
       assert.equal(body.provider, 'deepseek');
-      assert.deepEqual(body.usage, { prompt: 24, completion: 12, total: 36, inputBreakdown: { cacheHit: 16, cacheMiss: 8 } });
+      assert.deepEqual(body.usage, { prompt: 24, completion: 12, total: 36, inputBreakdown: { cacheHit: 16, cacheMiss: 8 }, reasoning: 0 });
       assert.equal(providerStatus().state, 'verified');
       // A refused credential still has to be reported as refused.
       reply = () => Response.json({ error: { message: 'Authentication Fails' } }, { status: 401 });
