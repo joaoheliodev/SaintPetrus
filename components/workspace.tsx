@@ -227,7 +227,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       </Tabs>
       </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={exchange => setExchanges(current => ({ ...current, [selected.id]: exchange }))} /></div>
       {view === 'activity' && <section className="view" aria-labelledby="activity-title"><h1 id="activity-title">Activity</h1>{feedEnabled ? <EventFeed /> : <p className="helper">The live event feed is off. See Optional features in Connection.</p>}</section>}
-      {view === 'budgets' && <BudgetsView tokens={tokens} />}
+      {view === 'budgets' && <BudgetsView tokens={tokens} agents={graph.agents} />}
       {view === 'prices' && <PricesView tokens={tokens} />}
       {view === 'connection' && <ConnectionView source={connection}><section className="optional-features" aria-labelledby="optional-title"><h2 id="optional-title">Optional features</h2>
         <p>{feedEnabled ? 'Live event feed: on (see Activity).' : 'Live event feed: off. Enable SAINTPETRUS_FEED on the server and restart.'}</p>

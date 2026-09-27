@@ -24,3 +24,37 @@ export function budgetMeter(rows: readonly BudgetRow[]) {
   const stopped = candidates.some(item => item.row.state === 'stopped');
   return { percent: percent(fullest.share), scope: fullest.row.scope, dimension: fullest.dimension, state: stopped ? 'stopped' : fullest.row.state };
 }
+
+export const scopes: { scope: BudgetRow['scope']; title: string; meaning: string }[] = [
+  { scope: 'global', title: 'Global', meaning: 'Everything this server has spent.' },
+  { scope: 'agent', title: 'Per agent', meaning: 'What each agent has spent.' },
+  { scope: 'model', title: 'Per model', meaning: 'What each requested model has spent.' },
+  { scope: 'session', title: 'Session', meaning: 'Since this server started.' },
+];
+// A row with nothing used, reserved or estimated, in tokens or dollars.
+export const idle = (row: BudgetRow) => row.used + row.reserved + row.estimated + row.unverifiable === 0 && row.costAccountedUsd + row.costReservedUsd + row.costUnmeasuredUsd === 0;
+
+export const usd = (value: number) => value === 0 ? '$0.00' : Math.abs(value) < 0.01 ? `$${value.toFixed(6)}` : `$${value.toFixed(2)}`;
+
+export type BudgetStatus = { tone: 'green' | 'amber' | 'red'; text: string };
+// One sentence: what is wrong, if anything, and the way out. Names come from the graph; a removed agent keeps its id.
+export function budgetStatus(snapshot: { rows: readonly BudgetRow[]; stopped: boolean; reservations: readonly { status: string }[] }, name: (row: BudgetRow) => string): BudgetStatus {
+  const label = (row: BudgetRow) => row.scope === 'global' || row.scope === 'session' ? `the ${row.scope} budget` : `the ${row.scope} budget for ${name(row)}`;
+  if (snapshot.rows.some(row => row.unverifiable > 0)) return { tone: 'red', text: 'A call lost contact with its provider, so its usage is unverifiable. Its reservation stays held until it expires into an estimate; check the provider billing, then apply the confirmed usage in Details.' };
+  const stopped = snapshot.rows.find(row => row.state === 'stopped');
+  if (stopped) return { tone: 'red', text: `Blocked: ${label(stopped)} is full in ${rowUsage(stopped).dimension}. Raise its limit in Details, then use Resume eligible agents.` };
+  if (snapshot.stopped) return { tone: 'red', text: 'Every agent is paused by Pause all agents. Use Resume eligible agents when you want them to run again.' };
+  const estimated = snapshot.reservations.filter(item => item.status === 'estimated').length;
+  if (estimated) return { tone: 'amber', text: `${estimated} expired ${estimated === 1 ? 'reservation is' : 'reservations are'} counted as an estimate until you apply the provider-confirmed usage in Details.` };
+  const warning = snapshot.rows.find(row => row.state === 'warning');
+  if (warning) return { tone: 'amber', text: `Warning: ${label(warning)} is above 80%. Calls are refused at 100%.` };
+  return { tone: 'green', text: 'All budgets have room.' };
+}
+
+// Calls in the receipt window the server keeps (GET /api/receipts, bounded). truncated means older ones were dropped.
+export function callCount(receipts: unknown) {
+  const body = receipts !== null && typeof receipts === 'object' ? receipts : {};
+  const list = Reflect.get(body, 'receipts'); const evicted = Reflect.get(body, 'evicted');
+  const calls = Array.isArray(list) ? list.filter(item => item !== null && typeof item === 'object' && Reflect.get(item, 'kind') === 'call').length : 0;
+  return { calls, truncated: typeof evicted === 'number' && evicted > 0 };
+}

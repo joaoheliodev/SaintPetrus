@@ -138,7 +138,7 @@ panel, nothing copied or loaded from it.
 | U2 | Demo kept apart | No single unconfirmed click replaces the graph | done |
 | U3 | Agent panel with Run and Details | Run an agent and read the answer without scrolling or changing tab | done |
 | U4 | Screen structure and navigation | Every current function reachable by mouse and keyboard; no route changes | done |
-| U5 | Budgets | Summary, per-scope blocks, details table with every field and action | pending |
+| U5 | Budgets | Summary, per-scope blocks, details table with every field and action | done |
 | U6 | Activity | Drawer and full view, readable monospace lines, `agent.moved` hidden by default | pending |
 | U7 | First steps | Checklist derived from server state, dismissible in memory | pending |
 | U8 | In-app confirmations (P3) | Dialog instead of `window.confirm`, same texts, refuse-then-confirm in the browser check | pending |
@@ -176,6 +176,12 @@ panel, nothing copied or loaded from it.
   global and session rows, used plus reserved over the limit in tokens or dollars (`lib/budget-summary.ts`), and it
   takes warning and stop from the server's own row state; it reads the one token snapshot and opens Budgets. The
   Ctrl+K hint arrives with the palette (U9).
+- U5: Budgets opens with a summary (global tokens and dollars with bars, call count, held or expired reservations,
+  one status sentence naming the problem and the way out, Resume eligible agents) and one block per scope with its
+  meaning; unused rows wait behind Show all scopes, which is what hides the Gemini model row in MOCK. The former
+  table, reservations with Apply confirmed usage and the allowlist live under Details with every field. The call
+  count is read from `GET /api/receipts` through the accounting reader, again only when the global counters move.
+  Agent rows show the agent's name from the graph; a removed agent keeps its id.
 
 #### Questions for João
 

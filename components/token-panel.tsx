@@ -4,7 +4,7 @@ import type { TokenSnapshot } from '../lib/tokens/service';
 import { Button } from './ui/button';
 import { PricePanel } from './price-panel';
 import { Gauge } from 'lucide-react';
-import { budgetMeter } from '../lib/budget-summary';
+import { budgetMeter, budgetStatus, callCount, idle, percent, rowUsage, scopes, usd, type BudgetRow } from '../lib/budget-summary';
 import { cn } from '../lib/utils';
 // The one GET reader for accounting evidence: the token snapshot and the receipts behind it.
 export function readAccounting(path: '/api/tokens', signal?: AbortSignal): Promise<TokenSnapshot>;
@@ -72,16 +72,47 @@ export function BudgetMeter({ snapshot, open }: { snapshot: Pick<TokenSnapshot, 
     <Gauge size={15} aria-hidden="true" /><span>{text}</span><span className="meter-track" aria-hidden="true"><span style={{ width: `${Math.min(100, meter?.percent ?? 0)}%` }} /></span>
   </button>;
 }
-export function BudgetsView({ tokens }: { tokens: TokenSource }) {
+function UsageBar({ label, value, limit, share, unit }: { label: string; value: string; limit: string; share: number; unit: string }) {
+  return <div className="usage-bar"><span>{label}</span><span className="mono">{value} of {limit} {unit}</span>
+    <span className="meter-track" aria-hidden="true"><span style={{ width: `${Math.min(100, percent(share))}%` }} /></span><span className="mono">{percent(share)}%</span></div>;
+}
+function ScopeRow({ row, name }: { row: BudgetRow; name: string }) {
+  const usage = rowUsage(row);
+  return <div className={cn('scope-row', `is-${row.state}`)}>
+    <p className="scope-row-name">{name}{'removed' in row && row.removed ? ' · removed agent' : ''}<span>{row.state === 'stopped' ? '■ Stopped' : row.state === 'warning' ? '▲ Warning' : '● Available'}</span></p>
+    <UsageBar label="Tokens" value={(row.used + row.reserved).toLocaleString('en-US')} limit={row.limit.toLocaleString('en-US')} share={usage.tokens} unit="" />
+    <UsageBar label="Dollars" value={usd(row.costAccountedUsd + row.costReservedUsd)} limit={usd(row.costLimitUsd)} share={usage.dollars} unit="" />
+  </div>;
+}
+export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agents?: readonly { id: string; name: string }[] }) {
   const { data, error, pending, command } = tokens;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
   const [reconciliation, setReconciliation] = useState<Record<string, { prompt: string; completion: string; costUsd: string }>>({});
+  const [allScopes, setAllScopes] = useState(false); const [calls, setCalls] = useState<ReturnType<typeof callCount>>();
   const total = data?.rows.find(row => row.scope === 'global');
+  const name = (row: BudgetRow) => row.scope === 'agent' ? agents.find(agent => agent.id === row.id)?.name ?? row.id : row.scope === 'global' ? 'All calls' : row.scope === 'session' ? 'This server run' : row.id;
+  // Receipts are read again only when the global counters move, i.e. after a call settles.
+  const moved = total ? `${total.used}:${total.reserved}:${total.estimated}:${total.saved}` : '';
+  useEffect(() => { let live = true; readAccounting('/api/receipts').then(value => { if (live) setCalls(callCount(value)); }).catch(() => {}); return () => { live = false; }; }, [moved]);
+  const status = data ? budgetStatus(data, name) : undefined;
   return <section className="view token-panel" aria-labelledby="budgets-title">
         <h1 id="budgets-title">Budgets</h1>
-        <p className="helper">Server-enforced token and USD budgets. Preflight reserves peak, cache-miss cost; reported usage reconciles against the configured local table. Mock consumption is estimated separately.</p>
-        <p role="status">{!data ? 'Loading server token state…' : data.stopped ? '■ Global pause active' : '● Global execution enabled'} {error}</p>
+        <p className="helper">Every call reserves its worst case before it leaves: peak price, no cache hits, full output. The mock&apos;s estimated tokens count against the token limits too, so the mock can reach a limit; its dollars are $0.</p>
+        {!data ? <p role="status">Loading server token state… {error}</p> : <>
+          <section className="budget-summary" aria-label="Budget summary">
+            <p role="status" className={`budget-status tone-${status?.tone}`}>{status?.text} {error}</p>
+            {total && <><UsageBar label="Tokens" value={(total.used + total.reserved).toLocaleString('en-US')} limit={total.limit.toLocaleString('en-US')} share={rowUsage(total).tokens} unit="tokens" />
+              <UsageBar label="Dollars" value={usd(total.costAccountedUsd + total.costReservedUsd)} limit={usd(total.costLimitUsd)} share={rowUsage(total).dollars} unit="" /></>}
+            <p className="helper">{calls ? `${calls.truncated ? 'At least ' : ''}${calls.calls} ${calls.calls === 1 ? 'call' : 'calls'}` : 'Counting calls…'} · {data.reservations.length} held or expired {data.reservations.length === 1 ? 'reservation' : 'reservations'}{total && total.reserved > 0 ? ' · a call in flight' : ''}</p>
+            <Button disabled={pending} variant="outline" onClick={() => command({ action: 'resume' })}>Resume eligible agents</Button>
+          </section>
+          {scopes.map(({ scope, title, meaning }) => { const rows = data.rows.filter(row => row.scope === scope && (allScopes || !idle(row) || scope === 'global')); return rows.length ? <section key={scope} className="scope-block" aria-label={`${title} budgets`}>
+            <h2>{title}</h2><p className="helper">{meaning}</p>{rows.map(row => <ScopeRow key={`${row.scope}:${row.id}`} row={row} name={name(row)} />)}
+          </section> : null; })}
+          <Button variant="ghost" aria-pressed={allScopes} onClick={() => setAllScopes(!allScopes)}>{allScopes ? 'Hide unused scopes' : 'Show all scopes'}</Button>
+        </>}
+        <details className="budget-details"><summary>Details</summary>
 
         <p>Actual provider tokens: {total?.actual.total ?? 0} · Mock estimated tokens: {total?.mock.total ?? 0} · Saved tokens: {total?.saved ?? 0}</p>
         <p>Accounted cost (USD): {(total?.costAccountedUsd ?? 0).toFixed(9)} · Reserved worst-case cost: {(total?.costReservedUsd ?? 0).toFixed(9)} · Local price table date: {data?.priceDate ?? 'Unavailable'}</p>
@@ -101,10 +132,11 @@ export function BudgetsView({ tokens }: { tokens: TokenSource }) {
           <span>{item.status === 'estimated' ? '⚠ Expired estimate' : '■ Awaiting usage'} · {item.agent} · {item.model}{item.servedModel && item.servedModel !== item.model ? ` · served by ${item.servedModel}` : ''} · {item.tokens} tokens and USD {item.costUsd.toFixed(9)} reserved · ID {item.id}</span>
           {item.status === 'estimated' && <><input aria-label={`Confirmed prompt tokens ${item.id}`} type="number" min={0} value={values.prompt} onChange={event => setReconciliation({ ...reconciliation, [item.id]: { ...values, prompt: event.target.value } })} /><input aria-label={`Confirmed completion tokens ${item.id}`} type="number" min={0} value={values.completion} onChange={event => setReconciliation({ ...reconciliation, [item.id]: { ...values, completion: event.target.value } })} /><input aria-label={`Confirmed cost USD ${item.id}`} type="number" min={0} step="any" value={values.costUsd} onChange={event => setReconciliation({ ...reconciliation, [item.id]: { ...values, costUsd: event.target.value } })} /><Button disabled={pending || values.prompt === '' || values.completion === '' || values.costUsd === ''} variant="outline" onClick={() => { if (window.confirm(`Replace the expired estimate ${item.id} with this confirmed usage and cost? This cannot be undone.`)) void command({ action: 'reconcile', reservationId: item.id, prompt: Number(values.prompt), completion: Number(values.completion), costUsd: Number(values.costUsd) }); }}>Apply confirmed usage</Button></>}
         </section>; })}
-        <Button disabled={pending} variant="outline" onClick={() => command({ action: 'resume' })}>Resume eligible agents</Button>
+        <p>Resume eligible agents is in the summary above.</p>
         <h3>Model allowlist</h3>
         <p>Edit config/token-policy.json and restart to change the allowlist. Manage tariffs in Prices without restarting. Cache TTL: {data?.cacheTtlMs ?? 0} ms; only temperature 0 is cached. Connection tests always bypass cache.</p>
         {Object.entries(data?.models ?? {}).map(([id, model]) => { const price = data?.prices[id]; return <p key={id}>{model.provider} / {id} · max_tokens {model.max_tokens} · temperature {model.temperature} · {price ? <>verified {price.verifiedAt} · off-peak hit/miss/output {price.offPeak.inputCacheHitPerMillion} / {price.offPeak.inputCacheMissPerMillion} / {price.offPeak.outputPerMillion} · peak {price.peak.inputCacheHitPerMillion} / {price.peak.inputCacheMissPerMillion} / {price.peak.outputPerMillion}{price.note && <small>{price.note}</small>}</> : <strong>price missing — execution refused</strong>}</p>; })}
+        </details>
   </section>;
 }
 export function PricesView({ tokens }: { tokens: TokenSource }) {

@@ -127,6 +127,7 @@ try {
   await evaluate(`document.querySelector('.budget-meter').click()`);
   await until(() => evaluate(`document.body.textContent.includes('Budgets and consumption') && document.querySelectorAll('.token-table tbody tr').length > 0`), 'token table');
   assert.ok(await evaluate(`document.body.textContent.includes('No held or expired reservations.')`), 'empty reservation state is explicit');
+  assert.match(await evaluate(`document.querySelector('.budget-status')?.textContent ?? ''`), /\w/, 'the summary says in a sentence how the budgets stand');
   assert.deepEqual(await unnamed(), [], 'budget controls are named');
   await until(() => click('Prices'), 'Prices view');
   await until(() => evaluate(`!!document.querySelector('form[aria-label="Add price validity"]')`), 'price form');
