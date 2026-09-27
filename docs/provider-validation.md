@@ -42,7 +42,7 @@ Fill this locally. No credential belongs in this document or the results table.
    `config/token-policy.json` before startup. Keep `cacheTtlMs: 0`. Gemini currently
    requires a model supporting disabled thinking; the adapter cannot express an
    enabled thinking budget. Do not assume the local allowlist proves availability.
-3. In **Tokens → Prices**, enter verified current tariffs for **`R` and every `S`**
+3. In **Prices**, enter verified current tariffs for **`R` and every `S`**
    that can answer it. A served-only candidate needs a price but need not be
    allowlisted for requests. `R` is the key in the allowlist and its price entry;
    each `S` is a separate exact price key, not a display name. Gemini strips the
@@ -53,7 +53,7 @@ Fill this locally. No credential belongs in this document or the results table.
    through `dispatch + reservationTtlMs`. New validities close an open predecessor
    server-side; do not edit old values. Record current version IDs from
    `GET /api/prices`. Live Prices writes need no restart; allowlist edits do.
-5. In **Tokens → Budgets**, set and record small limits for `global/all`, `agent/A`,
+5. In **Budgets**, set and record small limits for `global/all`, `agent/A`,
    `model/R`, `session/J`. Each must admit the one approved reservation. These are
    four views of the same consumption, not four independent spending allowances.
    Do not select models with unsupported context tiers or cache-write charges;
@@ -235,7 +235,7 @@ occurs, stop without a second attempt. Record that criterion as blocked, not pas
 ### L1: 80% and 100%, without buying extra output
 
 After V1 has reconciled and been checked, retain its positive token usage `U` and
-accounted cost `D`. Temporarily use **Tokens** to set one row's token limit to
+accounted cost `D`. Temporarily use **Budgets** to set one row's token limit to
 `floor(U / 0.8)` when that value exceeds `U`; verify `warning`. Restore the approved
 limit. Repeat independently for all four scopes. With `D > 0`, a USD limit between
 `D` and `D / 0.8` gives the USD warning. If either amount is zero/too small for that
@@ -316,7 +316,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
   authenticated provider request. A full network export can contain the key even
   though execution requests do not. Disconnect at the end; confirm configured
   credential status becomes disconnected.
-- Export context with `/api/graph/export`. Collect feed events if enabled and
+- Export the graph with `/api/graph/export`. Collect feed events if enabled and
   ordinary server logs; no verbose transport logging. The feed sanitizes before
   storage. Graph export is not a token ledger; retain token snapshots separately.
 - Keep candidate evidence local and unshared. Run, with the installed scanner,

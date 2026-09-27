@@ -28,8 +28,8 @@ test('U2 the demo is loaded from the More menu or the empty canvas, never from t
 
 test('U2 graph limits and the demo cost are separate, and the objective sits with Reset graph', async () => {
   const source = await workspace();
-  assert.match(source, /aria-label="Graph limits"><h2>Graph limits<\/h2>/);
-  assert.match(source, /\{mockEnabled && <section className="budget-card" aria-label="Demo cost"><h2>Demo cost<\/h2>/);
+  assert.match(source, /aria-label="Graph limits"><summary>Graph limits /);
+  assert.match(source, /\{mockEnabled && <details className="budget-card" aria-label="Demo cost"><summary>Demo cost /);
   const graphLimits = source.slice(source.indexOf('aria-label="Graph limits"'), source.indexOf('aria-label="Demo cost"'));
   assert.doesNotMatch(graphLimits, /maxCostCents: Number/, 'the demo cost limit is not a graph limit');
   const reset = source.slice(source.indexOf('<DialogTitle>Reset graph</DialogTitle>'));

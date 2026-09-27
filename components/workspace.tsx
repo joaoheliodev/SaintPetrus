@@ -2,21 +2,22 @@
 // Adapted canvas geometry and interactions; all mutations go to the local server.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Position, MarkerType, useEdgesState, useNodesState, useReactFlow, type Edge, type EdgeChange, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
-import { Bot, CornerDownRight, Download, Ellipsis, GitBranch, Maximize, Pause, Play, Plus, RotateCcw, ShieldCheck, Upload, Workflow, X } from 'lucide-react';
+import { Bot, CornerDownRight, Crown, Download, Ellipsis, Gauge, GitBranch, History, LayoutGrid, Maximize, Plug, Tag, Pause, Play, Plus, RotateCcw, ShieldCheck, Upload, Workflow, X } from 'lucide-react';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { connectionFeedback, type Agent, type Graph } from '@/lib/orchestrator';
 import { useProjection } from '@/lib/store';
 import { useGraphTransport } from '@/lib/use-graph-transport';
 import { AgentInspector } from './agent-inspector';
+import { BudgetsView, PauseAllButton, PricesView, useTokenSnapshot } from './token-panel';
 import { AgentStatusBadge } from './agent-status-badge';
 import { agentPlacement } from '@/lib/agent-status';
 import { ArtifactPreview } from './artifact-preview';
 import { EventFeed } from './event-feed';
-import { TokenPanel } from './token-panel';
-import { ProviderStatus, connectionTarget, useProviderStatus } from './provider-status';
+import { ConnectionChip, ConnectionView, connectionTarget, useProviderStatus } from './provider-status';
 import type { ProviderStatusSnapshot } from '@/lib/providers/runtime';
 import type { RunExchange } from '@/lib/run-exchange';
 import { allowSelectedEdgesOnly } from '@/lib/graph-deletion';
@@ -43,12 +44,15 @@ function AgentNode({ data, selected }: NodeProps<AgentNodeType>) {
   </article>;
 }
 const nodeTypes = { agent: AgentNode };
+type View = 'workspace' | 'activity' | 'budgets' | 'prices' | 'connection';
 type Draft = { parentId: string | null; position?: { x: number; y: number } };
 type Props = { initialGraph: Graph; mockEnabled: boolean; feedEnabled?: boolean; previewPort?: number };
 function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previewPort }: Props) {
   const { graph, selectedId, notice, events, select } = useProjection();
   const { command, importGraph, pending } = useGraphTransport(initialGraph);
-  const connection = useProviderStatus();
+  const connection = useProviderStatus(); const tokens = useTokenSnapshot();
+  // Which view fills the main column; presentation state in memory only.
+  const [view, setView] = useState<View>('workspace');
   const importInput = useRef<HTMLInputElement>(null); const exportLink = useRef<HTMLAnchorElement>(null);
   const [resetOpen, setResetOpen] = useState(false);
   // Each agent's last Run once, in memory only: never sent back, saved or put in browser storage.
@@ -165,25 +169,37 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   const applyLimits = () => command({ action: 'budget', depth: limits.maxDepth, nodes: limits.maxNodes, cents: limits.maxCostCents });
   const parentName = draft?.parentId ? graph.agents.find(a => a.id === draft.parentId)?.name : undefined;
   const lonely = graph.agents.length === 1 && !graph.edges.length;
+  const views: { id: View; label: string; icon: typeof Bot }[] = [
+    { id: 'workspace', label: 'Workspace', icon: LayoutGrid }, { id: 'activity', label: 'Activity', icon: History },
+    { id: 'budgets', label: 'Budgets', icon: Gauge }, { id: 'prices', label: 'Prices', icon: Tag }, { id: 'connection', label: 'Connection', icon: Plug },
+  ];
+  function openAgent(agent: Agent) { setView('workspace'); select(agent.id); void flow.setCenter(agent.position.x + 145, agent.position.y + 100, { zoom: .9, duration: 300 }); }
   return <main className="app-shell">
-    <header className="topbar"><div className="brand"><Workflow /><strong>SaintPetrus</strong><span className={cn('mode-badge', mockEnabled ? 'is-mock' : 'is-real')} title={mockEnabled ? 'MOCK mode: no provider is reachable.' : 'REAL mode: calls can reach a provider and cost money.'}>{mockEnabled ? 'MOCK' : 'REAL'}</span></div><ProviderStatus source={connection} /><TokenPanel /></header>
-    <div className="workspace-body"><aside className="setup-panel">
-      <div className="panel-title"><GitBranch size={17} />Graph agents <span>{graph.agents.length}</span></div>
+    <aside className="sidebar" aria-label="Navigation">
+      <div className="brand"><Workflow aria-hidden="true" /><strong>SaintPetrus</strong><span className={cn('mode-badge', mockEnabled ? 'is-mock' : 'is-real')} title={mockEnabled ? 'MOCK mode: no provider is reachable.' : 'REAL mode: calls can reach a provider and cost money.'}>{mockEnabled ? 'MOCK' : 'REAL'}</span></div>
+      <nav aria-label="Views" className="sidebar-nav">{views.map(item => <button key={item.id} type="button" aria-current={view === item.id ? 'page' : undefined} onClick={() => setView(item.id)}><item.icon size={16} aria-hidden="true" />{item.label}</button>)}</nav>
+      <div className="sidebar-label"><GitBranch size={14} aria-hidden="true" />Agents <span>{graph.agents.length}</span></div>
       <div className="agent-list">{graph.agents.map(a => <div key={a.id} className={cn('agent-list-item', selectedId === a.id && 'active')}>
-        <button className="agent-list-open" onClick={() => { select(a.id); void flow.setCenter(a.position.x + 145, a.position.y + 100, { zoom: .9, duration: 300 }); }}><Bot size={17} /><span>{a.name}</span></button>
-        <button className="agent-list-add" aria-label={`Add subagent under ${a.name}`} title={`Add subagent under ${a.name}`} disabled={pending} onClick={() => openDraft({ parentId: a.id })}><Plus size={15} /></button>
+        <button className="agent-list-open" onClick={() => openAgent(a)}><AgentStatusBadge status={a.status} compact /><span>{a.name}</span>{a.id === 'root' && <Crown className="role-mark" size={14} aria-label="Coordinator" />}</button>
+        <button className="agent-list-add" aria-label={`Add subagent under ${a.name}`} title={`Add subagent under ${a.name}`} disabled={pending} onClick={() => { setView('workspace'); openDraft({ parentId: a.id }); }}><Plus size={15} /></button>
       </div>)}</div>
-      <section className="budget-card" aria-label="Graph limits"><h2>Graph limits</h2><p className="helper">How deep and how large the graph may grow.</p>
+      <div className="sidebar-footer">
+      <details className="budget-card" aria-label="Graph limits"><summary>Graph limits <small>depth {graph.budget.maxDepth} · {graph.budget.maxNodes} agents</small></summary><p className="helper">How deep and how large the graph may grow.</p>
         <label>Max depth<input type="number" min={1} max={5} value={limits.maxDepth} disabled={active} onChange={e => setLimits({ ...limits, maxDepth: Number(e.target.value) })} /></label>
         <label>Max agents<input type="number" min={1} max={50} value={limits.maxNodes} disabled={active} onChange={e => setLimits({ ...limits, maxNodes: Number(e.target.value) })} /></label>
         <Button disabled={active || pending} variant="outline" onClick={applyLimits}>Apply graph limits</Button>
-      </section>
-      {mockEnabled && <section className="budget-card" aria-label="Demo cost"><h2>Demo cost</h2><p className="helper">Fictitious spend of the demo only. Budgets holds real accounting.</p><p>${(graph.costCents / 100).toFixed(2)} of ${(graph.budget.maxCostCents / 100).toFixed(2)}</p><Progress aria-label="Demo cost used" value={graph.costCents / graph.budget.maxCostCents * 100} />
+      </details>
+      {mockEnabled && <details className="budget-card" aria-label="Demo cost"><summary>Demo cost <small>${(graph.costCents / 100).toFixed(2)} of ${(graph.budget.maxCostCents / 100).toFixed(2)}</small></summary><p className="helper">Fictitious spend of the demo only. Budgets holds real accounting.</p><p>${(graph.costCents / 100).toFixed(2)} of ${(graph.budget.maxCostCents / 100).toFixed(2)}</p><Progress aria-label="Demo cost used" value={graph.costCents / graph.budget.maxCostCents * 100} />
         <label>Demo cost limit (cents)<input type="number" min={1} max={10000} value={limits.maxCostCents} disabled={active} onChange={e => setLimits({ ...limits, maxCostCents: Number(e.target.value) })} /></label>
         <Button disabled={active || pending} variant="outline" onClick={applyLimits}>Apply demo cost limit</Button>
-      </section>}
-      <p className="helper setup-section">The graph is saved in your user data directory and restored when the server starts; token accounting is not. Only Run once and connection tests call a provider, and only when you click them.{mockEnabled && ' Load demo replaces the graph with a fixed demonstration.'}</p>
-    </aside><div className="center-panel"><div className="canvas-toolbar"><span>Canvas · {graph.agents.length} {graph.agents.length === 1 ? 'agent' : 'agents'} · {graph.edges.length} {graph.edges.length === 1 ? 'connection' : 'connections'}</span><div className="project-actions">
+      </details>}
+      <p className="helper">The graph is saved on this machine; token accounting is not. Only Run once and connection tests call a provider, and only when you click them.</p>
+      </div>
+    </aside>
+    <div className="main-column">
+      <header className="topbar"><ConnectionChip source={connection} open={() => setView('connection')} /><div className="topbar-actions"><PauseAllButton tokens={tokens} /></div></header>
+      {/* The canvas stays laid out under the other views: React Flow measures nodes and draws its background from its own size. */}
+      <div className={cn('workspace-view', view !== 'workspace' && 'is-away')} inert={view !== 'workspace'}><div className="center-panel"><div className="canvas-toolbar"><span>Canvas · {graph.agents.length} {graph.agents.length === 1 ? 'agent' : 'agents'} · {graph.edges.length} {graph.edges.length === 1 ? 'connection' : 'connections'}</span><div className="project-actions">
       <Button disabled={pending} onClick={() => openDraft({ parentId: null })}><Plus />Add agent</Button>
       <Button variant="outline" disabled={pending || !selected} onClick={() => openDraft({ parentId: selected.id })}><CornerDownRight />Add subagent</Button>
       <Button variant="ghost" onClick={() => flow.fitView({ padding: .2, maxZoom: 1, duration: 300 })}><Maximize />Fit all</Button>
@@ -205,13 +221,19 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       <div className="canvas-area"><ConnectionContext.Provider value={connection.status}><ReactFlow<AgentNodeType, AgentEdgeType> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={changes} onEdgesChange={edgeChanges} onBeforeDelete={confirmDeletion} onEdgesDelete={deleteEdges} onNodeClick={(_, n) => select(n.id)} onConnect={c => connect(c.source, c.target)} onConnectEnd={connectEnd} onPaneClick={() => useProjection.setState({ notice: '' })} onDoubleClick={paneDoubleClick} zoomOnDoubleClick={false} minZoom={.25} maxZoom={1.5} deleteKeyCode={['Backspace', 'Delete']} colorMode="dark" fitView fitViewOptions={{ maxZoom: 1, padding: .25 }} aria-label="Agent graph"><Background /><Controls showInteractive={false} /><MiniMap pannable zoomable style={MINIMAP} /></ReactFlow></ConnectionContext.Provider>
         {lonely && <div className="canvas-hint"><p><strong>Two ways to grow the graph</strong></p><p>Drag from the dot on the right edge of a card and release on empty canvas — that creates a subagent already connected.</p><p>Or double-click anywhere empty to drop a standalone agent there.</p>{mockEnabled && <p>Just looking around? <Button variant="link" disabled={pending} onClick={loadDemo}>Load demo…</Button> It replaces this canvas with a fixed demonstration.</p>}</div>}
       </div>
-      <section className="event-panel" aria-label="Graph events"><div className="panel-title">Server events · revision {graph.revision}</div><div className="event-list">{events.length ? events.map(event => <p key={event.id}>{event.type} — {event.message}</p>) : <p>Ready. Add an agent to create your first connection.</p>}</div></section>
-    </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={exchange => setExchanges(current => ({ ...current, [selected.id]: exchange }))} /></div>
-    <div className="aux-panels">
-      {feedEnabled ? <EventFeed /> : <p className="helper">Live feed disabled on server. Enable SAINTPETRUS_FEED and restart.</p>}
-      {previewPort ? <ArtifactPreview port={previewPort} /> : <p className="helper">Preview disabled: it executes LLM-generated code in an isolated sandbox. Enable SAINTPETRUS_PREVIEW on the server and restart.</p>}
+      <Tabs className="drawer" defaultValue="activity"><TabsList aria-label="Canvas panels"><TabsTrigger value="activity">Activity</TabsTrigger>{previewPort && <TabsTrigger value="preview">Preview</TabsTrigger>}</TabsList>
+        <TabsContent value="activity" keepMounted><section className="event-panel" aria-label="Graph events"><div className="panel-title">Server events · revision {graph.revision}</div><div className="event-list">{events.length ? events.map(event => <p key={event.id}>{event.type} — {event.message}</p>) : <p>Ready. Add an agent to create your first connection.</p>}</div></section></TabsContent>
+        {previewPort && <TabsContent value="preview" keepMounted><ArtifactPreview port={previewPort} /></TabsContent>}
+      </Tabs>
+      </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={exchange => setExchanges(current => ({ ...current, [selected.id]: exchange }))} /></div>
+      {view === 'activity' && <section className="view" aria-labelledby="activity-title"><h1 id="activity-title">Activity</h1>{feedEnabled ? <EventFeed /> : <p className="helper">The live event feed is off. See Optional features in Connection.</p>}</section>}
+      {view === 'budgets' && <BudgetsView tokens={tokens} />}
+      {view === 'prices' && <PricesView tokens={tokens} />}
+      {view === 'connection' && <ConnectionView source={connection}><section className="optional-features" aria-labelledby="optional-title"><h2 id="optional-title">Optional features</h2>
+        <p>{feedEnabled ? 'Live event feed: on (see Activity).' : 'Live event feed: off. Enable SAINTPETRUS_FEED on the server and restart.'}</p>
+        <p>{previewPort ? 'Artifact preview: on (see the Preview tab under the canvas).' : 'Artifact preview: off. It executes LLM-generated code in an isolated sandbox. Enable SAINTPETRUS_PREVIEW on the server and restart.'}</p>
+      </section></ConnectionView>}
     </div>
-    <footer className="statusbar">Local server · 127.0.0.1 <span>{mockEnabled ? `Demo: ${graph.status}` : 'REAL mode · demo unavailable'}</span></footer>
     {notice && <div role="alert" className="notice"><ShieldCheck /><span>{notice}</span><Button variant="ghost" size="icon" aria-label="Dismiss notice" onClick={() => useProjection.setState({ notice: '' })}><X /></Button></div>}
     <Dialog open={!!draft} onOpenChange={open => setDraft(open ? draft : null)}><DialogContent>
       <DialogTitle>{parentName ? 'Add subagent' : 'Add agent'}</DialogTitle>

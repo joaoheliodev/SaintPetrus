@@ -52,8 +52,8 @@ says **MOCK** or **REAL**. The former `SAINTPETRUS_MOCK` variables are gone, and
 is still set. The mock answers every call with synthetic `MOCK:` text, uses no network, costs nothing and never
 writes to the price file.
 
-With the mock on, **Run mock** plays a fixed synthetic demonstration (it replaces the current graph, so it asks
-first), **Pause mock** and **Resume mock** control its scheduler, and the "Mock limits" card shows its
+With the mock on, **Load demo** (in the canvas **More** menu) plays a fixed synthetic demonstration (it replaces
+the current graph, so it asks first), **Pause demo** and **Resume demo** control its scheduler, and the "Demo cost" section shows its
 fictitious budget: one cent per 30 characters, reserved before output is delivered.
 
 ## Main flow
@@ -72,20 +72,20 @@ fictitious budget: one cent per 30 characters, reserved before output is deliver
    under **Output**. It first asks the server what the call would reserve, through the same preflight and budgets
    as the call itself, and shows that maximum (tokens and dollars) in a confirmation. Nothing is reserved or sent
    until you accept. With the mock it is free. With a real provider it is an ordinary budgeted call.
-7. **Watch** the server events panel, the connection badge in the header, and **Tokens** for budgets,
+7. **Watch** the server events panel, the connection badge in the header, and **Budgets** for budgets,
    reservations and receipts. An optional live feed is described below.
-8. **Export context** downloads the current graph as redacted JSON. **Import graph** reads such a file back and
+8. **Export graph** downloads the current graph as redacted JSON. **Import graph** reads such a file back and
    replaces the canvas after a confirmation.
 9. **Delete a connection**: select it and press Delete or Backspace, then confirm. **Remove** in the inspector
    deletes an agent and its connections after a confirmation. It is refused for the coordinator, for an agent
    with subagents, during a mock run, and while the agent has a call in flight or usage that is unverifiable or
-   awaiting reconciliation. Its accounting rows stay in **Tokens**, marked as a removed agent.
+   awaiting reconciliation. Its accounting rows stay in **Budgets**, marked as a removed agent.
 10. **Reset graph** and **Pause all agents** ask before acting.
 
 The server owns the graph: every tab sees the same one. It is saved to `graph.json` in the user data directory
 (the same place as remembered keys, see `SECURITY.md`) and restored at startup, with every agent back at rest.
 Token accounting, reservations, receipts and the event feed are not saved: they are process-local, so a restart
-starts them empty. Settle every reservation in **Tokens** before stopping the server.
+starts them empty. Settle every reservation in **Budgets** before stopping the server.
 
 An imported file is untrusted input. It must be at most 4 MiB and match the export format exactly: an unknown
 field at any level, a `model` field included, is refused, as is credential-shaped text, a provider other than
@@ -98,7 +98,7 @@ Snapshots arrive over a server-sent event stream, with 300 ms polling only while
 
 ## Connecting a provider
 
-In REAL mode, click **Connect AI**, choose Google Gemini or DeepSeek (in MOCK mode only the mock is offered), enter the
+In REAL mode, open **Connection** in the sidebar, choose Google Gemini or DeepSeek (in MOCK mode only the mock is offered), enter the
 provider's model ID and paste the key into the password field. **Connect and verify (1 call)** stores the key
 in backend memory and makes exactly one minimal provider call; with a real key that call costs money.
 **Test again** repeats the probe. **Disconnect** clears the key from memory and cancels a call in flight.
@@ -115,7 +115,7 @@ A key only works for a model the operator has prepared:
 
 - `config/token-policy.json` must allowlist the exact model ID with its provider, `max_tokens`, `temperature`,
   thinking policy and whether it can answer deterministically. Restart after editing it.
-- The model must have a verified price. Add it in **Tokens → Prices** ("Add price validity"): effective date,
+- The model must have a verified price. Add it in **Prices** ("Add price validity"): effective date,
   `verifiedAt`, source URL, UTC peak windows and USD rates for cache hit, cache miss and output in both
   off-peak and peak bands. Records are appended to `config/prices.json`: nothing is deleted, and an open
   predecessor only receives its end date.
@@ -153,7 +153,7 @@ key as an argument.
 
 ## Budgets, prices and receipts
 
-**Tokens** shows global, agent, model and session limits in tokens and in USD. Either dimension warns at 80%;
+**Budgets** shows global, agent, model and session limits in tokens and in USD. Either dimension warns at 80%;
 a call whose reservation would pass any limit is refused before provider I/O and pauses its agent, and at 100%
 further calls are blocked. Raising a limit does not restart work: use **Resume eligible agents**.
 **Pause all agents** cancels the active provider request and pauses the mock too.

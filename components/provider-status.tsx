@@ -1,7 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './ui/dialog';
 import type { ConnectionState, ProviderStatusSnapshot } from '../lib/providers/runtime';
 const keyedProviders = ['openai', 'gemini', 'deepseek'];
 type RefreshPriority = 'poll' | 'explicit';
@@ -95,20 +94,26 @@ export function useProviderStatus() {
   return { status, unavailable, refresh };
 }
 export type ProviderStatusSource = ReturnType<typeof useProviderStatus>;
-export function ProviderStatus({ source }: { source: ProviderStatusSource }) {
-  const { status, unavailable, refresh } = source;
+export const statusText = (source: ProviderStatusSource) => source.status ? `${connectionLabel(source.status)}${source.unavailable ? ' · server unreachable' : ''}` : source.unavailable ? '○ Local server unavailable' : '◌ Loading connection state';
+// The top-bar chip: the connection in one line, and the way to the Connection view.
+export function ConnectionChip({ source, open }: { source: ProviderStatusSource; open: () => void }) {
+  const { status } = source;
+  return <>
+    <button type="button" className={`provider-badge ${status ? `is-${status.state}` : 'is-loading'}`} title="Open Connection" onClick={open}><span role="status">{statusText(source)}</span></button>
+    {status?.validationTimeoutMs !== undefined && <span className="provider-badge is-incomplete" title="Set at server startup with SAINTPETRUS_VALIDATION_TIMEOUT_MS">⏱ Validation timeout · {status.validationTimeoutMs} ms</span>}
+  </>;
+}
+// Where the form starts: the current keyed pair, or the mock while it is on offer.
+const initialProvider = (status: ProviderStatusSnapshot | undefined) => status && keyedProviders.includes(status.provider) ? status.provider : status?.mockAvailable === false ? 'gemini' : 'mock';
+export function ConnectionView({ source, children }: { source: ProviderStatusSource; children?: React.ReactNode }) {
+  const { status, refresh } = source;
   const [result, setResult] = useState(''); const [pending, setPending] = useState(false);
-  const [open, setOpen] = useState(false); const [provider, setProvider] = useState('openai');
-  const [model, setModel] = useState(''); const [custom, setCustom] = useState('');
+  const [provider, setProvider] = useState(() => initialProvider(status));
+  const [model, setModel] = useState(() => status && keyedProviders.includes(status.provider) ? status.model : ''); const [custom, setCustom] = useState('');
   const [show, setShow] = useState(false); const [remember, setRemember] = useState(false);
   const realMode = status?.mode === 'real';
-  // Uncontrolled, transient field: no credential in React state or browser storage.
+  // Uncontrolled, transient field: no credential in React state or browser storage. Leaving the view removes it with its value.
   const keyField = useRef<HTMLInputElement>(null);
-  function toggle(value: boolean) {
-    if (keyField.current) keyField.current.value = '';
-    setShow(false); setRemember(false); setOpen(value);
-    if (value) { setProvider(status?.mocked ? 'mock' : status && keyedProviders.includes(status.provider) ? status.provider : 'openai'); setModel(status && keyedProviders.includes(status.provider) ? status.model : ''); setResult(''); }
-  }
   async function configure(action: 'set' | 'disconnect' | 'forget') {
     const selected = action === 'set' ? provider : status?.provider ?? 'none';
     const body: Record<string, unknown> = { action, provider: selected };
@@ -148,14 +153,10 @@ export function ProviderStatus({ source }: { source: ProviderStatusSource }) {
     } catch (error) { setResult(error instanceof ConfigurationFailure ? error.message : 'Operation failed. Check the model, key, and local server; remembering a key requires an unlocked OS keyring.'); }
     finally { setPending(false); }
   }
-  return <div className="project-actions">
-    <span role="status" className={`provider-badge ${status ? `is-${status.state}` : 'is-loading'}`}>{status ? connectionLabel(status) : unavailable ? '○ Local server unavailable' : '◌ Loading connection state'}{status && unavailable ? ' · server unreachable' : ''}</span>
-    {status?.validationTimeoutMs !== undefined && <span className="provider-badge is-incomplete" title="Set at server startup with SAINTPETRUS_VALIDATION_TIMEOUT_MS">⏱ Validation timeout · {status.validationTimeoutMs} ms</span>}
-    <Dialog open={open} onOpenChange={toggle}>
-      <DialogTrigger render={<Button variant="outline" />}>Connection</DialogTrigger>
-      <DialogContent className="provider-panel">
-        <DialogTitle>Connection</DialogTitle>
-        <DialogDescription>Keys go only to this local backend. Connecting makes one minimal call to prove the key works, and can incur provider charges. Memory only by default.</DialogDescription>
+  return <section className="view provider-panel" aria-labelledby="connection-title">
+        <h1 id="connection-title">Connection</h1>
+        <p className="helper">Keys go only to this local backend. Connecting makes one minimal call to prove the key works, and can incur provider charges. Memory only by default.</p>
+        <p className="connection-now">Now: <strong>{statusText(source)}</strong></p>
         <label>Provider<select value={provider} disabled={pending} onChange={event => { setProvider(event.target.value); setModel(''); setCustom(''); if (keyField.current) keyField.current.value = ''; setShow(false); }}>
           {status?.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
           <option value="openai" disabled>OpenAI (not supported until validated)</option><option value="gemini" disabled={!realMode}>Google Gemini{realMode ? '' : ' (REAL mode only)'}</option><option value="deepseek" disabled={!realMode}>DeepSeek{realMode ? '' : ' (REAL mode only)'}</option>
@@ -168,16 +169,17 @@ export function ProviderStatus({ source }: { source: ProviderStatusSource }) {
         {provider !== 'mock' && <>
           <label>API key<input ref={keyField} type={show ? 'text' : 'password'} autoComplete="off" spellCheck={false} maxLength={4096} disabled={pending} /></label>
           <Button variant="outline" aria-pressed={show} disabled={pending} onClick={() => setShow(!show)}>{show ? 'Hide key' : 'Show key'}</Button>
-          <label><input type="checkbox" checked={remember} disabled={pending} onChange={event => setRemember(event.target.checked)} /> Remember key using encrypted OS keyring storage</label>
-          <p>Closing or submitting clears this field. Terminal entry remains available with npm run key.</p>
+          <label className="checkbox-row"><input type="checkbox" checked={remember} disabled={pending} onChange={event => setRemember(event.target.checked)} /> Remember key using encrypted OS keyring storage</label>
+          <p>Leaving this view or submitting clears this field. Terminal entry remains available with npm run key.</p>
         </>}
-        <Button disabled={pending} onClick={() => run('connect')}>{pending ? 'Verifying…' : 'Connect and verify (1 call)'}</Button>
-        <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('test')}>Test again</Button>
-        <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('disconnect')}>Disconnect</Button>
-        <Button variant="outline" disabled={pending || !status || !keyedProviders.includes(status.provider)} onClick={() => run('forget')}>Forget key</Button>
+        <div className="project-actions">
+          <Button disabled={pending} onClick={() => run('connect')}>{pending ? 'Verifying…' : 'Connect and verify (1 call)'}</Button>
+          <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('test')}>Test again</Button>
+          <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('disconnect')}>Disconnect</Button>
+          <Button variant="outline" disabled={pending || !status || !keyedProviders.includes(status.provider)} onClick={() => run('forget')}>Forget key</Button>
+        </div>
         {status?.remembered && <p>An encrypted copy of this key is saved on this machine. Forget key deletes it.</p>}
         <p role="status">{result}</p>
-      </DialogContent>
-    </Dialog>
-  </div>;
+        {children}
+  </section>;
 }

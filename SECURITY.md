@@ -56,7 +56,7 @@ content of the graph (objectives, model answers, events, exports), which can hol
 
 Keys are entered through `npm run key -- set <provider>` in an interactive local
 terminal. Input is hidden, not accepted as argv, and sent to the loopback backend.
-Alternatively, Connect AI accepts a key in a transient password field. Only its
+Alternatively, the Connection view accepts a key in a transient password field. Only its
 same-origin local configuration POST may carry that key. The field is cleared on
 submission/close; it is never put in React state or browser storage. Completion
 requests carry no key. Both UI configuration and terminal configuration are

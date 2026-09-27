@@ -137,7 +137,7 @@ panel, nothing copied or loaded from it.
 | U1 | Vocabulary and status | No text contradicts another about mode, connection or status | done |
 | U2 | Demo kept apart | No single unconfirmed click replaces the graph | done |
 | U3 | Agent panel with Run and Details | Run an agent and read the answer without scrolling or changing tab | done |
-| U4 | Screen structure and navigation | Every current function reachable by mouse and keyboard; no route changes | pending |
+| U4 | Screen structure and navigation | Every current function reachable by mouse and keyboard; no route changes | in progress: structure done (U4a), top bar next (U4b) |
 | U5 | Budgets | Summary, per-scope blocks, details table with every field and action | pending |
 | U6 | Activity | Drawer and full view, readable monospace lines, `agent.moved` hidden by default | pending |
 | U7 | First steps | Checklist derived from server state, dismissible in memory | pending |
@@ -165,6 +165,13 @@ panel, nothing copied or loaded from it.
   computed in the browser. Exchanges live in workspace memory per agent. Both tabs stay mounted so a draft survives
   a tab switch. The message field is not focused automatically: selecting a card with the keyboard must keep focus
   on the canvas so the arrow keys still move it.
+- U4a: a fixed sidebar (brand, mode badge, Workspace/Activity/Budgets/Prices/Connection, the agent list with status icon
+  and a Coordinator mark, Graph limits and Demo cost as collapsible sections) and one view at a time in the main column.
+  Budgets, Prices and Connection became views; the chip in the top bar opens Connection. The canvas view stays laid
+  out under the others (`visibility: hidden` plus `inert`): with `display: none` React Flow computed NaN geometry
+  for its background and minimap. The optional feed and preview notices moved to Connection → Optional features;
+  the preview is a tab of the drawer under the canvas. Leaving the Connection view unmounts the key field with its
+  value, which replaces the dialog's "cleared on close".
 
 #### Questions for João
 
