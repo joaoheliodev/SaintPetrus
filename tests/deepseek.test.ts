@@ -432,3 +432,16 @@ test('The provider route reports an unpriced served model with its reservation a
     }
   });
 });
+
+test('R1 a DeepSeek answer without a served model names its fields, like every other provider', async () => {
+  await withCredentials(async store => {
+    const anonymous = Object.fromEntries(Object.entries(completion).filter(([key]) => key !== 'model'));
+    const adapter = new DeepSeekAdapter(model, store, async () => Response.json(anonymous));
+    let caught: unknown;
+    try { await adapter.complete('Hi', signal(), { systemPrompt: 'System', messages: [{ role: 'user', content: 'Hi' }], temperature: 0, maxTokens: 64, thinking: { mode: 'disabled' } }); } catch (error) { caught = error; }
+    assert.ok(ProviderFailure.is(caught)); assert.equal(caught.code, 'upstream');
+    for (const key of Object.keys(anonymous)) assert.ok(caught.fields?.includes(key), `names the ${key} field`);
+    assert.ok(caught.fields?.includes('usage.prompt_cache_hit_tokens'), 'one level deep, as for every provider');
+    assert.ok(!JSON.stringify(caught.fields).includes(String(completion.choices[0].message.content)), 'names only, never a value');
+  });
+});

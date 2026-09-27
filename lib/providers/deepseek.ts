@@ -88,7 +88,7 @@ export class DeepSeekAdapter implements ProviderAdapter {
         const text = redactText(content ?? '');
         let billingModel: string;
         try { billingModel = normalizeModelId(this.id, payload.model); }
-        catch { throw new ProviderFailure('upstream'); }
+        catch { throw new ProviderFailure('upstream', fieldNames(payload)); }
         // A response that spent the output budget was billed and must reconcile, but it proves nothing.
         const outcome: Completion['outcome'] = text === '' && choice.finish_reason === 'length' ? 'output_limit' : undefined;
         return { text, usage, billingModel, ...(outcome ? { outcome } : {}) };

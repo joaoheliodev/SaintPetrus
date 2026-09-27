@@ -1,5 +1,6 @@
 import { fieldNames, ProviderFailure, type Completion } from './adapter';
 import { normalizeModelId } from './model-id';
+import { openAIUsage } from './openai-usage';
 import { redactText } from '../security/redact';
 // Responses SSE decoding; provider metadata/errors never become artifact text.
 export async function readResponseStream(response: Response, onText: (text: string) => void): Promise<Completion> {
@@ -13,12 +14,11 @@ export async function readResponseStream(response: Response, onText: (text: stri
     if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') { text += event.delta; onText(redactText(text)); }
     if (['error', 'response.failed', 'response.incomplete'].includes(event.type)) throw new ProviderFailure('upstream');
     if (event.type === 'response.completed') {
-      const raw = event.response?.usage;
       // The completed response names the snapshot that answered; without it the call cannot be priced.
       let billingModel: string;
       try { billingModel = normalizeModelId('openai', event.response?.model); }
       catch { throw new ProviderFailure('upstream', fieldNames(event.response)); }
-      completion = { text: redactText(text), billingModel, ...(raw ? { usage: { prompt: raw.input_tokens, completion: raw.output_tokens, total: raw.total_tokens } } : {}) };
+      completion = { text: redactText(text), billingModel, usage: openAIUsage(event.response?.usage, event.response) };
     }
   }
   try {

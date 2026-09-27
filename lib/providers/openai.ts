@@ -4,6 +4,7 @@ import { redactText } from '../security/redact';
 import { fieldNames, ProviderFailure, type ProviderAdapter, type RequestOptions } from './adapter';
 import { ModelIdError, normalizeModelId } from './model-id';
 import { thinkingCallValid } from './thinking-policy';
+import { openAIUsage } from './openai-usage';
 const endpoint = 'https://api.openai.com/v1/responses';
 export function openAIErrorCode(status: number): ProviderFailure['code'] {
   if (status === 400 || status === 401 || status === 403) return 'unauthorized';
@@ -47,12 +48,11 @@ export class OpenAIAdapter implements ProviderAdapter {
           for (const part of item.content) if (part?.type === 'output_text' && typeof part.text === 'string') texts.push(part.text);
         }
         if (!texts.length) throw new ProviderFailure('upstream');
-        const raw = payload.usage;
-        const usage = raw ? { prompt: raw.input_tokens, completion: raw.output_tokens, total: raw.total_tokens } : undefined;
         // `model` names the snapshot that answered, which is the one the invoice prices.
         let billingModel: string;
         try { billingModel = normalizeModelId(this.id, payload.model); }
         catch { throw new ProviderFailure('upstream', fieldNames(payload)); }
+        const usage = openAIUsage(payload.usage, payload);
         return { text: redactText(texts.join('\n')), usage, billingModel };
       } catch (error) {
         if (signal.aborted) throw new ProviderFailure('cancelled');

@@ -149,7 +149,11 @@ credits/free tier and rounding; a locally priced usage result is not an invoice.
 - **OpenAI:** `response.model`, or `response.model` inside the streamed
   `response.completed` event, becomes `billingModel`. It is usually a dated snapshot
   of the requested alias, so register that snapshot's price too; a missing identity
-  fails closed with field names only.
+  fails closed with field names only. Usage is strict: `input_tokens → prompt`,
+  `output_tokens → completion`, `total_tokens → total`, which must add up; a reported
+  `output_tokens_details.reasoning_tokens` is returned alone as `usage.reasoning`. The
+  cache split is not read, so every input token is priced at the miss band. Any other
+  shape fails closed with field names only.
 - **Any provider, unpriced `S`:** if the served model is absent from the captured
   catalog, the local response is 409 with `error: served_model_unpriced`,
   `requestedModel`, `servedModel` and `reservationId`. Actual totals stay

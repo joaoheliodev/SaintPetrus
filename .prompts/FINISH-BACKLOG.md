@@ -222,6 +222,10 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R1-11 | verdict recorded after the side effects | killed by the same test |
 | R1-12 | service falls back to the requested model | killed by "R1 only the mock is priced as asked…" |
 | R1-12 | proxy falls back to the requested model | killed by the same test |
+| R1-07 | DeepSeek served model without names | killed by "R1 a DeepSeek answer without a served model names its fields…" |
+| R1-08 | OpenAI totals not checked | killed by both OpenAI usage tests |
+| R1-08 | OpenAI stream back to lax usage | killed by "R1 the OpenAI adapter refuses an unreadable usage on both paths…" |
+| R1-08 | reasoning above output accepted | killed by "R1 OpenAI usage is parsed strictly…" |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
@@ -236,8 +240,8 @@ parallel without editing the tree. Each finding is listed with its disposition.
 | R1-04 | minor | Browser check profiles live in `.audit/` and are not removed when Chromium dies or the run is interrupted (pending CDP calls never settle) | fixed (this commit): both checks share `scripts/disposable-chromium.mjs`, which puts the profile under the OS temporary directory, rejects pending calls when Chromium exits or the socket closes, and cleans up on SIGINT/SIGTERM |
 | R1-05 | minor | Stale toolbar text "No API calls to LLMs." | pending |
 | R1-06 | minor | Forget key acts only on the selected provider, and the saved-copy note disappears after Disconnect or a restart | pending |
-| R1-07 | minor | DeepSeek throws without field names when the served model is missing | pending |
-| R1-08 | minor | OpenAI usage is not parsed strictly: bad usage loses the served model and the field names | pending |
+| R1-07 | minor | DeepSeek throws without field names when the served model is missing | fixed (this commit): it names the fields like Gemini and OpenAI |
+| R1-08 | minor | OpenAI usage is not parsed strictly: bad usage loses the served model and the field names | fixed in part (this commit): `lib/providers/openai-usage.ts` parses usage strictly on both paths, fails closed with field names and reports the reasoning count. Not done: carrying the served model inside a usage failure so receipts and manual reconciliation can name it; that is true of every adapter and is recorded as follow-up F-01 |
 | R1-09 | minor, plausible | A probe admitted while a new key is being configured can stamp its verdict on the new pair | pending |
 | R1-10 | minor, pre-existing | Expiry of an unpriced served model converts the preflight estimate even when the provider reported more usage | pending |
 | R1-11 | nit, latent | A throw after settlement re-runs failure bookkeeping (double release on the mock, stuck unverifiable count) | fixed (this commit): the `billed` verdict, outcome and price are recorded the moment counters settle, and the failure path rethrows at once for a settled call |
@@ -246,6 +250,12 @@ parallel without editing the tree. Each finding is listed with its disposition.
 | R1-14 | nit | `AGENTS.md` says `.prompts/` vanishes in a fresh clone, but this backlog is force-tracked (D-02) | pending |
 | R1-15 | major, found while fixing R1-04 | `npm run test:browser` hung since f42e1e1: "Run preview mock" now asks first and the preview check never answered the dialog | fixed (this commit): the check accepts and asserts the question; passes again |
 | R1-16 | open observation | In `npm run dev` only, about 1 run in 15 the Tab walk found the canvas cards and edge focused (`:focus-visible` true) without the override outline, while every other stop kept its ring; never in production (every run passed). The compiled CSS contains the rule; the cause is unproven (a stale dev stylesheet is the leading suspect). The check now reports whether the override was loaded when it fails | open |
+
+Follow-ups recorded by the review, not done in this branch:
+
+- **F-01** When a usage shape cannot be parsed, every adapter throws before returning, so the served model the
+  response did name is lost: receipts show `servedModel: null` and manual reconciliation journals only the requested
+  model. Carrying the served model inside the `ProviderFailure` would fix it for all providers at once.
 
 ## Phase 2 security findings
 
