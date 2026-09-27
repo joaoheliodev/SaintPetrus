@@ -138,6 +138,10 @@ credits/free tier and rounding; a locally priced usage result is not an invoice.
 
 - **DeepSeek:** `response.model` becomes `billingModel`. Register `R` plus each
   possible canonical `response.model` as a price key **before dispatch**.
+- **OpenAI:** `response.model`, or `response.model` inside the streamed
+  `response.completed` event, becomes `billingModel`. It is usually a dated snapshot
+  of the requested alias, so register that snapshot's price too; a missing identity
+  fails closed with field names only.
 - **Any provider, unpriced `S`:** if the served model is absent from the captured
   catalog, the local response is 409 with `error: served_model_unpriced`,
   `requestedModel`, `servedModel` and `reservationId`. Actual totals stay

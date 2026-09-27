@@ -4,9 +4,14 @@ import { TokenService, UnpricedServedModel } from '../lib/tokens/service';
 import type { Prices, TokenPolicy } from '../lib/tokens/config';
 import type { ModelPrice } from '../lib/tokens/pricing';
 import { ProviderProxy } from '../lib/providers/proxy';
-import type { ProviderAdapter } from '../lib/providers/adapter';
+import type { ProviderAdapter, RequestOptions } from '../lib/providers/adapter';
 import { fixedRatioTokenCounter } from '../lib/core/token-estimate';
 import { eventBus } from '../lib/events/bus';
+import { randomBytes } from 'node:crypto';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { OpenAIAdapter } from '../lib/providers/openai';
+import { Credentials } from '../lib/security/credentials';
+import { EncryptedVault } from '../lib/security/encrypted-vault';
 
 const requested = 'synthetic-requested';
 const served = 'synthetic-unpriced-served';
@@ -61,4 +66,31 @@ test('A priced reroute reconciles at the served tariff and its record makes no p
   assert.ok(Math.abs(service.snapshot().rows.find(row => row.scope === 'global')!.costAccountedUsd - (10 * 3 + 5 * 6) / 1e6) < 1e-12);
   const reroute = eventBus().snapshot(before).events.find(event => event.type === 'provider.rerouted');
   assert.equal(reroute?.payload, `Request for ${requested} was served by ${served}.`);
+});
+
+test('OpenAI prices the snapshot its response names, plain or streamed, and fails closed without one', async () => {
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/openai-served-');
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
+  const secret = Buffer.from(randomBytes(32).toString('hex'));
+  const snapshot = `${requested}-2026-01-01`;
+  const output = [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }];
+  const usage = { input_tokens: 10, output_tokens: 5, total_tokens: 15 };
+  try {
+    await store.configure('openai', secret);
+    const { service } = setup('openai');
+    service.catalog.append({ model: snapshot, price: { ...rate, provider: 'openai', sourceUrl: 'https://example.invalid/synthetic', offPeak: { inputCacheHitPerMillion: 5, inputCacheMissPerMillion: 5, outputPerMillion: 7 }, peak: { inputCacheHitPerMillion: 5, inputCacheMissPerMillion: 5, outputPerMillion: 7 } } });
+    const result = await service.execute(new ProviderProxy(), new OpenAIAdapter(requested, store, async () => Response.json({ model: snapshot, output, usage })), 'Question', new AbortController().signal, 'a', 'System');
+    assert.equal(result.billingModel, snapshot);
+    assert.ok(Math.abs(service.snapshot().rows.find(row => row.scope === 'global')!.costAccountedUsd - (10 * 5 + 5 * 7) / 1e6) < 1e-12, 'priced at the snapshot, not the requested alias');
+    const before = eventBus().snapshot().cursor;
+    const { service: blind } = setup('openai');
+    await assert.rejects(blind.execute(new ProviderProxy(), new OpenAIAdapter(requested, store, async () => Response.json({ output, usage })), 'Question', new AbortController().signal, 'a', 'System'), /upstream/);
+    assert.equal(blind.snapshot().rows.find(row => row.scope === 'global')!.unverifiable, 1);
+    assert.match(eventBus().snapshot(before).events.find(event => event.type === 'provider.usage_unparsed')?.payload ?? '', /output, usage/);
+    const stream = (response: object) => async () => new Response(['{"type":"response.output_text.delta","delta":"OK"}', JSON.stringify({ type: 'response.completed', response })].map(data => `data: ${data}\n\n`).join(''), { headers: { 'content-type': 'text/event-stream' } });
+    const options: RequestOptions = { systemPrompt: '', messages: [{ role: 'user', content: 'Hi' }], temperature: 0, maxTokens: 64, onText: () => {} };
+    const streamed = await new OpenAIAdapter(requested, store, stream({ model: snapshot, usage })).complete('Hi', new AbortController().signal, options);
+    assert.equal(streamed.billingModel, snapshot);
+    await assert.rejects(new OpenAIAdapter(requested, store, stream({ usage })).complete('Hi', new AbortController().signal, options), /upstream/);
+  } finally { store.disconnect('openai'); secret.fill(0); await rm(dir, { recursive: true }); }
 });

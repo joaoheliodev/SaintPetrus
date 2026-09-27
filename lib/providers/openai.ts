@@ -1,7 +1,7 @@
 import { readResponseStream } from './response-stream';
 import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
-import { ProviderFailure, type ProviderAdapter, type RequestOptions } from './adapter';
+import { fieldNames, ProviderFailure, type ProviderAdapter, type RequestOptions } from './adapter';
 import { ModelIdError, normalizeModelId } from './model-id';
 import { thinkingCallValid } from './thinking-policy';
 const endpoint = 'https://api.openai.com/v1/responses';
@@ -49,7 +49,11 @@ export class OpenAIAdapter implements ProviderAdapter {
         if (!texts.length) throw new ProviderFailure('upstream');
         const raw = payload.usage;
         const usage = raw ? { prompt: raw.input_tokens, completion: raw.output_tokens, total: raw.total_tokens } : undefined;
-        return { text: redactText(texts.join('\n')), usage };
+        // `model` names the snapshot that answered, which is the one the invoice prices.
+        let billingModel: string;
+        try { billingModel = normalizeModelId(this.id, payload.model); }
+        catch { throw new ProviderFailure('upstream', fieldNames(payload)); }
+        return { text: redactText(texts.join('\n')), usage, billingModel };
       } catch (error) {
         if (signal.aborted) throw new ProviderFailure('cancelled');
         if (error instanceof ProviderFailure) throw error;

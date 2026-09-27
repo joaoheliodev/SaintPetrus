@@ -32,11 +32,11 @@ test('Responses stream publishes partial artifact text and preserves final provi
   const encoder = new TextEncoder(); const events = [
     { type: 'response.output_text.delta', delta: '<html>One' },
     { type: 'response.output_text.delta', delta: '</html>' },
-    { type: 'response.completed', response: { usage: { input_tokens: 3, output_tokens: 5, total_tokens: 8 } } },
+    { type: 'response.completed', response: { model: 'test-model', usage: { input_tokens: 3, output_tokens: 5, total_tokens: 8 } } },
   ].map(e => `data: ${JSON.stringify(e)}\r\n\r\n`).join('');
   const bytes = encoder.encode(events); let index = 0;
   const body = new ReadableStream<Uint8Array>({ pull(controller) { if (index === bytes.length) controller.close(); else controller.enqueue(bytes.slice(index, ++index)); } });
   const partials: string[] = []; const result = await readResponseStream(new Response(body), text => partials.push(text));
   assert.deepEqual(partials, ['<html>One', '<html>One</html>']);
-  assert.deepEqual(result.usage, { prompt: 3, completion: 5, total: 8 });
+  assert.deepEqual(result.usage, { prompt: 3, completion: 5, total: 8 }); assert.equal(result.billingModel, 'test-model');
 });

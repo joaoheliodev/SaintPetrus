@@ -16,7 +16,7 @@ import type { ModelPrice } from '../lib/tokens/pricing';
 
 const deepseekReply = JSON.parse(await readFile('tests/fixtures/deepseek-chat-completion.json', 'utf8'));
 const geminiReply = JSON.parse(await readFile('tests/fixtures/gemini-generate-content.json', 'utf8'));
-const openaiReply = { output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }], usage: { input_tokens: 10, output_tokens: 1, total_tokens: 11 } };
+const openaiReply = { model: 'gpt-test-model', output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }], usage: { input_tokens: 10, output_tokens: 1, total_tokens: 11 } };
 const model = 'deepseek-test-model';
 const keyed: ('openai' | 'gemini' | 'deepseek')[] = ['openai', 'gemini', 'deepseek'];
 const signal = () => new AbortController().signal;

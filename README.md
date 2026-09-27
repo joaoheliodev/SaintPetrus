@@ -96,7 +96,9 @@ shows connection state. Test connection makes one minimal provider call and show
 latency. Mock mode uses no network. No real API call was used for verification.
 
 The server owns the destination, model, output ceiling, timeout and single active
-request limit. Browser completion requests contain only action/input, never the
+request limit. The response's `model`, usually a dated snapshot of the requested alias,
+is the price key: register its price before a real OpenAI call, or the call stays
+unverifiable. Browser completion requests contain only action/input, never the
 credential. OpenAI requests disable storage and redirects; errors are normalized.
 The adapter follows the [official Responses reference](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).
 RF-06 accounts provider usage and enforces budgets. Streaming and agent-driven real execution are not implemented.

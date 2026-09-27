@@ -53,7 +53,8 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | V4 | Upstream dispatch counter per provider (G3) | Nothing proves a refused call never left the server | Server-owned count incremented immediately before transport, per provider, exposed read-only; tests prove every preflight refusal leaves it unchanged and a dispatched call adds exactly one | no | done (3f6955d; `dispatches` on `GET /api/provider`) |
 | V5 | Validation timeout control (G4) | V2 of the protocol cannot force a timeout | Off by default; read only at startup; never taken from `/api/provider` bodies; applies inside the proxy after preflight and reservation, so budgets still bind; invalid values refuse startup; visible in provider status | no | done (3e15849; `SAINTPETRUS_VALIDATION_TIMEOUT_MS`) |
 | V6 | `npm run key -- set deepseek` (G7) | Terminal helper omits DeepSeek | DeepSeek accepted with the same rules as Gemini (hidden TTY input, no argv secret, opt-in remember); regression test without spawning processes | no | done (9262bc5; extra arguments now refused) |
-| V7 | Empty visible output never verifies a probe (G11) | `connection-state.md` requires usable output; empty text with a non-limit finish reason is marked verified | Empty-text probe keeps billed usage, does not verify, reports a distinct error; badge not "Connected" | no | done (this commit; state `incomplete`, 422 `empty_output`) |
+| V7 | Empty visible output never verifies a probe (G11) | `connection-state.md` requires usable output; empty text with a non-limit finish reason is marked verified | Empty-text probe keeps billed usage, does not verify, reports a distinct error; badge not "Connected" | no | done (7c97951; state `incomplete`, 422 `empty_output`) |
+| V11 | OpenAI served identity | Found while closing V2: `AGENTS.md` makes the response `model` the price key, but the OpenAI adapter ignored it (plain and streamed) | `billingModel` from `response.model`; missing identity fails closed with names; unpriced snapshot follows V2 | confirm (Q-07) | done (this commit) |
 | V8 | Gemini usage failures report field names only (G8, second half) | `AGENTS.md` requires names-only diagnostics for an unparsed usage shape; only DeepSeek has them | Gemini parse failure publishes the field names it saw and never a value; a missing usage object reports the response's names in both adapters | no | done (35a8022) |
 | V9 | Update `docs/provider-validation.md` | Protocol must describe the new receipts, counter, timeout, identity and terminal support | Gaps table updated (resolved vs still open); steps use the new evidence sources | no | pending |
 
@@ -166,6 +167,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | V7 | empty-output check removed | killed by the empty-output probe test |
 | V7 | `empty_output` not mapped to `incomplete` | killed by the same test |
 | V7 | whitespace-only text treated as visible | killed by the same test |
+| V11 | OpenAI drops `billingModel` | killed by the OpenAI snapshot test |
+| V11 | stream drops `billingModel` | killed by the same test |
+| V11 | missing identity without names | killed by the same test |
 
 ## Decisões tomadas (decisions taken)
 
@@ -180,6 +184,10 @@ The commit is documentation only and carries no secret or leaky instruction.
   the development launcher changes its default; an explicit `SAINTPETRUS_MOCK=false` (shell or
   `.env.local`) still wins, and `npm start`, used for real validation, keeps the mock off. Reversible;
   confirmation requested in Q-01.
+- **D-05 OpenAI price key.** `AGENTS.md` says the price key is the response `model`. The OpenAI adapter now
+  follows it like Gemini and DeepSeek. Real OpenAI responses usually name a dated snapshot of the alias, so
+  until the operator registers that snapshot's price, an OpenAI call stays unverifiable and pauses its agent.
+  Conservative and reversible; see Q-07.
 - **D-04 Language.** Code, UI, docs and commits stay in English as `AGENTS.md` requires; the final
   session report to the operator is in Portuguese.
 
@@ -196,6 +204,8 @@ The commit is documentation only and carries no secret or leaky instruction.
   process-local by design). Wanted?
 - **Q-05** Security contact for `SECURITY.md` (placeholder left).
 - **Q-06** LICENSE: none exists; which one, if any?
+- **Q-07** OpenAI now prices the served snapshot (D-05). Which dated IDs and prices should be registered
+  before any OpenAI use, or should OpenAI be removed from the allowlist until then?
 
 ## Session log
 

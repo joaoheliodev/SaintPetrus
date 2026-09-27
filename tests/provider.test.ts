@@ -42,7 +42,7 @@ test('validation probe uses the low policy and documented nano payload without p
       assert.deepEqual(payload.reasoning, { effort: 'minimal' });
       assert.equal(payload.max_output_tokens, 128);
       assert.equal(payload.store, false);
-      return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }], usage: { input_tokens: 12, output_tokens: 1, total_tokens: 13 } });
+      return Response.json({ model: 'gpt-5-nano', output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }], usage: { input_tokens: 12, output_tokens: 1, total_tokens: 13 } });
     });
     const result = await adapter.complete('Reply OK.', signal(), { systemPrompt: '', messages: [{ role: 'user', content: 'Reply OK.' }], temperature: 1, maxTokens: 128, thinking: policy.models['gpt-5-nano'].thinking });
     assert.equal(calls, 1); assert.deepEqual(result.usage, { prompt: 12, completion: 1, total: 13 });
@@ -123,7 +123,7 @@ test('M2 adapter keeps credentials in backend header; proxy redacts output, log,
       assert.ok(new Headers(options?.headers).get('authorization') === `Bearer ${secret.toString()}`);
       assert.ok(!String(options?.body).includes(secret.toString()));
       const body = JSON.parse(String(options?.body)); assert.equal(body.store, false); assert.equal(body.max_output_tokens, 64);
-      return Response.json({ usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: secret.toString() }] }] });
+      return Response.json({ model: 'test-model', usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: secret.toString() }] }] });
     };
     const output = await new ProviderProxy().execute(new OpenAIAdapter('test-model', store, transport), secret.toString(), signal());
     assert.equal(calls, 1); assert.ok(!JSON.stringify(output).includes(secret.toString()));
@@ -177,7 +177,7 @@ test('RF-01 same-origin UI configures memory-only credentials, tests once, and d
     assert.equal(store.status('openai').remembered, false); assert.equal(providerStatus().model, 'test-model');
     globalThis.fetch = async (_url, options) => {
       calls++; assert.ok(new Headers(options?.headers).get('authorization') === `Bearer ${key}`);
-      return Response.json({ usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] });
+      return Response.json({ model: 'test-model', usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] });
     };
     const result = await POST(request({ action: 'test' })); assert.equal(result.status, 200); assert.equal(calls, 1);
     assert.ok(!(await result.text()).includes(key));
@@ -205,7 +205,7 @@ test('connection state is proved by a live call, never by a stored credential, a
   host.saintpetrusCredentials = store; clearVerification();
   const key = randomBytes(32).toString('hex');
   const browserRequest = (body: unknown) => new Request('http://127.0.0.1:3000/api/credentials', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json', 'X-SaintPetrus-Client': 'browser', 'Sec-Fetch-Site': 'same-origin' }, body: JSON.stringify(body) });
-  const ok = async () => Response.json({ usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] });
+  const ok = async () => Response.json({ model: 'test-model', usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] });
   try {
     await configure(browserRequest({ action: 'set', provider: 'openai', model: 'test-model', key }));
     // A stored key is only "configured": nothing has proved it works.
