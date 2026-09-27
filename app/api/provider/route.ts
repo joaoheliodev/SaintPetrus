@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       return safeJson({ ...result, error: 'empty_output', status: providerStatus() }, 422);
     }
     if (input.action === 'test' && !result.cached) recordVerification(true);
+    if (input.action === 'complete') graphRuntime().graph.recordOutput(agent.id, result.text);
     return safeJson({ ...result, status: providerStatus() });
   } catch (error) {
     // The provider answered, but its model has no captured price: no verdict either way, the hold stays.

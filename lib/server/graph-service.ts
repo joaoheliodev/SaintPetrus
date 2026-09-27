@@ -84,6 +84,12 @@ export class GraphService {
     agent.name = name; agent.context = { ...agent.context, objective: changes.objective };
     this.emit('agent.updated', 'Agent updated.');
   }
+  // A provider answer replaces the agent's output, bounded; a reset may already have removed the agent that asked.
+  recordOutput(id: string, text: string): boolean {
+    const agent = this.graph.agents.find(a => a.id === id);
+    if (!agent) return false;
+    agent.output = text.slice(0, 8000); this.emit('agent.output', 'Provider output recorded.'); return true;
+  }
   connect(source: string, target: string) {
     // Authoritative validation: never trust client feedback or supplied edge IDs.
     if (source === target) throw new GraphError('Self-connections are not allowed.');

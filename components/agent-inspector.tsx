@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
-import { Bot, Check, Pencil, ShieldCheck } from 'lucide-react';
+import { Bot, Check, Pencil, Send, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import type { Agent, Graph } from '../lib/orchestrator';
+import { postProviderAction, verificationMessage } from './provider-status';
 export const statusLabels = { paused: 'Paused', ready: 'Ready', running: 'Running', completed: 'Completed', blocked: 'Blocked' };
 type Props = { agent: Agent; pending: boolean; command: (input: Record<string, unknown>) => Promise<Graph | null> };
 // Mount with `key={agent.id}` so drafts never carry over from another agent.
@@ -13,6 +14,18 @@ export function AgentInspector({ agent, pending, command }: Props) {
   const [objective, setObjective] = useState(agent.context.objective);
   function edit() { setName(agent.name); setObjective(agent.context.objective); setEditing(true); }
   async function save() { if (await command({ action: 'update', id: agent.id, name, objective })) setEditing(false); }
+  const [message, setMessage] = useState(''); const [running, setRunning] = useState(false); const [result, setResult] = useState('');
+  // One budgeted call through the connected provider; the server records the answer as this agent's output.
+  async function run() {
+    setRunning(true); setResult('');
+    try {
+      const { ok, status, data } = await postProviderAction(JSON.stringify({ action: 'complete', input: message, agentId: agent.id }));
+      if (ok) setResult(`${data.mocked ? 'Mock answer' : `Answer from ${data.billingModel}`} · ${data.usage?.total ?? 0} tokens · ${data.latencyMs} ms`);
+      // A 409 carries either a known code or the server's own fixed refusal sentence; both are safe to show.
+      else setResult(status === 409 && typeof data?.error === 'string' && !/^[a-z_]+$/.test(data.error) ? `Stopped by the server: ${data.error}` : verificationMessage(status, data?.error));
+    } catch { setResult('Local server unavailable. The call was not confirmed.'); }
+    finally { setRunning(false); }
+  }
   return <aside className="inspector" aria-label="Agent inspector"><div className="panel-title">Agent inspector</div><div className="inspector-profile"><Bot /><h2>{agent.name}</h2></div><p className="status"><Check size={15} />{statusLabels[agent.status]} · {agent.provider}</p>
     <Tabs defaultValue="context"><TabsList><TabsTrigger value="context">Context</TabsTrigger><TabsTrigger value="output">Output</TabsTrigger></TabsList>
       <TabsContent value="context">
@@ -25,5 +38,11 @@ export function AgentInspector({ agent, pending, command }: Props) {
       </TabsContent>
       <TabsContent value="output"><pre>{agent.output || 'No provider output.'}</pre></TabsContent>
     </Tabs>
+    <section className="inspector-run" aria-label="Run this agent"><h3>Run once</h3>
+      <p className="helper">Sends one budgeted call through the connected provider and shows the answer under Output. The mock is free; a real provider can charge for it.</p>
+      <label>Message<textarea value={message} maxLength={2000} onChange={event => setMessage(event.target.value)} /></label>
+      <Button disabled={running || !message.trim()} onClick={run}><Send />{running ? 'Running…' : 'Send (1 call)'}</Button>
+      <p role="status">{result}</p>
+    </section>
   </aside>;
 }

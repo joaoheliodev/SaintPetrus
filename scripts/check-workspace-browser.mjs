@@ -64,6 +64,18 @@ try {
   await until(() => click('Save'), 'save button');
   await until(() => evaluate(`Array.from(document.querySelectorAll('.react-flow__node h3')).some(h => h.textContent === 'Renamed smoke agent')`), 'renamed node card');
   console.log('PASS: agent edited through the server');
+  const mocked = await evaluate(`!document.querySelector('.statusbar')?.textContent.includes('Mock disabled')`);
+  await type('section[aria-label="Run this agent"] textarea', 'Say something short.');
+  await until(() => click('Send (1 call)'), 'run button');
+  const answer = await until(() => evaluate(`document.querySelector('section[aria-label="Run this agent"] [role=status]')?.textContent || ''`), 'run result');
+  if (mocked) {
+    assert.match(answer, /^Mock answer/);
+    await until(() => evaluate(`(() => { const tab = Array.from(document.querySelectorAll('[role=tab]')).find(t => t.textContent === 'Output'); tab?.click(); return document.querySelector('.inspector pre')?.textContent.startsWith('MOCK:'); })()`), 'answer recorded as the agent output');
+    console.log('PASS: agent ran once through the mock and its output was recorded by the server');
+  } else {
+    assert.match(answer, /No provider is connected/);
+    console.log('PASS: running without a provider explains what is missing');
+  }
   await until(() => click('Tokens'), 'Tokens button');
   await until(() => evaluate(`document.body.textContent.includes('Budgets and consumption') && document.querySelectorAll('.token-table tbody tr').length > 0`), 'token table');
   await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);

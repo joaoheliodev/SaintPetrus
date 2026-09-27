@@ -241,3 +241,28 @@ test('connection state is proved by a live call, never by a stored credential, a
     assert.equal(providerStatus().state, 'disconnected');
   } finally { restoreTokens(); clearVerification(); store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }
 });
+
+test('F2 running one agent records the answer as that agent output; a connection probe records nothing', async () => {
+  const { loadConfig } = await import('../lib/tokens/config');
+  const { policy, prices } = loadConfig();
+  const previous = { tokens: Reflect.get(globalThis, 'saintpetrusTokens'), mock: process.env.SAINTPETRUS_MOCK, provider: process.env.SAINTPETRUS_PROVIDER };
+  runtime().mock.reset(); const graph = runtime().graph;
+  Reflect.set(globalThis, 'saintpetrusTokens', new TokenService(policy, prices, { ids: () => graph.snapshot().agents.map(agent => agent.id), pause: () => {}, pauseAll: () => {} }));
+  process.env.SAINTPETRUS_MOCK = 'true'; process.env.SAINTPETRUS_PROVIDER = 'mock';
+  try {
+    const child = graph.add({ name: 'Runner', provider: 'Unconfigured', context: { objective: 'Answer once.', summary: 'Runner summary', artifacts: [] } });
+    assert.equal((await POST(request({ action: 'test' }))).status, 200);
+    assert.ok(graph.snapshot().agents.every(agent => agent.output === ''), 'a probe proves the connection; it is not agent work');
+    const response = await POST(request({ action: 'complete', input: 'Say something.', agentId: child }));
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    const outputs = new Map(graph.snapshot().agents.map(agent => [agent.id, agent.output]));
+    assert.equal(outputs.get(child), body.text); assert.match(body.text, /^MOCK:/);
+    assert.equal(outputs.get('root'), '', 'only the agent that ran gets the answer');
+    assert.equal((await POST(request({ action: 'complete', input: 'x'.repeat(2001), agentId: child }))).status, 409, 'input bounds still apply');
+  } finally {
+    Reflect.set(globalThis, 'saintpetrusTokens', previous.tokens); runtime().mock.reset();
+    if (previous.mock === undefined) delete process.env.SAINTPETRUS_MOCK; else process.env.SAINTPETRUS_MOCK = previous.mock;
+    if (previous.provider === undefined) delete process.env.SAINTPETRUS_PROVIDER; else process.env.SAINTPETRUS_PROVIDER = previous.provider;
+  }
+});

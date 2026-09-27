@@ -74,8 +74,8 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
 | F1 | Keyless mock by default in `npm run dev` | Definition of Done item 2 | `npm run dev` starts with the mock unless `SAINTPETRUS_MOCK` says otherwise; `npm start` unchanged (mock off) | confirm (D-03) | done (37605ba; verified by hand in dev with and without the override) |
-| F2 | Run one call for a selected agent from the inspector | `complete` action exists server-side with no UI; inspector output tab expects provider output | Inspector sends one budgeted call through the existing route for the selected agent; output recorded by the graph owner; works with the mock and no key | no | pending |
-| F3 | Edit agent name and objective | Operator's main flow lists editing | Server-validated `update` command with the create limits; UI in the inspector | no | done (this commit; browser check edits an agent) |
+| F2 | Run one call for a selected agent from the inspector | `complete` action exists server-side with no UI; inspector output tab expects provider output | Inspector sends one budgeted call through the existing route for the selected agent; output recorded by the graph owner; works with the mock and no key | no | done (this commit; mock usage no longer rewrites `config/prices.json`) |
+| F3 | Edit agent name and objective | Operator's main flow lists editing | Server-validated `update` command with the create limits; UI in the inspector | no | done (a456256; browser check edits an agent) |
 | F4 | Confirm destructive actions | Operator requirement | Reset graph, run mock (resets), pause all (cancels in-flight work), disconnect credential, delete connection, add price validity and apply confirmed usage all require explicit confirmation | no | pending |
 | F5 | Loading, empty and error states | Operator requirement | Every panel shows all three where applicable | no | pending |
 | F6 | Export context from the UI | Export route exists without a UI entry | Download link to the existing endpoint; no new client fetch | no | pending |
@@ -179,6 +179,11 @@ The commit is documentation only and carries no secret or leaky instruction.
 | F1 | default given to `npm start` too | killed by the same test |
 | F3 | service-side edit validation removed | first survived (the dispatcher validates too); a direct service test was added and kills it |
 | F3 | `update` command not dispatched | killed by "F3 an agent name and objective can be edited…" |
+| F2 | route stops recording the answer | killed by "F2 running one agent records the answer…" |
+| F2 | a probe records output too | killed by the same test |
+| F2 | recorded output unbounded | killed by "F2 a provider answer replaces only its agent output…" |
+| F2 | mock call journaled into the price file | killed by "F2 synthetic mock usage never rewrites the operator price file…" |
+| F2 | mock manual reconciliation journaled | killed by the every-provider served-model test |
 
 ## Phase 2 security findings
 
@@ -221,6 +226,11 @@ The commit is documentation only and carries no secret or leaky instruction.
   follows it like Gemini and DeepSeek. Real OpenAI responses usually name a dated snapshot of the alias, so
   until the operator registers that snapshot's price, an OpenAI call stays unverifiable and pauses its agent.
   Conservative and reversible; see Q-07.
+- **D-06 Run once.** The inspector can send one call for the selected agent through the existing `complete`
+  action (no new route or client fetch), and the server records the answer as that agent's output. With the dev
+  mock it is free; with a real provider it is an ordinary budgeted call the user clicks for. Reversible; Q-09.
+- **D-07 Mock journal.** A browser run found that a mock call wrote a reconciliation entry into the tracked
+  `config/prices.json`. Synthetic mock usage is no longer journaled; real reconciliation still is.
 - **D-04 Language.** Code, UI, docs and commits stay in English as `AGENTS.md` requires; the final
   session report to the operator is in Portuguese.
 
@@ -239,6 +249,7 @@ The commit is documentation only and carries no secret or leaky instruction.
 - **Q-06** LICENSE: none exists; which one, if any?
 - **Q-08** Remembered keys are encrypted under the ignored `data/vault` inside the checkout. Move the vault to a
   per-user data directory outside the project folder (existing remembered keys would need re-entry)?
+- **Q-09** Keep the inspector's Run once action (D-06), or restrict real-provider calls to the connection probe?
 - **Q-07** OpenAI now prices the served snapshot (D-05). Which dated IDs and prices should be registered
   before any OpenAI use, or should OpenAI be removed from the allowlist until then?
 

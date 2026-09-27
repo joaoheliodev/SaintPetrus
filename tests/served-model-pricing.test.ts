@@ -53,6 +53,11 @@ test('A served model without a captured tariff stays unverifiable for every prov
     advance(100);
     const expired = service.snapshot().rows.find(row => row.scope === 'global')!;
     assert.equal(expired.reserved, 0); assert.ok(expired.used > 0); assert.ok(expired.costUnmeasuredUsd > 0, provider);
+    // Confirmed usage replaces the estimate; only real providers enter the persisted reconciliation journal.
+    service.reconcileReservation(error.reservationId, 10, 5, 0.01);
+    const [manual] = service.receiptSnapshot().receipts;
+    assert.equal(manual.kind, 'manual');
+    if (manual.kind === 'manual') assert.deepEqual(manual.journal?.models ?? null, provider === 'mock' ? null : [requested, served], provider);
   }
 });
 

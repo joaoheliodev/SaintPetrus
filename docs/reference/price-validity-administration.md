@@ -22,7 +22,8 @@ model authorization: the policy allowlist remains separate.
 Before actual or manual reconciliation changes counters, the catalog records the
 requested and known served model's protected time interval in `reconciled`. An
 append is refused if either its new interval or its predecessor closure intersects
-that history. This journal begins with this feature; it cannot reconstruct older
+that history. Synthetic mock usage is never journaled, so the mock cannot rewrite the
+operator's file. This journal begins with this feature; it cannot reconstruct older
 process-local consumption. It survives restart, although counters and inflight
 reservations remain process-local. File writes use an exclusive temporary file,
 fsync and atomic rename; failure leaves the previous file and memory unchanged.

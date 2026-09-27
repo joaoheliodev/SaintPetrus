@@ -88,3 +88,15 @@ test('F3 the graph service validates an edit itself, not only through the HTTP d
   const renamed = service.snapshot().agents.find(agent => agent.id === id)!;
   assert.deepEqual([renamed.name, renamed.context.objective], ['Renamed', 'New objective']);
 });
+
+test('F2 a provider answer replaces only its agent output, bounded, and a removed agent is skipped quietly', () => {
+  const service = new GraphService(); const id = service.spawn('root', request());
+  const revision = service.snapshot().revision;
+  assert.equal(service.recordOutput(id, 'x'.repeat(9000)), true);
+  const snapshot = service.snapshot();
+  assert.equal(snapshot.agents.find(agent => agent.id === id)!.output.length, 8000);
+  assert.equal(snapshot.agents[0].output, '', 'other agents keep their output');
+  assert.equal(snapshot.revision, revision + 1);
+  assert.equal(service.recordOutput('removed-by-a-reset', 'late answer'), false);
+  assert.equal(service.snapshot().revision, revision + 1, 'nothing is emitted for an agent that is gone');
+});

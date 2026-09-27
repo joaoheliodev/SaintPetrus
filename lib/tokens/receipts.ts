@@ -10,7 +10,7 @@ export type CallReceipt = Identity & { kind: 'call'; reservationId: string; verd
   reportedUsage: ReceiptUsage | null; band: 'peak' | 'offPeak' | null; costUsd: number | null; journal: JournalInterval | null };
 export type CacheReceipt = Identity & { kind: 'cache'; savedTokens: number };
 export type ExpiryReceipt = Identity & { kind: 'expiry'; reservationId: string; tokens: number; heldCostUsd: number; costUsd: number };
-export type ManualReceipt = Identity & { kind: 'manual'; reservationId: string; usage: { prompt: number; completion: number; total: number }; replacedCostUsd: number; costUsd: number; journal: JournalInterval };
+export type ManualReceipt = Identity & { kind: 'manual'; reservationId: string; usage: { prompt: number; completion: number; total: number }; replacedCostUsd: number; costUsd: number; journal: JournalInterval | null };
 export type Receipt = CallReceipt | CacheReceipt | ExpiryReceipt | ManualReceipt;
 type Draft<T> = T extends unknown ? Omit<T, 'id'> : never;
 // Bounded and append-only: the oldest receipt is evicted, never edited, and the eviction count is reported.

@@ -98,8 +98,9 @@ export class TokenService {
     const reservation = this.reservations.get(id);
     if (!reservation || reservation.status !== 'estimated') throw new TokenFailure('Unknown estimated reservation.');
     const total = prompt + completion;
-    const journal: JournalInterval = { models: [...new Set([reservation.model, reservation.billingModel ?? reservation.model])], from: reservation.createdAt, to: Math.max(reservation.createdAt, this.now()) + 1 };
-    this.catalog.recordReconciliation(journal.models, journal.from, journal.to);
+    // Synthetic mock usage never enters the persisted journal: it protects real tariffs and must not rewrite the operator's file.
+    const journal: JournalInterval | null = reservation.provider === 'mock' ? null : { models: [...new Set([reservation.model, reservation.billingModel ?? reservation.model])], from: reservation.createdAt, to: Math.max(reservation.createdAt, this.now()) + 1 };
+    if (journal) this.catalog.recordReconciliation(journal.models, journal.from, journal.to);
     for (const row of reservation.rows) {
       row.used += total - reservation.tokens;
       row.estimated -= reservation.tokens;
@@ -180,7 +181,7 @@ export class TokenService {
     if (previewEnabled()) options.onText = text => observeArtifact(agent, this.hooks.role?.(agent) ?? agent, text);
     let verdict: BillingVerdict = 'unverifiable';
     let outcome = 'completed'; let dispatch: Dispatch | undefined; let reportedUsage: ReceiptUsage | undefined;
-    let priced: { servedPriceVersionId: string; band: 'peak' | 'offPeak'; costUsd: number; journal: JournalInterval } | undefined;
+    let priced: { servedPriceVersionId: string; band: 'peak' | 'offPeak'; costUsd: number; journal: JournalInterval | null } | undefined;
     try {
       const result = await proxy.execute(adapter, input, signal, options, { correlationId: reservation.id, onDispatch: sent => { dispatch = sent; } });
       const approximate = adapter.id === 'mock';
@@ -203,8 +204,8 @@ export class TokenService {
       const billingPrice = Object.hasOwn(reservation.priceVersions, billingModel) ? reservation.priceVersions[billingModel].price : undefined;
       if (!billingPrice) throw new UnpricedServedModel(adapter.model, billingModel, reservation.id);
       const actualCostUsd = reconciledCostUsd(billingPrice, usage, createdAt, responseAt, true);
-      const journal: JournalInterval = { models: [...new Set([adapter.model, billingModel])], from: Math.min(createdAt, responseAt), to: Math.max(createdAt, responseAt) + 1 };
-      this.catalog.recordReconciliation(journal.models, journal.from, journal.to);
+      const journal: JournalInterval | null = approximate ? null : { models: [...new Set([adapter.model, billingModel])], from: Math.min(createdAt, responseAt), to: Math.max(createdAt, responseAt) + 1 };
+      if (journal) this.catalog.recordReconciliation(journal.models, journal.from, journal.to);
       for (const row of rows) {
         row.reserved -= reservedTokens; row.used += usage.total; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); row.costAccountedUsd = money(row.costAccountedUsd + actualCostUsd);
         const totals = approximate ? row.mock : row.actual;

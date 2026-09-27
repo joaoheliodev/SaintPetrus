@@ -50,6 +50,7 @@ const failures: Record<number, string> = {
   504: 'The provider request timed out. The credential was neither verified nor rejected.',
 };
 const codeFailures: Record<string, string> = {
+  unconfigured: 'No provider is connected. Open Connect AI and connect one first.',
   empty_output: 'The provider answered without visible text, so the connection is not verified. Usage was charged; check the model and prompt before testing again.',
   served_model_unpriced: 'The provider answered with a model that has no verified price. The call may have been billed, so its reservation stays held and the agent is paused. Add that model in Tokens → Prices, then reconcile the expired estimate with provider-confirmed usage.',
 };
@@ -58,6 +59,11 @@ const configurationFailures: Record<string, string> = {
   model_not_allowlisted: 'This model is not in the server token-policy allowlist.',
 };
 class ConfigurationFailure extends Error {}
+// The one client of /api/provider actions: a body carries the action and, to execute, only the input and agent.
+export async function postProviderAction(body: string) {
+  const response = await fetch('/api/provider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+  return { ok: response.ok, status: response.status, data: await response.json() };
+}
 export function ProviderStatus() {
   const [status, setStatus] = useState<ProviderStatusSnapshot>();
   const [result, setResult] = useState(''); const [pending, setPending] = useState(false);
@@ -108,12 +114,11 @@ export function ProviderStatus() {
   }
   // One minimal live call. Its outcome, not the presence of a key, is what the badge reports.
   async function verify(mocked: boolean) {
-    const response = await fetch('/api/provider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test' }) });
-    const data = await response.json();
+    const { ok, status, data } = await postProviderAction(JSON.stringify({ action: 'test' }));
     await refresh('explicit');
-    setResult(response.ok
+    setResult(ok
       ? `${mocked ? 'Mock verified' : 'Connection verified'} · ${data.latencyMs} ms`
-      : verificationMessage(response.status, data?.error));
+      : verificationMessage(status, data?.error));
   }
   async function run(action: 'connect' | 'test' | 'disconnect' | 'forget') {
     if (action === 'forget' && !window.confirm(`Forget the ${status?.provider ?? ''} key? This clears it from backend memory and deletes any encrypted copy saved on this machine. It cannot be undone.`)) return;

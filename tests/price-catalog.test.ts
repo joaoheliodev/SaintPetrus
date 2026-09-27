@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PriceCatalog } from '../lib/prices/catalog';
-import type { Prices } from '../lib/tokens/config';
+import type { Prices, TokenPolicy } from '../lib/tokens/config';
 import type { ModelPrice } from '../lib/tokens/pricing';
 
 const model = 'synthetic-test-model';
@@ -199,4 +199,26 @@ test('failed atomic replacement preserves destination content and catalog memory
   assert.equal(readFileSync(sentinel, 'utf8'), before);
   assert.deepEqual(prices.snapshot(), snapshot);
   assert.deepEqual(readdirSync(directory), ['prices.json']);
+});
+
+test('F2 synthetic mock usage never rewrites the operator price file; real reconciliation still journals', async () => {
+  const { mkdir, mkdtemp, readFile: read, rm, writeFile } = await import('node:fs/promises');
+  const { TokenService } = await import('../lib/tokens/service');
+  const { ProviderProxy } = await import('../lib/providers/proxy');
+  const { PriceCatalog } = await import('../lib/prices/catalog');
+  const { join } = await import('node:path');
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/price-file-');
+  const file = join(dir, 'prices.json');
+  const flat = { effectiveAt: '1970-01-01', verifiedAt: '1970-01-01', peakWindowsUtc: [], offPeak: { inputCacheHitPerMillion: 0, inputCacheMissPerMillion: 0, outputPerMillion: 0 }, peak: { inputCacheHitPerMillion: 0, inputCacheMissPerMillion: 0, outputPerMillion: 0 } };
+  const document: Prices = { date: '2026-09-27', currency: 'USD', models: { 'mock-v1': { ...flat, provider: 'mock' }, 'test-model': { ...flat, provider: 'openai' } } };
+  try {
+    await writeFile(file, JSON.stringify(document));
+    const original = await read(file, 'utf8');
+    const policy: TokenPolicy = { global: 1000, perAgent: 1000, perModel: 1000, perSession: 1000, costLimitsUsd: { global: 1, perAgent: 1, perModel: 1, perSession: 1 }, cacheTtlMs: 0, reservationTtlMs: 100, models: { 'mock-v1': { provider: 'mock', max_tokens: 64, temperature: 0 }, 'test-model': { provider: 'openai', max_tokens: 64, temperature: 0 } } };
+    const service = new TokenService(policy, document, { ids: () => ['a'], pause: () => {}, pauseAll: () => {} }, undefined, Date.now, new PriceCatalog(structuredClone(document), file));
+    await service.execute(new ProviderProxy(), { id: 'mock', model: 'mock-v1', complete: async () => ({ text: 'Synthetic' }) }, 'Question', new AbortController().signal, 'a', 'System');
+    assert.equal(await read(file, 'utf8'), original, 'a mock call leaves the file byte-identical');
+    await service.execute(new ProviderProxy(), { id: 'openai', model: 'test-model', complete: async () => ({ text: 'Answer', usage: { prompt: 1, completion: 1, total: 2 } }) }, 'Question', new AbortController().signal, 'a', 'System');
+    assert.deepEqual(JSON.parse(await read(file, 'utf8')).reconciled.map((entry: { models: string[] }) => entry.models), [['test-model']], 'real consumption is still protected');
+  } finally { await rm(dir, { recursive: true }); }
 });
