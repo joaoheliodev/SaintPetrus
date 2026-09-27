@@ -1,7 +1,9 @@
 # Operator protocol for real provider validation
 
-Prepared from commit `0662647` on 2026-09-26. This is a procedure, not evidence of a
-real call. No provider request, model discovery or price lookup was made to prepare
+Prepared from commit `0662647` on 2026-09-26 and updated on 2026-09-27 on
+`night/provider-validation-ready` for served identities, receipts, the dispatch
+ledger, the validation timeout and terminal DeepSeek entry. This is a procedure, not
+evidence of a real call. No provider request, model discovery or price lookup was made to prepare
 it. The operator runs the server and approves each paid step. Read
 [First real call](reference/first-real-call.md),
 [billing scopes](reference/billing-scope-and-price-key.md) and
@@ -27,14 +29,15 @@ Fill this locally. No credential belongs in this document or the results table.
 | Four token limits and four USD limits; total approved validation spend | |
 | Tariffs: source URL, verifiedAt, effectiveAt, optional expiresAt, UTC peak windows | |
 | Both rate bands: input cache hit, input cache miss, output per million | |
-| Whether feed is enabled; method for observing upstream dispatch without payloads | |
-| Approved timeout method and disposable-key rejection method | |
+| Whether feed is enabled; dispatch evidence comes from `dispatches` on `GET /api/provider` | |
+| Approved timeout method (`SAINTPETRUS_VALIDATION_TIMEOUT_MS` value or an external impairment) and disposable-key rejection method | |
 
 1. Operator: run the build on this branch before validation. Start only on
    `127.0.0.1`; disable mock and preview. Enable `SAINTPETRUS_FEED=true` at startup
    if feed evidence is required. Enabling only its UI is insufficient. Do not
    restart once a possibly billed call is unresolved: counters and reservations
-   are process-local. Use the policy's configured TTL, not a new timeout policy.
+   are process-local. Use the policy's configured TTL, not a new timeout policy, and
+   leave `SAINTPETRUS_VALIDATION_TIMEOUT_MS` unset except for V2.
 2. Operator: put `R` and its provider/output/thinking policy in
    `config/token-policy.json` before startup. Keep `cacheTtlMs: 0`. Gemini currently
    requires a model supporting disabled thinking; the adapter cannot express an
@@ -43,7 +46,8 @@ Fill this locally. No credential belongs in this document or the results table.
    that can answer it. A served-only candidate needs a price but need not be
    allowlisted for requests. `R` is the key in the allowlist and its price entry;
    each `S` is a separate exact price key, not a display name. Gemini strips the
-   `models/` prefix; otherwise IDs must match exactly. No IDs or rates are supplied
+   `models/` prefix from requested and served IDs, and OpenAI usually answers with a
+   dated snapshot of the alias; otherwise IDs must match exactly. No IDs or rates are supplied
    by this protocol. Include price-side provider metadata for every candidate.
 4. Prices must be effective at dispatch; the requested price must remain valid
    through `dispatch + reservationTtlMs`. New validities close an open predecessor
@@ -71,7 +75,7 @@ Fill this locally. No credential belongs in this document or the results table.
 
 | Stage / owner | What happens | Operator evidence |
 | --- | --- | --- |
-| Local selection: `lib/providers/runtime.ts` | Validates provider and normalized allowlisted `R`; constructs adapter | Local `GET /api/provider`, credential-free execution body; configured is not verified |
+| Local selection: `lib/providers/runtime.ts` | Validates provider and normalized allowlisted `R` for a UI selection; a terminal or startup selection is checked against the allowlist by `TokenService`, still before I/O; constructs adapter | Local `GET /api/provider`, credential-free execution body; configured is not verified |
 | Preflight: `TokenService.execute` in `lib/tokens/service.ts` | Checks pause, policy, active captured tariffs and four token/USD ceilings | Local 409 on refusal; `budget.refused`; row/paused snapshots. `dispatches` on `GET /api/provider` stays unchanged: the server-side proof of no upstream call |
 | Reservation: same service | Synchronous holds in all four rows before `ProviderProxy.execute` | `/api/tokens`: `reserved`, `costReservedUsd`; a fast call may finish before observation. Inflight IDs are omitted |
 | I/O: `lib/providers/proxy.ts`, provider adapter | One active request, 15-second proxy timeout; fixed endpoint, no redirects, bounded response | Connection latency/status; local API result. Browser network shows local requests, not the server's provider transport |
@@ -81,8 +85,8 @@ Fill this locally. No credential belongs in this document or the results table.
 | Manual reconciliation | Replaces an expired estimate using provider-confirmed tokens and cost | Same four row deltas; estimate/reservation removed, then explicit resume. Appends a `manual` receipt with the replaced estimate and journal interval |
 | Feed / export | Redacted circular SSE window / redacted graph snapshot | `/api/events` when enabled, `/api/graph/export`; neither is a complete billing ledger |
 
-Save before/after `/api/tokens`, `/api/prices`, `/api/provider`, graph export and
-only the relevant local execution response. GETs to these **local** endpoints do
+Save before/after `/api/tokens`, `/api/prices`, `/api/provider`, `/api/receipts`,
+graph export and only the relevant local execution response. GETs to these **local** endpoints do
 not call the provider. Local POSTs require the exact loopback Origin and JSON
 content type; do not weaken that check. Requests to `/api/provider` contain only
 `action`, optionally `input` and `agentId`; never a key, model override or URL.
@@ -105,12 +109,16 @@ With `ceil12(x) = ceil(x × 10^12) / 10^12`, the requested-model preflight is:
 T_i = I_i + O_i
 B_i = ceil12((I_i × R.peak.inputCacheMissPerMillion
               + O_i × R.peak.outputPerMillion) / 1,000,000)
-admit only if, in each of the four rows:
+refuse first if, in any of the four rows:
+  used + reserved >= token limit, or
+  costAccountedUsd + costReservedUsd >= USD limit
+then admit only if, in each of the four rows:
   used + reserved + T_i <= token limit
   costAccountedUsd + costReservedUsd + B_i <= USD limit
 ```
 
-This is the maximum **reservation at the estimated input**, not a guaranteed
+The first check means a row already at its limit refuses even a zero-cost
+reservation. This is the maximum **reservation at the estimated input**, not a guaranteed
 invoice maximum: input is approximate and an unanticipated served price may be
 dearer. For scenario planning calculate `W_i`, the maximum of the same peak/miss
 formula over every active captured candidate, restricted to the validated provider
@@ -318,7 +326,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
   never credentials, headers, prompt, reasoning or account identifiers. Review and
   scan before sharing. This mission does not create fixtures from unexecuted calls.
 
-## Gaps and minimum proposed changes (not implemented)
+## Gaps: resolved and still open
 
 | ID | Verified limitation | Minimum proposal / decision |
 | --- | --- | --- |
@@ -327,11 +335,11 @@ and stop; never send bursts to induce it. Not observed means not verified.
 | G3 | Resolved: `GET /api/provider` returns `dispatches` (`total`, `byProvider`, the latest 50 with `sequence`, `provider`, `model`, `correlationId` = reservation ID, `at`), recorded by the proxy immediately before transport, never for a local refusal or cache hit | Process-local; restart clears it. It counts requests that left, not what the provider billed |
 | G4 | Resolved: startup-only `SAINTPETRUS_VALIDATION_TIMEOUT_MS` (1–14999 ms) shortens the proxy timeout, is visible in the header and status, and never bypasses preflight or budgets | A local abort does not prove the provider received the request; pair it with the dispatch ledger and provider billing |
 | G5 | Feed tokens are message totals: omit billed output-limit responses, expiry/manual adjustments. The reroute text no longer claims reconciliation, and an unpriced served model has its own `provider.unpriced` event | Keep feed as activity evidence; per-call accounting evidence belongs to receipts (G2) |
-| G6 | Token/price receipt export absent; graph export omits ledger, inflight reservations and captures | Propose sanitized accounting export carrying four scopes and captured tariff identities; save local snapshots meanwhile |
+| G6 | Partly resolved: per-call accounting evidence is in `GET /api/receipts` (G2). The graph export still omits the budget rows, inflight reservations and captured tariffs | Save `/api/tokens`, `/api/prices` and `/api/receipts` snapshots next to the graph export; a combined accounting export stays a proposal |
 | G7 | Resolved: the terminal helper accepts `deepseek` under the same rules as the other providers, and a test pins its provider list to the backend credential store | None |
 | G8 | Zero live cached/thinking tokens cannot establish nonzero cases. The names-only diagnostic now covers Gemini usage failures and a missing usage object in both adapters | Obtain numeric provider evidence, or explicitly leave nonzero cases unverified. Do not manufacture billable coverage |
 | G9 | No safe arbitrary-key/fragment comparator for exported artifacts; short fragments not generally identifiable | Approve an ephemeral, nonlogging comparator and an explicit fragment criterion; Gitleaks alone is insufficient |
-| G10 | Counters/holds vanish on restart; input approximate; price-only reroutes beyond known candidates and unsupported price dimensions can exceed estimates | Preserve process/evidence during the run, select only supported pricing, approve residual exposure; durable receipts/accurate counting need a separate task |
+| G10 | Counters, holds, receipts and the dispatch ledger vanish on restart; input approximate; price-only reroutes beyond known candidates and unsupported price dimensions can exceed estimates | Preserve process/evidence during the run, select only supported pricing, approve residual exposure; durable receipts/accurate counting need a separate task |
 | G11 | Resolved: a probe answered without visible text returns 422 `empty_output`, keeps its billed usage and leaves the connection `incomplete` ("No visible output"), like an output-limit result | Still require visible output during manual validation |
 
 ## Results record
