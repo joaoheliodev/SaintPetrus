@@ -135,7 +135,7 @@ panel, nothing copied or loaded from it.
 | ID | Item | Acceptance criterion | Status |
 | --- | --- | --- | --- |
 | U1 | Vocabulary and status | No text contradicts another about mode, connection or status | done |
-| U2 | Demo kept apart | No single unconfirmed click replaces the graph | pending |
+| U2 | Demo kept apart | No single unconfirmed click replaces the graph | done |
 | U3 | Agent panel with Run and Details | Run an agent and read the answer without scrolling or changing tab | pending |
 | U4 | Screen structure and navigation | Every current function reachable by mouse and keyboard; no route changes | pending |
 | U5 | Budgets | Summary, per-scope blocks, details table with every field and action | pending |
@@ -153,6 +153,11 @@ panel, nothing copied or loaded from it.
 - U1: the provider-status and token readers are lifted into hooks inside the same files, because the fetch
   ratchet pins direct `fetch` calls to those files.
 - U1: the palette's AA contrast for the status colours is a test that reads `app/globals.css`.
+- U2: Import, Export, Reset and Load demo live in a **More** menu (`@base-ui/react` Menu, wrapped in
+  `components/ui/menu.tsx`); the main toolbar keeps Add agent, Add subagent, Fit all and, only while the demo runs,
+  Pause/Resume demo. The empty canvas offers Load demo as a link. The Coordinator objective moved into the Reset
+  graph dialog, which also names that the demo uses it. Graph limits show in both modes; Demo cost only in MOCK.
+  Both still send the one existing `budget` command with all three values.
 
 #### Questions for João
 

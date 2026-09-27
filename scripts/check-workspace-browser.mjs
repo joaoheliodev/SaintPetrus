@@ -22,6 +22,11 @@ try {
     return result.result.value;
   };
   const until = async (fn, label) => { for (let i = 0; i < 300; i++) { const value = await fn(); if (value) return value; await new Promise(resolve => setTimeout(resolve, 100)); } throw new Error(`Timed out: ${label}`); };
+  // Graph-replacing actions live in the More menu: open it, then pick the item by its visible name.
+  const menu = async text => {
+    await until(() => click('More'), 'More menu');
+    return until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('[role=menuitem]')).find(i => i.textContent.trim() === ${JSON.stringify(text)} && !i.hasAttribute('data-disabled')); if (!item) return false; item.click(); return true; })()`), `${text} menu item`);
+  };
   const click = text => evaluate(`(() => { const target = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === ${JSON.stringify(text)} && !b.disabled); if (!target) return false; target.click(); return true; })()`);
   // A real key press always ends with keyup; React Flow matches shortcuts against the keys still held.
   const press = async key => { for (const phase of ['keydown', 'keyup']) { await evaluate(`document.dispatchEvent(new KeyboardEvent('${phase}', { key: '${key}', code: '${key}', bubbles: true }))`); await new Promise(resolve => setTimeout(resolve, 150)); } };
@@ -160,6 +165,14 @@ try {
   assert.ok(stops > 20, `Tab reached ${stops} stops`);
   assert.deepEqual(hidden, [], 'every focus stop is visible');
   console.log(`PASS: ${stops} Tab stops, each with a visible focus indicator`);
+  if (mocked) {
+    // The demo replaces the canvas: it is one menu away and asks first; refusing keeps every agent.
+    decisions.push(false); await menu('Load demo…'); await until(() => dialogs.some(text => text.startsWith('Load the demo?')), 'load demo question');
+    await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await nodes(), 3, 'a refused demo keeps the graph');
+    console.log('PASS: the demo is behind a menu and a confirmation');
+  }
+  await menu('Reset graph…');
+  await until(() => evaluate(`!!document.querySelector('[role=dialog] #objective') && document.body.textContent.includes('The objective the Coordinator receives when the graph is reset')`), 'reset dialog with the coordinator objective');
   decisions.push(false); await until(() => click('Reset graph'), 'Reset graph button'); await until(() => dialogs.some(text => text.startsWith('Reset the graph?')), 'reset question');
   await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await nodes(), 3, 'a refused reset keeps the graph');
   await until(() => click('Reset graph'), 'Reset graph button'); await until(async () => await nodes() === 1, 'graph reset after confirmation');
