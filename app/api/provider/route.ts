@@ -29,8 +29,12 @@ export async function POST(request: Request) {
       if (input.action === 'test') recordVerification(false, 'output_limit');
       return safeJson({ ...result, error: 'output_limit', status: providerStatus() }, 422);
     }
-    // Only a completed round trip proves the credential. Cache hits prove nothing new but never invalidate.
-    if (input.action === 'test' && !(result as { cached?: boolean }).cached) recordVerification(true);
+    // Only a completed round trip with visible text proves the credential. Cache hits prove nothing new but never invalidate.
+    if (input.action === 'test' && !result.cached && !result.text.trim()) {
+      recordVerification(false, 'empty_output');
+      return safeJson({ ...result, error: 'empty_output', status: providerStatus() }, 422);
+    }
+    if (input.action === 'test' && !result.cached) recordVerification(true);
     return safeJson({ ...result, status: providerStatus() });
   } catch (error) {
     // The provider answered, but its model has no captured price: no verdict either way, the hold stays.

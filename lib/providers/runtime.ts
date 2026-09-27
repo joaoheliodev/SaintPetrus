@@ -44,7 +44,9 @@ export function providerStatus(): ProviderStatusSnapshot {
   // A stale verification must never be shown as current: it only counts for the exact pair it proved.
   const proof = state.saintpetrusVerification;
   const current = proof && proof.provider === base.provider && proof.model === base.model ? proof : undefined;
-  const state_: ConnectionState = !base.connected ? 'disconnected' : current?.code === 'output_limit' ? 'incomplete' : current?.ok ? 'verified' : current ? 'rejected' : 'configured';
+  // Billed but without usable output: the provider answered, yet nothing was proved.
+  const incomplete = current?.code === 'output_limit' || current?.code === 'empty_output';
+  const state_: ConnectionState = !base.connected ? 'disconnected' : incomplete ? 'incomplete' : current?.ok ? 'verified' : current ? 'rejected' : 'configured';
   const { timeoutMs } = providerProxy();
   return { ...base, mockAvailable, verified: current?.ok === true, verifiedAt: current?.ok ? current.at : undefined, failureCode: current && !current.ok ? current.code : undefined, state: state_, ...(timeoutMs === DEFAULT_PROVIDER_TIMEOUT_MS ? {} : { validationTimeoutMs: timeoutMs }) };
 }

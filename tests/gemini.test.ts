@@ -203,3 +203,42 @@ test('Reasoning is a count inside completion, present only when the provider rep
   const thinking = geminiUsage({ promptTokenCount: 10, candidatesTokenCount: 2, thoughtsTokenCount: 3, totalTokenCount: 15 });
   assert.equal(thinking.reasoning, 3); assert.equal(thinking.completion, 5);
 });
+
+test('A probe answered without visible text is incomplete, keeps its billed usage and never verifies the connection', async () => {
+  const { POST: configure } = await import('../app/api/credentials/route');
+  const { POST: execute } = await import('../app/api/provider/route');
+  const { providerStatus, clearVerification } = await import('../lib/providers/runtime');
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/gemini-empty-');
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
+  const keys = ['saintpetrusCredentials', 'saintpetrusSelection', 'saintpetrusTokens'];
+  const old = new Map(keys.map(key => [key, Reflect.get(globalThis, key)])); const transport = globalThis.fetch;
+  const { policy, prices } = loadConfig();
+  const tokens = new TokenService(policy, prices, { ids: () => runtime().graph.snapshot().agents.map(agent => agent.id), pause: () => {}, pauseAll: () => {} });
+  const secret = randomBytes(32).toString('hex');
+  const request = (path: string, body: unknown) => new Request(`http://127.0.0.1:3100/api/${path}`, { method: 'POST', headers: { Origin: 'http://127.0.0.1:3100', 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'same-origin', 'X-SaintPetrus-Client': 'browser' }, body: JSON.stringify(body) });
+  // A safety stop or a filtered answer: the provider billed the call and returned nothing to read.
+  const silent = { ...fixture, candidates: [{ content: { parts: [{ text: '  ' }], role: 'model' }, finishReason: 'STOP', index: 0 }] };
+  let reply: object = fixture;
+  try {
+    Reflect.set(globalThis, 'saintpetrusCredentials', store); Reflect.set(globalThis, 'saintpetrusTokens', tokens); clearVerification();
+    globalThis.fetch = async () => Response.json(reply);
+    assert.equal((await configure(request('credentials', { action: 'set', provider: 'gemini', model, key: secret }))).status, 200);
+    reply = silent;
+    const empty = await execute(request('provider', { action: 'test' }));
+    assert.equal(empty.status, 422);
+    const body = await empty.json();
+    assert.equal(body.error, 'empty_output'); assert.equal(body.status.state, 'incomplete'); assert.equal(body.status.failureCode, 'empty_output');
+    assert.equal(providerStatus().verified, false);
+    assert.match(connectionLabel(body.status), /No visible output/); assert.doesNotMatch(connectionLabel(body.status), /Connected/);
+    assert.deepEqual(tokens.snapshot().rows.find(row => row.scope === 'global')!.actual, { prompt: 17, completion: 7, total: 24 }, 'the billed usage is still accounted');
+    // A later readable answer proves the connection; a new silent one retracts it, as an output-limit result does.
+    reply = fixture;
+    assert.equal((await execute(request('provider', { action: 'test' }))).status, 200); assert.equal(providerStatus().state, 'verified');
+    reply = silent;
+    assert.equal((await execute(request('provider', { action: 'test' }))).status, 422); assert.equal(providerStatus().state, 'incomplete');
+    // Ordinary execution has nothing to verify: an empty answer is simply returned.
+    assert.equal((await execute(request('provider', { action: 'complete', input: 'Anything' }))).status, 200);
+  } finally {
+    clearVerification(); store.disconnect('gemini'); for (const [key, value] of old) Reflect.set(globalThis, key, value); globalThis.fetch = transport; await rm(dir, { recursive: true });
+  }
+});

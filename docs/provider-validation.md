@@ -328,7 +328,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
 | G8 | Zero live cached/thinking tokens cannot establish nonzero cases. The names-only diagnostic now covers Gemini usage failures and a missing usage object in both adapters | Obtain numeric provider evidence, or explicitly leave nonzero cases unverified. Do not manufacture billable coverage |
 | G9 | No safe arbitrary-key/fragment comparator for exported artifacts; short fragments not generally identifiable | Approve an ephemeral, nonlogging comparator and an explicit fragment criterion; Gitleaks alone is insufficient |
 | G10 | Counters/holds vanish on restart; input approximate; price-only reroutes beyond known candidates and unsupported price dimensions can exceed estimates | Preserve process/evidence during the run, select only supported pricing, approve residual exposure; durable receipts/accurate counting need a separate task |
-| G11 | Empty text without an output-limit finish reason can still mark a probe verified | Require visible output during manual validation; separately enforce that requirement without dropping billed usage |
+| G11 | Resolved: a probe answered without visible text returns 422 `empty_output`, keeps its billed usage and leaves the connection `incomplete` ("No visible output"), like an output-limit result | Still require visible output during manual validation |
 
 ## Results record
 

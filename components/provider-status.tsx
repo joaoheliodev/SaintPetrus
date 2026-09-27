@@ -33,7 +33,7 @@ const badges: Record<ConnectionState, (status: ProviderStatusSnapshot) => string
   verified: s => `● Connected · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
   rejected: s => `▲ Connection rejected · ${s.provider}`,
   configured: s => `◐ Configured, not verified · ${s.mocked ? 'MOCK' : s.provider} · ${s.model}`,
-  incomplete: s => `△ Output budget exhausted · ${s.provider} · ${s.model}`,
+  incomplete: s => `△ ${s.failureCode === 'empty_output' ? 'No visible output' : 'Output budget exhausted'} · ${s.provider} · ${s.model}`,
   disconnected: () => '○ Disconnected',
 };
 export const connectionLabel = (status: ProviderStatusSnapshot) => badges[status.state](status);
@@ -50,6 +50,7 @@ const failures: Record<number, string> = {
   504: 'The provider request timed out. The credential was neither verified nor rejected.',
 };
 const codeFailures: Record<string, string> = {
+  empty_output: 'The provider answered without visible text, so the connection is not verified. Usage was charged; check the model and prompt before testing again.',
   served_model_unpriced: 'The provider answered with a model that has no verified price. The call may have been billed, so its reservation stays held and the agent is paused. Add that model in Tokens → Prices, then reconcile the expired estimate with provider-confirmed usage.',
 };
 const configurationFailures: Record<string, string> = {
