@@ -100,7 +100,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | D4 | `CHANGELOG.md` | Operator requirement | What this session delivered | no | done (this commit; kept current until the final commit) |
 | D5 | CI workflow | Operator requirement | Lint, typechecks, tests, build and Gitleaks on push and PR (workflow already exists; verify and adjust) | no | done (this commit; verified: Gitleaks over full history, tracked-path check, `npm ci`, audit, lint, both typechecks, tests and build on every push and PR. Added: the test run is held to the AGENTS.md floor with zero failures, cancellations, skips and todos) |
 | D6 | LICENSE | Operator requirement: do not choose one | Question Q-06 | yes | blocked (operator decision) |
-| D7 | Permanent rules from this prompt into `AGENTS.md` | `AGENTS.md` requires prompt rules to be written down before acting on them | Test hygiene, dependency policy and published-secret stop rule added; floor kept current | no | pending |
+| D7 | Permanent rules from this prompt into `AGENTS.md` | `AGENTS.md` requires prompt rules to be written down before acting on them | Test hygiene, dependency policy and published-secret stop rule added; floor kept current | no | done (this commit; also: contract changes carry docs and tests, no invented configuration values, keys nowhere and no `.env`, the list of guarantees not to weaken. Session-only rules such as this session's commit authorization were deliberately not made permanent) |
 
 ### Phase 6 — review and close
 

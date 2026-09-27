@@ -36,6 +36,10 @@ The test count is a floor, not a target. It stands at 387 today. A run below the
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
+Never delete, skip or narrow a test to get green: no `skip`, `only` or `todo`. CI refuses a run below the floor or with any failed, cancelled, skipped or todo test (`scripts/check-test-floor.mjs`). Do not loosen lint or TypeScript configuration. A new `@ts-ignore`, `eslint-disable` or `any` needs a comment on the same or the previous line saying why it is unavoidable.
+
+A change to an API contract updates its documentation and its tests in the same change.
+
 Ratchet pins and allowlists in `tests/repository-ratchets.test.ts` only go down. They hold direct `fetch` inside `lib/providers/` apart from a shrinking legacy allowlist, zero browser storage references, no provider error-body reads, no model-literal branches in adapters, React Flow nodes owned by `useNodesState`, shrinking counts of type assertions and Gitleaks suppressions, and the anchors of the reference documents below. A failing ratchet is fixed by migrating the occurrence, never by raising a pin or extending an allowlist; when a count falls, lower its pin in the same change. A new pin is computed from the current tree, never estimated. Do not add a `max-lines` limit on its own: this code concentrates density in long lines, so a line count would pass unreadable files. A useful limit needs line length too, which is a large refactor: propose it and wait.
 
 Never create a recovery copy or backup inside the project, and ask before creating one anywhere else. A recovery copy under `.audit/` was once linted as source.
@@ -62,6 +66,8 @@ When a provider's usage shape cannot be parsed, record the set of field names th
 
 `config/prices.json` is maintained by the operator, from their own browser, with a `verifiedAt` date. No agent transcribes a provider's price into it, and no agent adds a DeepSeek price or model identifier to configuration. Independent readings of the DeepSeek page on the same day produced different numbers, and cached snapshots circulate as if official. Until the operator enters a DeepSeek model with its price, selecting it is refused with `model_not_allowlisted`; that is the correct answer, not a gap to close.
 
+Likewise no agent invents a model ID, a rate, a budget or a peak window, or writes real values into `config/token-policy.json`. Fictitious values belong only in tests, clearly marked as fictitious.
+
 Price administration appends validity records in the same file. The server may fill only an open predecessor's `expiresAt`, exactly at the successor's `effectiveAt`; all other predecessor fields remain unchanged. Refuse overlap and edits or closures covering reconciled consumption. Reservations capture price-version identities and their tariff data before I/O, including known reroute candidates: a later price edit must never change their reconciliation or expiry floor. Historical prices are never deleted; browser price writes do not relax credential protections.
 
 **The input counter is approximate.** The monetary ceiling blocks concurrency and refuses later calls, but it is a guard, not a proof of what the invoice will say. Treat it as a guard. This is why the first real call ever made against each provider, not merely the first of a session, must be checked against the actual invoice before a second one is made.
@@ -69,6 +75,10 @@ Price administration appends validity records in the same file. The server may f
 ## Safety locks
 
 A key never reaches `localStorage`, `sessionStorage`, a URL, a log, or a response body. The only request that may carry one is the local credential configuration call. Authored code holds no browser storage reference at all, and that zero has no allowlist.
+
+No key in code, an environment variable, a file, a command argument, a log, a fixture or a commit, and an agent never creates a `.env` file: tests generate synthetic material at runtime and use mocked transport only. Anything that tries to reach a provider's network during development is stopped and reported. Gitleaks must report zero findings on staged content before every commit. If it finds a secret in something already published, stop and report at once: the key must be revoked, and history is not rewritten.
+
+Do not weaken these guarantees: loopback binding; exact Origin and JSON checks on local POSTs; redaction in the feed and the export; synchronous reservations in all four scopes; conservative expiry that never releases uncertain consumption; the agent paused on `unverifiable`; fixed provider endpoints without redirects; and a `/api/provider` body that carries no key, model or URL.
 
 A provider error body is never read, echoed, logged or returned. Adapters translate HTTP status into the shared `ProviderFailure` code vocabulary and nothing else crosses the boundary.
 
@@ -95,6 +105,10 @@ RF-03 and RF-04 are out of scope. Do not start them.
 Before writing new logic at any scale, look for an existing implementation and extend it. Search in proportion to the work: a quick look for something trivial, a real search before a subsystem.
 
 The §5.4 detectors and the RF-07 handoff come from `lib/core`. They are pure, dependency-free and already tested. Do not reimplement them elsewhere.
+
+## Dependencies
+
+Prefer what is already installed. A new dependency needs its justification in the commit message and the handoff, a permissive license (MIT, Apache-2.0, BSD or ISC), no telemetry and active maintenance. Updates stay within patch and minor versions, and only with a green gate.
 
 ## State ownership
 
