@@ -23,7 +23,7 @@ test('U2 the demo is loaded from the More menu or the empty canvas, never from t
   assert.doesNotMatch(source, /Run mock|Run preview mock|Mock limits|Project objective/);
   assert.match(source, /<MenuItem disabled=\{pending \|\| active\} onClick=\{loadDemo\}><Play \/>Load demo…<\/MenuItem>/);
   assert.equal(source.match(/onClick=\{loadDemo\}/g)?.length, 2, 'the menu item and the empty-canvas link');
-  assert.match(source, /\{lonely && <div className="canvas-hint">.*onClick=\{loadDemo\}/);
+  assert.match(source, /\{mockEnabled && lonely && <> Or <Button variant="link" disabled=\{pending\} onClick=\{loadDemo\}>Load demo…<\/Button>/);
 });
 
 test('U2 graph limits and the demo cost are separate, and the objective sits with Reset graph', async () => {

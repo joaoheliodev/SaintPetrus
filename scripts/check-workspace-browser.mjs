@@ -65,13 +65,16 @@ try {
   assert.match(header('content-security-policy'), /frame-ancestors 'none'/); assert.equal(header('x-frame-options'), 'DENY');
   console.log('PASS: page rendered under the security headers');
   assert.deepEqual(await unnamed(), [], 'main page controls are named');
+  const firstSteps = () => evaluate(`document.querySelector('.first-steps h2')?.textContent ?? 'gone'`);
+  assert.equal(await firstSteps(), 'First steps · 0 of 3', 'a fresh canvas starts with the checklist');
   await until(() => click('Add agent'), 'Add agent button');
   await until(() => evaluate(`!!document.querySelector('[role=dialog] textarea')`), 'add agent dialog');
   assert.deepEqual(await unnamed(), [], 'add agent dialog controls are named');
   await type('[role=dialog] input', 'Smoke agent'); await type('[role=dialog] textarea', 'Exercise the main flow in a real browser.');
   await until(() => click('Create agent'), 'Create agent button');
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 2`), 'second node on the canvas');
-  console.log('PASS: agent created through the server');
+  await until(async () => await firstSteps() === 'First steps · 1 of 3', 'first step checked from the server graph');
+  console.log('PASS: agent created through the server; first steps 1 of 3');
   await until(() => evaluate(`document.querySelector('.inspector h2')?.textContent === 'Smoke agent'`), 'new agent selected in the inspector');
   await tab('Details');
   await until(() => click('Edit name and objective'), 'edit button');
@@ -155,6 +158,7 @@ try {
   await type('[role=dialog] textarea', 'A delegated subtask.');
   await until(() => click('Create subagent'), 'Create subagent button');
   await until(async () => await nodes() === 3 && await edges() === 1, 'subagent with its delegation edge');
+  if (mocked) await until(async () => await firstSteps() === 'gone', 'checklist done once an agent was added, connected and run');
   // Delete the connection from the keyboard: first refuse, then confirm.
   const edgeId = await evaluate(`document.querySelector('.react-flow__edge')?.getAttribute('data-id')`);
   const pressDelete = async () => { await evaluate(`document.querySelector('.react-flow__edge-path, .react-flow__edge-interaction')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`); await until(() => evaluate(`document.querySelector('.react-flow__edge.selected') !== null`), 'edge selected'); await press('Delete'); };
@@ -200,6 +204,9 @@ try {
   await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await nodes(), 3, 'a refused reset keeps the graph');
   await until(() => click('Reset graph'), 'Reset graph button'); await until(async () => await nodes() === 1, 'graph reset after confirmation');
   console.log('PASS: reset asks first and honours the answer');
+  await until(async () => await firstSteps() === 'First steps · 0 of 3', 'checklist back on a reset canvas');
+  await until(() => click('Dismiss'), 'dismiss first steps'); await until(async () => await firstSteps() === 'gone', 'checklist dismissed');
+  console.log('PASS: first steps follow the graph and can be dismissed');
   await until(() => click('Pause all agents'), 'Pause all agents button'); await until(() => dialogs.some(text => text.startsWith('Pause every agent?')), 'pause question');
   await until(() => evaluate(`document.querySelector('.react-flow__node .status')?.textContent.includes('Paused')`), 'agents paused');
   console.log('PASS: pause all asks first and pauses every agent');

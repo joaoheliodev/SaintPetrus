@@ -2,7 +2,7 @@
 // Adapted canvas geometry and interactions; all mutations go to the local server.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Position, MarkerType, useEdgesState, useNodesState, useReactFlow, type Edge, type EdgeChange, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
-import { Bot, ChevronDown, ChevronUp, CornerDownRight, Crown, Download, Ellipsis, Gauge, GitBranch, History, LayoutGrid, Maximize, Plug, Tag, Pause, Play, Plus, RotateCcw, ShieldCheck, Upload, Workflow, X } from 'lucide-react';
+import { Bot, ChevronDown, ChevronUp, Circle, CircleCheck, CornerDownRight, Crown, Download, Ellipsis, Gauge, GitBranch, History, LayoutGrid, Maximize, Plug, Tag, Pause, Play, Plus, RotateCcw, ShieldCheck, Upload, Workflow, X } from 'lucide-react';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -21,6 +21,7 @@ import { GraphActivity } from './activity-log';
 import { ConnectionChip, ConnectionView, connectionTarget, useProviderStatus } from './provider-status';
 import type { ProviderStatusSnapshot } from '@/lib/providers/runtime';
 import type { RunExchange } from '@/lib/run-exchange';
+import { firstSteps } from '@/lib/first-steps';
 import { allowSelectedEdgesOnly } from '@/lib/graph-deletion';
 import { latestMoveSender, settledMoves } from '@/lib/node-moves';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,8 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   const connection = useProviderStatus(); const tokens = useTokenSnapshot();
   // Which view fills the main column; presentation state in memory only.
   const [view, setView] = useState<View>('workspace'); const [drawerOpen, setDrawerOpen] = useState(true);
+  // Dismissing the checklist lasts until the page reloads: no browser storage.
+  const [stepsDismissed, setStepsDismissed] = useState(false);
   const importInput = useRef<HTMLInputElement>(null); const exportLink = useRef<HTMLAnchorElement>(null);
   const [resetOpen, setResetOpen] = useState(false);
   // Each agent's last Run once, in memory only: never sent back, saved or put in browser storage.
@@ -170,6 +173,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   const applyLimits = () => command({ action: 'budget', depth: limits.maxDepth, nodes: limits.maxNodes, cents: limits.maxCostCents });
   const parentName = draft?.parentId ? graph.agents.find(a => a.id === draft.parentId)?.name : undefined;
   const lonely = graph.agents.length === 1 && !graph.edges.length;
+  const steps = firstSteps(graph);
   const views: { id: View; label: string; icon: typeof Bot }[] = [
     { id: 'workspace', label: 'Workspace', icon: LayoutGrid }, { id: 'activity', label: 'Activity', icon: History },
     { id: 'budgets', label: 'Budgets', icon: Gauge }, { id: 'prices', label: 'Prices', icon: Tag }, { id: 'connection', label: 'Connection', icon: Plug },
@@ -219,8 +223,13 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       <a ref={exportLink} href="/api/graph/export" download hidden tabIndex={-1}>Export graph</a>
       <input ref={importInput} type="file" accept="application/json,.json" hidden aria-label="Graph file to import" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file && window.confirm(`Import ${file.name}? It replaces every agent, connection and output on the canvas. Token accounting is not part of the file and is unchanged.`)) void file.text().then(importGraph); }} />
     </div></div>
+      {!steps.complete && !stepsDismissed && <section className="first-steps" aria-labelledby="first-steps-title">
+        <h2 id="first-steps-title">First steps · {steps.done} of {steps.steps.length}</h2>
+        <ol>{steps.steps.map(step => <li key={step.id} className={step.done ? 'is-done' : undefined}>{step.done ? <CircleCheck size={16} className="tone-green" aria-hidden="true" /> : <Circle size={16} aria-hidden="true" />}{step.label}{step.done && <span className="sr-only"> (done)</span>}</li>)}</ol>
+        <p className="helper">{steps.steps.find(step => !step.done)?.how}{mockEnabled && lonely && <> Or <Button variant="link" disabled={pending} onClick={loadDemo}>Load demo…</Button> to replace this canvas with a fixed demonstration.</>}</p>
+        <Button variant="ghost" size="sm" onClick={() => setStepsDismissed(true)}>Dismiss</Button>
+      </section>}
       <div className="canvas-area"><ConnectionContext.Provider value={connection.status}><ReactFlow<AgentNodeType, AgentEdgeType> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={changes} onEdgesChange={edgeChanges} onBeforeDelete={confirmDeletion} onEdgesDelete={deleteEdges} onNodeClick={(_, n) => select(n.id)} onConnect={c => connect(c.source, c.target)} onConnectEnd={connectEnd} onPaneClick={() => useProjection.setState({ notice: '' })} onDoubleClick={paneDoubleClick} zoomOnDoubleClick={false} minZoom={.25} maxZoom={1.5} deleteKeyCode={['Backspace', 'Delete']} colorMode="dark" fitView fitViewOptions={{ maxZoom: 1, padding: .25 }} aria-label="Agent graph"><Background /><Controls showInteractive={false} /><MiniMap pannable zoomable style={MINIMAP} /></ReactFlow></ConnectionContext.Provider>
-        {lonely && <div className="canvas-hint"><p><strong>Two ways to grow the graph</strong></p><p>Drag from the dot on the right edge of a card and release on empty canvas — that creates a subagent already connected.</p><p>Or double-click anywhere empty to drop a standalone agent there.</p>{mockEnabled && <p>Just looking around? <Button variant="link" disabled={pending} onClick={loadDemo}>Load demo…</Button> It replaces this canvas with a fixed demonstration.</p>}</div>}
       </div>
       <Tabs className={cn('drawer', !drawerOpen && 'is-collapsed')} defaultValue="activity"><div className="drawer-bar"><TabsList aria-label="Canvas panels"><TabsTrigger value="activity">Activity</TabsTrigger>{previewPort && <TabsTrigger value="preview">Preview</TabsTrigger>}</TabsList>
         <Button variant="ghost" size="sm" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(!drawerOpen)}>{drawerOpen ? <ChevronDown /> : <ChevronUp />}{drawerOpen ? 'Collapse panel' : 'Expand panel'}</Button></div>

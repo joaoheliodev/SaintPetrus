@@ -140,7 +140,7 @@ panel, nothing copied or loaded from it.
 | U4 | Screen structure and navigation | Every current function reachable by mouse and keyboard; no route changes | done |
 | U5 | Budgets | Summary, per-scope blocks, details table with every field and action | done |
 | U6 | Activity | Drawer and full view, readable monospace lines, `agent.moved` hidden by default | done |
-| U7 | First steps | Checklist derived from server state, dismissible in memory | pending |
+| U7 | First steps | Checklist derived from server state, dismissible in memory | done |
 | U8 | In-app confirmations (P3) | Dialog instead of `window.confirm`, same texts, refuse-then-confirm in the browser check | pending |
 | U9 | Command palette (P3, optional) | Ctrl+K filterable list of existing actions | pending |
 | U10 | Finish | Dev indicator, README, CHANGELOG, STATUS, floor | pending |
@@ -189,6 +189,10 @@ panel, nothing copied or loaded from it.
   only and the time is when this panel received them (kept in the projection as presentation state); naming the
   agent would mean inferring it from snapshot diffs, which `docs/reference/state-ownership.md` forbids. The live
   feed lines do carry the agent's name. The Run once exchange is not merged into the log (it is in the Run tab).
+- U7: `lib/first-steps.ts` derives Add an agent (2+ agents), Connect two agents (1+ connection) and Run an agent (any
+  non-blank output) from the server graph. A slim bar above the canvas (an overlay covered cards) shows while the graph is unfinished,
+  says how to do the next step, replaces the old two-ways hint and keeps the empty-canvas Load demo link. Dismiss lasts
+  until reload (memory only).
 
 #### Questions for João
 
