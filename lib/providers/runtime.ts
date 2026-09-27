@@ -19,7 +19,7 @@ export type ValidatedSelection = { provider: ModelProvider; model: string };
 // A verification is a fact about one (provider, model) pair that was proved by a real call.
 // It is never inferred from the presence of a credential and never survives a credential change.
 type Verification = { provider: string; model: string; ok: boolean; at: number; code?: string };
-const state = globalThis as typeof globalThis & { saintpetrusProxy?: ProviderProxy; saintpetrusTimeoutPin?: { ms: number | undefined }; saintpetrusSelection?: { provider: string; model: string }; saintpetrusVerification?: Verification };
+const state = globalThis as typeof globalThis & { saintpetrusProxy?: ProviderProxy; saintpetrusTimeoutPin?: { ms: number | undefined }; saintpetrusVerificationGeneration?: number; saintpetrusSelection?: { provider: string; model: string }; saintpetrusVerification?: Verification };
 // Startup-only validation aid: a shorter proxy timeout forces the lost-contact path against a real provider. It is
 // never read from a request, and it applies inside the proxy, after preflight has already reserved the call.
 export function validationTimeoutMs(value = process.env.SAINTPETRUS_VALIDATION_TIMEOUT_MS): number | undefined {
@@ -31,8 +31,12 @@ export function validationTimeoutMs(value = process.env.SAINTPETRUS_VALIDATION_T
 // copy of these modules, and a proxy built there would reach the routes with classes from the wrong copy.
 export function pinnedValidationTimeoutMs() { return (state.saintpetrusTimeoutPin ??= { ms: validationTimeoutMs() }).ms; }
 export const providerProxy = () => state.saintpetrusProxy ??= new ProviderProxy(pinnedValidationTimeoutMs() ?? DEFAULT_PROVIDER_TIMEOUT_MS);
-export function clearVerification() { state.saintpetrusVerification = undefined; }
-export function recordVerification(ok: boolean, code?: string) {
+// Every credential or selection change clears the proof and starts a new generation, so a probe that finishes late
+// cannot stamp its verdict on a key or pair it never tested.
+export const verificationGeneration = () => state.saintpetrusVerificationGeneration ?? 0;
+export function clearVerification() { state.saintpetrusVerification = undefined; state.saintpetrusVerificationGeneration = verificationGeneration() + 1; }
+export function recordVerification(ok: boolean, code?: string, generation = verificationGeneration()) {
+  if (generation !== verificationGeneration()) return;
   const { provider, model } = providerStatus();
   state.saintpetrusVerification = { provider, model, ok, at: Date.now(), code };
 }

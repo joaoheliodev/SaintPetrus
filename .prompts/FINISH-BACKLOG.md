@@ -228,6 +228,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R1-08 | reasoning above output accepted | killed by "R1 OpenAI usage is parsed strictly…" |
 | R1-13 | `busy` message removed | killed by "R1 the panel says which actions call a provider…" |
 | R1-13 | floor parser back to TAP only | killed by "R1 the floor check reads the spec reporter as well as TAP…" |
+| R1-09 | generation guard removed | killed by both generation tests |
+| R1-09 | route records without its generation | killed by "R1 a probe that finishes after a credential change…" |
+| R1-09 | clearing starts no new generation | killed by both generation tests |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
@@ -244,7 +247,7 @@ parallel without editing the tree. Each finding is listed with its disposition.
 | R1-06 | minor | Forget key acts only on the selected provider, and the saved-copy note disappears after Disconnect or a restart | pending |
 | R1-07 | minor | DeepSeek throws without field names when the served model is missing | fixed (this commit): it names the fields like Gemini and OpenAI |
 | R1-08 | minor | OpenAI usage is not parsed strictly: bad usage loses the served model and the field names | fixed in part (this commit): `lib/providers/openai-usage.ts` parses usage strictly on both paths, fails closed with field names and reports the reasoning count. Not done: carrying the served model inside a usage failure so receipts and manual reconciliation can name it; that is true of every adapter and is recorded as follow-up F-01 |
-| R1-09 | minor, plausible | A probe admitted while a new key is being configured can stamp its verdict on the new pair | pending |
+| R1-09 | minor, plausible | A probe admitted while a new key is being configured can stamp its verdict on the new pair | fixed (this commit): every credential or selection change starts a new verification generation; the provider route records a verdict only for the generation it started under, as `connection-state.md` requires ("a stale result cannot restore it") |
 | R1-10 | minor, pre-existing | Expiry of an unpriced served model converts the preflight estimate even when the provider reported more usage | pending |
 | R1-11 | nit, latent | A throw after settlement re-runs failure bookkeeping (double release on the mock, stuck unverifiable count) | fixed (this commit): the `billed` verdict, outcome and price are recorded the moment counters settle, and the failure path rethrows at once for a settled call |
 | R1-12 | nit, latent | `billingModel ?? adapter.model` would price a keyed adapter that omits the served model at the requested tariff | fixed (this commit): only the mock may fall back, in the proxy and in the service; a keyed answer without a served model is `upstream` and stays `unverifiable`. Thirteen test doubles in four files now name their served model as every real adapter does; no assertion changed |
