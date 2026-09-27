@@ -45,7 +45,8 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
-| V0 | Review of Part 2 (`1445177`) | Protocol must match the code; gaps found in review get fixes in new commits | Every claim in `docs/provider-validation.md` checked against code; confirmed divergences fixed or listed; no rewrite of `1445177` | no | pending |
+| V0 | Review of Part 2 (`1445177`) | Protocol must match the code; gaps found in review get fixes in new commits | Every claim in `docs/provider-validation.md` checked against code; confirmed divergences fixed or listed; no rewrite of `1445177` | no | done (this commit; findings below) |
+| V10 | A reset during a call cannot corrupt accounting | Found by V0: the pause hook throws for an agent a graph reset removed, which jams a billed call as unverifiable forever, releases a mock hold twice (negative `reserved`) and replaces a timeout with a generic 400 | Pause recorded by `TokenService` even when the graph hook fails; billed call stays billed, no double release, original failure preserved | no | done (this commit) |
 | V1 | Gemini served model identity (G1) | Price key must be the response model; Gemini ignores `modelVersion` | Adapter returns normalized `modelVersion` (no `models/` prefix) as the served model; missing or malformed identity fails closed as unverifiable; pricing uses the served model; requested and served models recorded separately | no | pending |
 | V2 | Served model without captured tariff (all providers) | Current path reports a `budget.refused` event and a "reconciled" reroute message for a call that was billed and not reconciled | Reservation kept unverifiable, agent paused, explicit feed event naming requested/served model and reservation; never released; requested tariff never used; reroute event no longer claims reconciliation first | no | pending |
 | V3 | Per-call accounting receipt (G2) | No per-call record of usage, identity, tariff and timing | Bounded in-memory journal of redacted receipts (numbers, ids, codes only), linked to the persisted reconciliation interval, exposed by a local read-only GET; eviction reported | no | pending |
@@ -107,6 +108,34 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | R1 | Independent review of `0662647..HEAD` | Reviewer subagent that did not implement; confirmed findings fixed, discarded ones recorded with reason | pending |
 | R2 | Final gate and Gitleaks over the branch history | Recorded counts | pending |
 | R3 | STATUS, NIGHT-LOG, handoff, Checklist do João | Updated in the final commit | pending |
+
+## V0 review of Part 2 (`1445177`)
+
+Checked every section of `docs/provider-validation.md` and the `STATUS.md` change against the code.
+Preparation steps, the code path table, the cost worksheet (`B_i`, `W_i`, `E_i`, `D_i`, `ceil12`), the
+identity and usage contracts, the L0/V1/L1/V2/V3 expectations and the secret checks match the code.
+The commit is documentation only and carries no secret or leaky instruction.
+
+- **Confirmed code gaps the doc already names:** G1 → V1, G2 → V3, G3 → V4, G4 → V5, G5 wording → V2,
+  G7 → V6, G8 → V8, G11 → V7. G6, G9 and G10 stay documented gaps.
+- **Imprecisions, corrected in V9:** (1) the admission formula omits the strict pre-check: a row already
+  at its limit refuses even a zero-cost reservation; (2) provider/model validation in
+  `lib/providers/runtime.ts` covers the UI path, while a terminal or environment selection is checked
+  against the allowlist by `TokenService` at execution, still before I/O; (3) the Gemini zero defaults
+  for missing candidate, thought and cache counts are safe only because the total invariant catches a
+  missing output count and a missing cache split prices at the dearer miss band; say so.
+- **New defect, not in the doc:** a graph reset during an in-flight call made the pause hook throw
+  inside `TokenService.execute`. Reproduced: a billed call ended with `unverifiable: 1` and no
+  reservation (resume refused until restart), a mock call released its hold twice (`reserved: -127`),
+  and a timeout surfaced as "Agent not found." Fixed in V10.
+- **Protocol claim without a test:** selecting an explicit agent with `agentId` on `/api/provider`
+  (only the forged-ID refusal is tested). Covered with V4.
+
+## Mutation log
+
+| Item | Mutation | Result |
+| --- | --- | --- |
+| V10 | `TokenService.pause` calls the graph hook without the guard | killed by "A graph that drops an agent mid-call cannot jam a billed call or release its hold twice"; restored, sha256 identical |
 
 ## Decisões tomadas (decisions taken)
 

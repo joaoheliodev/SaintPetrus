@@ -46,7 +46,8 @@ export class TokenService {
   private scopes(agent: string, model: string) { return [this.row('global', 'all', this.policy.global, this.policy.costLimitsUsd.global), this.row('agent', agent, this.policy.perAgent, this.policy.costLimitsUsd.perAgent), this.row('model', model, this.policy.perModel, this.policy.costLimitsUsd.perModel), this.row('session', this.sessionId, this.policy.perSession, this.policy.costLimitsUsd.perSession)]; }
   private blocked(row: Row) { return row.used + row.reserved >= row.limit || row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd; }
   private warning(row: Row) { return row.used + row.reserved >= row.limit * .8 || row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd * .8; }
-  private pause(id: string) { this.paused.add(id); this.hooks.pause(id); }
+  // A reset can drop the agent from the graph mid-call; a failing projection hook must not undo settled accounting.
+  private pause(id: string) { this.paused.add(id); try { this.hooks.pause(id); } catch { /* The recorded pause still applies. */ } }
   private expireReservations() {
     const now = this.now();
     for (const reservation of this.reservations.values()) {

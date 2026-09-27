@@ -294,6 +294,29 @@ test('O4 resume changes only graph pauses owned and released by TokenService', a
   }
 });
 
+test('A graph that drops an agent mid-call cannot jam a billed call or release its hold twice', async () => {
+  const cases: { provider: ProviderAdapter['id']; model: string }[] = [{ provider: 'openai', model: 'test-model' }, { provider: 'mock', model: 'mock-v1' }];
+  for (const { provider, model } of cases) {
+    const f = fixture(65); let present = true;
+    // The production hook throws once a graph reset has removed the agent.
+    const service = new TokenService(f.policy, f.prices, { ids: () => ['a'], pause: () => { if (!present) throw new Error('Agent not found.'); }, pauseAll: () => {} }, fixedRatioTokenCounter(1000), () => 0);
+    const adapter: ProviderAdapter = { id: provider, model, complete: async () => { present = false; return provider === 'mock' ? { text: 'x'.repeat(64_001) } : { text: 'Answer', usage: { prompt: 1, completion: 64, total: 65 } }; } };
+    await service.execute(new ProviderProxy(), adapter, 'Question', signal(), 'a', 'System');
+    const snapshot = service.snapshot();
+    assert.deepEqual(snapshot.reservations, [], provider);
+    assert.ok(snapshot.rows.every(row => row.reserved === 0 && row.costReservedUsd === 0 && row.unverifiable === 0), provider);
+    assert.equal(snapshot.rows.find(row => row.scope === 'global')!.state, 'stopped', provider);
+    assert.deepEqual(snapshot.paused, ['a'], provider);
+    assert.doesNotThrow(() => service.resume(), provider);
+  }
+  // A lost call keeps its own failure and its unverifiable hold even when the pause cannot reach the graph.
+  const f = fixture(); let present = true;
+  const service = new TokenService(f.policy, f.prices, { ids: () => ['a'], pause: () => { if (!present) throw new Error('Agent not found.'); }, pauseAll: () => {} }, fixedRatioTokenCounter(1000), () => 0);
+  const lost: ProviderAdapter = { id: 'openai', model: 'test-model', complete: async () => { present = false; throw new ProviderFailure('timeout'); } };
+  await assert.rejects(service.execute(new ProviderProxy(), lost, 'Question', signal(), 'a', 'System'), /timeout/);
+  assert.deepEqual(service.snapshot().reservations.map(item => item.status), ['unverifiable']);
+});
+
 test('O4 token panel imports the owner contract and has one snapshot writer', () => {
   const source = readFileSync(new URL('../components/token-panel.tsx', import.meta.url), 'utf8');
   assert.match(source, /import type \{ TokenSnapshot \} from '\.\.\/lib\/tokens\/service'/);
