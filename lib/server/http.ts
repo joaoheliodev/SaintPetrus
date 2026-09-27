@@ -35,6 +35,8 @@ export function dispatch(graph: GraphService, mock: MockProvider, enabled: boole
       } }, { parentId, position });
       break;
     }
+    case 'update':
+      graph.update(string(data.id, 100), { name: string(data.name, 70), objective: string(data.objective) }); break;
     case 'move':
       if (typeof data.x !== 'number' || typeof data.y !== 'number') throw new GraphError('Invalid position.');
       graph.move(string(data.id, 100), { x: data.x, y: data.y }); break;

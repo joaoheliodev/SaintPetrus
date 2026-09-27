@@ -4,12 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Position, MarkerType, useEdgesState, useNodesState, useReactFlow, type Edge, type EdgeChange, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
 import { Bot, Check, CornerDownRight, GitBranch, Maximize, Pause, Play, Plus, RotateCcw, ShieldCheck, Workflow, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { connectionFeedback, type Agent, type Graph } from '@/lib/orchestrator';
 import { useProjection } from '@/lib/store';
 import { useGraphTransport } from '@/lib/use-graph-transport';
+import { AgentInspector, statusLabels } from './agent-inspector';
 import { ArtifactPreview } from './artifact-preview';
 import { EventFeed } from './event-feed';
 import { TokenPanel } from './token-panel';
@@ -19,7 +19,6 @@ import { cn } from '@/lib/utils';
 import '@xyflow/react/dist/style.css';
 type AgentNodeType = Node<{ agent: Agent }, 'agent'>;
 type AgentEdgeType = Edge;
-const statusLabels = { paused: 'Paused', ready: 'Ready', running: 'Running', completed: 'Completed', blocked: 'Blocked' };
 const MINIMAP = { width: 120, height: 80 };
 // Compared without position: position is reconciled separately so an in-flight drag is not overwritten.
 const sameAgent = (a: Agent | undefined, b: Agent) => !!a && JSON.stringify({ ...a, position: null }) === JSON.stringify({ ...b, position: null });
@@ -169,9 +168,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         {lonely && <div className="canvas-hint"><p><strong>Two ways to grow the graph</strong></p><p>Drag from the dot on the right edge of a card and release on empty canvas — that creates a subagent already connected.</p><p>Or double-click anywhere empty to drop a standalone agent there.</p></div>}
       </div>
       <section className="event-panel" aria-label="Graph events"><div className="panel-title">Server events · revision {graph.revision}</div><div className="event-list">{events.length ? events.map(event => <p key={event.id}>{event.type} — {event.message}</p>) : <p>Ready. Add an agent to create your first connection.</p>}</div></section>
-    </div><aside className="inspector"><div className="panel-title">Agent inspector</div><div className="inspector-profile"><Bot /><h2>{selected.name}</h2></div><p className="status"><Check size={15} />{statusLabels[selected.status]} · {selected.provider}</p>
-      <Tabs defaultValue="context"><TabsList><TabsTrigger value="context">Context</TabsTrigger><TabsTrigger value="output">Output</TabsTrigger></TabsList><TabsContent value="context"><h3>Objective</h3><p>{selected.context.objective}</p><h3>Executive summary</h3><p>{selected.context.summary}</p><div className="context-note"><ShieldCheck /><span>Isolated context envelope. Parent transcript is not inherited.</span></div></TabsContent><TabsContent value="output"><pre>{selected.output || 'No provider output.'}</pre></TabsContent></Tabs>
-    </aside></div>
+    </div><AgentInspector key={selected.id} agent={selected} pending={pending} command={command} /></div>
     <div className="aux-panels">
       {feedEnabled ? <EventFeed /> : <p className="helper">Live feed disabled on server. Enable SAINTPETRUS_FEED and restart.</p>}
       {previewPort ? <ArtifactPreview port={previewPort} /> : <p className="helper">Preview disabled: it executes LLM-generated code in an isolated sandbox. Enable SAINTPETRUS_PREVIEW on the server and restart.</p>}

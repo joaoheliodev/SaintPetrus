@@ -57,6 +57,13 @@ try {
   await until(() => click('Create agent'), 'Create agent button');
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 2`), 'second node on the canvas');
   console.log('PASS: agent created through the server');
+  await until(() => evaluate(`document.querySelector('.inspector h2')?.textContent === 'Smoke agent'`), 'new agent selected in the inspector');
+  await until(() => click('Edit name and objective'), 'edit button');
+  await until(() => evaluate(`!!document.querySelector('form[aria-label="Edit agent"] input')`), 'edit form');
+  await type('form[aria-label="Edit agent"] input', 'Renamed smoke agent');
+  await until(() => click('Save'), 'save button');
+  await until(() => evaluate(`Array.from(document.querySelectorAll('.react-flow__node h3')).some(h => h.textContent === 'Renamed smoke agent')`), 'renamed node card');
+  console.log('PASS: agent edited through the server');
   await until(() => click('Tokens'), 'Tokens button');
   await until(() => evaluate(`document.body.textContent.includes('Budgets and consumption') && document.querySelectorAll('.token-table tbody tr').length > 0`), 'token table');
   await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);

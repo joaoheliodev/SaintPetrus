@@ -76,6 +76,14 @@ export class GraphService {
     if (parent) this.record('connection.created', parent.id, 'Delegation connection created.', { source: parent.id, destination: id });
     this.emit('agent.created', 'Agent created.'); return id;
   }
+  update(id: string, changes: { name: string; objective: string }) {
+    const agent = this.graph.agents.find(a => a.id === id);
+    if (!agent) throw new GraphError('Agent not found.');
+    const name = changes.name.trim();
+    if (!name || name.length > 70 || !changes.objective.trim() || changes.objective.length > 2000) throw new GraphError('Invalid agent request.');
+    agent.name = name; agent.context = { ...agent.context, objective: changes.objective };
+    this.emit('agent.updated', 'Agent updated.');
+  }
   connect(source: string, target: string) {
     // Authoritative validation: never trust client feedback or supplied edge IDs.
     if (source === target) throw new GraphError('Self-connections are not allowed.');

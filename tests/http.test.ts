@@ -122,3 +122,25 @@ test('F1 the mock default comes only from the dev launcher, and an explicit SAIN
     assert.match(launcher, /\.\.\.\(mode === 'dev' \? \{ SAINTPETRUS_MOCK_DEFAULT: 'true' \} : \{\}\)/, 'only dev receives the default');
   } finally { set('SAINTPETRUS_MOCK', saved.mock); set('SAINTPETRUS_MOCK_DEFAULT', saved.fallback); }
 });
+
+test('F3 an agent name and objective can be edited through the server, within the create limits only', async () => {
+  runtime().mock.reset();
+  assert.equal((await post({ action: 'add', name: 'Editable', objective: 'Before' })).status, 200);
+  const agent = runtime().graph.snapshot().agents.find(item => item.name === 'Editable')!;
+  const revision = runtime().graph.snapshot().revision;
+  assert.equal((await post({ action: 'update', id: agent.id, name: '  Edited  ', objective: 'After' })).status, 200);
+  const edited = runtime().graph.snapshot();
+  const after = edited.agents.find(item => item.id === agent.id)!;
+  assert.deepEqual([after.name, after.context.objective, after.context.summary], ['Edited', 'After', agent.context.summary]);
+  assert.equal(edited.revision, revision + 1);
+  for (const body of [
+    { action: 'update', id: agent.id, name: '', objective: 'x' },
+    { action: 'update', id: agent.id, name: 'a'.repeat(71), objective: 'x' },
+    { action: 'update', id: agent.id, name: 'x', objective: ' ' },
+    { action: 'update', id: agent.id, name: 'x', objective: 'o'.repeat(2001) },
+    { action: 'update', id: 'not-an-agent', name: 'x', objective: 'x' },
+    { action: 'update', id: agent.id, name: 'x' },
+  ]) assert.equal((await post(body)).status, 400, JSON.stringify(body).slice(0, 80));
+  assert.deepEqual(runtime().graph.snapshot(), edited, 'a refused edit changes nothing');
+  runtime().mock.reset();
+});

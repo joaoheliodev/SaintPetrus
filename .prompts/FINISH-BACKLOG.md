@@ -73,9 +73,9 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
-| F1 | Keyless mock by default in `npm run dev` | Definition of Done item 2 | `npm run dev` starts with the mock unless `SAINTPETRUS_MOCK` says otherwise; `npm start` unchanged (mock off) | confirm (D-03) | done (this commit; verified by hand in dev with and without the override) |
+| F1 | Keyless mock by default in `npm run dev` | Definition of Done item 2 | `npm run dev` starts with the mock unless `SAINTPETRUS_MOCK` says otherwise; `npm start` unchanged (mock off) | confirm (D-03) | done (37605ba; verified by hand in dev with and without the override) |
 | F2 | Run one call for a selected agent from the inspector | `complete` action exists server-side with no UI; inspector output tab expects provider output | Inspector sends one budgeted call through the existing route for the selected agent; output recorded by the graph owner; works with the mock and no key | no | pending |
-| F3 | Edit agent name and objective | Operator's main flow lists editing | Server-validated `update` command with the create limits; UI in the inspector | no | pending |
+| F3 | Edit agent name and objective | Operator's main flow lists editing | Server-validated `update` command with the create limits; UI in the inspector | no | done (this commit; browser check edits an agent) |
 | F4 | Confirm destructive actions | Operator requirement | Reset graph, run mock (resets), pause all (cancels in-flight work), disconnect credential, delete connection, add price validity and apply confirmed usage all require explicit confirmation | no | pending |
 | F5 | Loading, empty and error states | Operator requirement | Every panel shows all three where applicable | no | pending |
 | F6 | Export context from the UI | Export route exists without a UI entry | Download link to the existing endpoint; no new client fetch | no | pending |
@@ -177,6 +177,8 @@ The commit is documentation only and carries no secret or leaky instruction.
 | S4 | eval allowed in production | killed by the same test |
 | F1 | default applied even over an explicit value | killed by "F1 the mock default comes only from the dev launcher…" |
 | F1 | default given to `npm start` too | killed by the same test |
+| F3 | service-side edit validation removed | first survived (the dispatcher validates too); a direct service test was added and kills it |
+| F3 | `update` command not dispatched | killed by "F3 an agent name and objective can be edited…" |
 
 ## Phase 2 security findings
 

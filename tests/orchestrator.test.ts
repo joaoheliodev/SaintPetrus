@@ -76,3 +76,15 @@ test('server rejects malformed budgets and agent requests', () => {
   assert.throws(() => service.spawn('root', { ...request(), name: '' }));
   assert.deepEqual(service.snapshot(), before);
 });
+
+test('F3 the graph service validates an edit itself, not only through the HTTP dispatcher', () => {
+  const service = new GraphService(); const id = service.spawn('root', request()); const before = service.snapshot();
+  for (const changes of [{ name: '', objective: 'x' }, { name: '   ', objective: 'x' }, { name: 'a'.repeat(71), objective: 'x' }, { name: 'x', objective: '' }, { name: 'x', objective: '  ' }, { name: 'x', objective: 'o'.repeat(2001) }]) {
+    assert.throws(() => service.update(id, changes), /Invalid agent request/, JSON.stringify(changes).slice(0, 60));
+  }
+  assert.throws(() => service.update('missing', { name: 'x', objective: 'x' }), /Agent not found/);
+  assert.deepEqual(service.snapshot(), before);
+  service.update(id, { name: ' Renamed ', objective: 'New objective' });
+  const renamed = service.snapshot().agents.find(agent => agent.id === id)!;
+  assert.deepEqual([renamed.name, renamed.context.objective], ['Renamed', 'New objective']);
+});
