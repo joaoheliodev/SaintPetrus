@@ -15,7 +15,8 @@
     "test": "node --import tsx --test tests/*.test.ts tests/core/*.test.ts",
     "setup:hooks": "git config core.hooksPath .githooks",
     "key": "node scripts/key.mjs",
-    "test:browser": "node scripts/check-preview-browser.mjs"
+    "test:browser": "node scripts/check-preview-browser.mjs",
+    "test:e2e": "node scripts/check-workspace-browser.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

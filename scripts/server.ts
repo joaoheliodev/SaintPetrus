@@ -7,6 +7,7 @@ import { optionalEventRoutes } from '../lib/events/http';
 import { graphRoutes } from '../lib/server/graph-http';
 import { runtime } from '../lib/server/runtime';
 import { providerProxy, validationTimeoutMs } from '../lib/providers/runtime';
+import { securityHeaders } from '../lib/server/security-headers';
 const port = Number(process.env.PORT ?? 3000);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid local port.');
 const app = next({ dev: process.argv[2] === 'dev', hostname: '127.0.0.1', port });
@@ -27,7 +28,9 @@ const previewServer = previewEnabled() ? createServer(async (req, res) => {
   const response = previewDocument(port); res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(await response.text());
 }) : undefined;
 previewServer?.listen(previewPort, '127.0.0.1');
+const headersForEveryResponse = Object.entries(securityHeaders({ port, previewPort: previewEnabled() ? previewPort : undefined, dev: process.argv[2] === 'dev' }));
 const server = createServer(async (req, res) => {
+  for (const [name, value] of headersForEveryResponse) res.setHeader(name, value);
   const controller = new AbortController();
   res.on('close', () => controller.abort());
   try {

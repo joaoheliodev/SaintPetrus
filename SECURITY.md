@@ -65,6 +65,13 @@ exports, receipts or the dispatch ledger.
 Launchers bind only 127.0.0.1 and reject override arguments. Next telemetry and
 request logging are disabled. Do not run the scaffold through a public tunnel.
 Host and Origin checks reject cross-origin/rebinding requests; no permissive CORS.
+Every response of the main listener carries a Content Security Policy (only this origin,
+no framing of the app, no plugins, no base or foreign form targets, connections to this
+origin only, frames only for the isolated preview origin), `X-Frame-Options: DENY`,
+`nosniff`, `no-referrer`, same-origin opener and resource policies and a Permissions-Policy.
+Scripts keep `'unsafe-inline'` because Next hydrates with inline scripts, and development adds
+`'unsafe-eval'` and its reload socket; a nonce-based policy is a possible later hardening.
+`npm run test:e2e` checks the page against these headers in a disposable Chromium.
 LLM connectivity is not part of M1. M2 permits only the configured provider route.
 
 Application log, error, response and context-export serialization uses a shared

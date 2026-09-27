@@ -62,12 +62,12 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
-| S1 | Key lifecycle audit | Operator asked for where a key travels, how long it lives and how remembered keys are stored and erased | Documented path (field, POST, memory buffers, per-call copies, header), remembered ciphertext location/permissions/erasure verified; gaps fixed or recorded | no | done (this commit; lifecycle table in `SECURITY.md`; UI Forget key added) |
-| S2 | Leak audit | Logs, errors, feed, export and API responses must carry no secret or raw provider payload | Each sink checked and tested; findings fixed or recorded | no | pending |
-| S3 | API route hardening audit | Loopback, Origin, content type, input and response bounds | Every route checked; gaps fixed with tests | no | pending |
-| S4 | Security headers for the local app | No CSP, framing or referrer policy on the main app | Headers on every main-listener response, tested, and the app verified working in Chromium in dev and production | no | pending |
-| S5 | `npm audit` | Operator requirement | Non-breaking fixes applied; remainder recorded | no | done (this commit; 0 vulnerabilities, nothing to fix; patch/minor updates available but not applied, see findings) |
-| S6 | `.gitignore` coverage | `.env*`, remembered credentials, logs and build artifacts | Patterns cover each class; check-staged and CI still pass | no | done (this commit) |
+| S1 | Key lifecycle audit | Operator asked for where a key travels, how long it lives and how remembered keys are stored and erased | Documented path (field, POST, memory buffers, per-call copies, header), remembered ciphertext location/permissions/erasure verified; gaps fixed or recorded | no | done (this commit; lifecycle table in `SECURITY.md`; UI Forget key added; ef0ad5d) |
+| S2 | Leak audit | Logs, errors, feed, export and API responses must carry no secret or raw provider payload | Each sink checked and tested; findings fixed or recorded | no | done (this commit; no new leak, see findings) |
+| S3 | API route hardening audit | Loopback, Origin, content type, input and response bounds | Every route checked; gaps fixed with tests | no | done (this commit; no new gap, see findings; coverage in Q1) |
+| S4 | Security headers for the local app | No CSP, framing or referrer policy on the main app | Headers on every main-listener response, tested, and the app verified working in Chromium in dev and production | no | done (this commit; `npm run test:e2e` passed in dev and production) |
+| S5 | `npm audit` | Operator requirement | Non-breaking fixes applied; remainder recorded | no | done (ef0ad5d; 0 vulnerabilities, nothing to fix; patch/minor updates available but not applied, see findings) |
+| S6 | `.gitignore` coverage | `.env*`, remembered credentials, logs and build artifacts | Patterns cover each class; check-staged and CI still pass | no | done (ef0ad5d) |
 
 ### Phase 3 — core function (P1)
 
@@ -86,7 +86,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
 | Q1 | Coverage for critical modules | Token, credential, event and preview routes have uncovered branches | New tests with mocked transport only; coverage recorded | no | pending |
-| Q2 | Browser end-to-end smoke check | Chromium is preinstalled in this environment | Dependency-free CDP script for the main flow in mock mode, outside the gate; run result recorded | no | pending |
+| Q2 | Browser end-to-end smoke check | Chromium is preinstalled in this environment | Dependency-free CDP script for the main flow in mock mode, outside the gate; run result recorded | no | in progress (`scripts/check-workspace-browser.mjs` added with S4; extended with Phase 3) |
 | Q3 | Basic accessibility | Keyboard, labels, visible focus, contrast | Focus-visible styles, labelled controls, keyboard paths checked; contrast of tokens measured | no | pending |
 | Q4 | Dead code | Only when unused is proven | Removals backed by search evidence, or none | no | pending |
 
@@ -172,6 +172,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | V11 | missing identity without names | killed by the same test |
 | S1 | forget no longer cancels the call in flight | killed by "S1 the browser can forget a remembered key…" |
 | S1 | status stops reporting a remembered key | killed by the same test |
+| S4 | server stops sending the headers | killed by "S4 the custom server sends the headers…" |
+| S4 | `frame-ancestors` dropped | killed by "S4 production headers…" |
+| S4 | eval allowed in production | killed by the same test |
 
 ## Phase 2 security findings
 
@@ -183,6 +186,17 @@ The commit is documentation only and carries no secret or leaky instruction.
 - **S5 dependencies.** `npm audit` (all and production): 0 vulnerabilities. Available but not applied, with no
   security driver: next/eslint-config-next 16.3.4 → 16.3.6, tsx 4.23.15, lucide-react 1.48, react/react-dom
   19.3, @xyflow/react 12.12, tailwind 4.3. Pinned versions were deliberate; upgrading is an operator choice.
+- **S2 leaks.** Every error returned by a route is a fixed string or a code (TokenFailure, GraphError and
+  PriceCatalogError messages carry no input), every response passes the redacting serializer, adapters never
+  read error bodies, events redact before storage, receipts and the dispatch ledger hold numbers and IDs only,
+  and app code has no console output. No new leak; known limits stay recorded (short key fragments, strings
+  that JavaScript cannot zero).
+- **S3 routes.** Every route checks loopback Host and Origin; every mutation requires the exact Origin and JSON;
+  bodies are capped at 16 KiB, text inputs at 2000 characters, provider responses at 256 KiB, event, receipt,
+  dispatch and artifact histories are bounded. GET routes have no side effect beyond converting already
+  expired reservations. No new gap; uncovered branches go to Q1.
+- **S4 headers.** CSP and companion headers on every main-listener response, verified in Chromium in dev and
+  production with zero violations. `'unsafe-inline'` scripts remain because Next hydrates inline.
 - **S6 ignore rules.** `.env*` (not only `.env` and `.env.*`), `*.log`, `*.p12`, `*.pfx`, `/out/`, `/build/`
   added; `.env.example` stays tracked.
 
