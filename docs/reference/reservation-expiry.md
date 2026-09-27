@@ -17,3 +17,9 @@ reconciliation must replace the same converted amount rather than charge it twic
 Candidates are the tariff values captured with the reservation, not the current
 catalog. Closing or appending a validity after dispatch must not change this floor;
 see [price administration](price-validity-administration.md).
+
+A provider that answered from a model with no captured price is a different case: contact was not lost and the
+usage is known. Its reservation converts each dimension (input, output, reasoning) at the larger of the estimate and
+the reported usage, priced at least at the requested model's peak, cache-miss rate. The estimate only ever grows, and
+the agent stays paused until the operator reconciles it by hand; converting only the estimate would understate usage
+the provider has already reported (operator decision Q-10).

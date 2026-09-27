@@ -160,7 +160,9 @@ credits/free tier and rounding; a locally priced usage result is not an invoice.
   unchanged, both holds remain, the agent pauses and the feed gets
   `provider.unpriced`; the reservation shows its `servedModel`. The requested
   tariff is never used and nothing is released. Later adding `S` does not
-  retrofit that reservation. After expiry use provider-confirmed manual
+  retrofit that reservation. At expiry it converts at the larger of the estimate
+  and the reported usage in each dimension, at least at the requested model's peak,
+  cache-miss rate, and the agent stays paused until provider-confirmed manual
   reconciliation. `provider.rerouted` only records the divergence; it makes no
   reconciliation claim.
 - **Gemini:** `promptTokenCount → prompt`;

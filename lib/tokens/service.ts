@@ -21,7 +21,7 @@ type Scope = 'global' | 'agent' | 'model' | 'session';
 export type BillingVerdict = 'unbilled' | 'billed' | 'unverifiable';
 // The USD ceiling reads costAccountedUsd; costUnmeasuredUsd is the part of it charged at reservation expiry and not yet confirmed.
 type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costAccountedUsd: number; costUnmeasuredUsd: number; saved: number; unverifiable: number };
-type Reservation = { id: string; agent: string; model: string; provider: ProviderAdapter['id']; priceVersionId: string; priceVersions: ReturnType<PriceCatalog['capture']>; billingModel?: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[] };
+type Reservation = { id: string; agent: string; model: string; provider: ProviderAdapter['id']; priceVersionId: string; priceVersions: ReturnType<PriceCatalog['capture']>; billingModel?: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[]; reported?: { prompt: number; completion: number; reasoning?: number } };
 type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => string[]; role?: (id: string) => string };
 // disabled, invalid_model_format and model_not_allowlisted are local refusals that bill nothing, yet stay unverifiable: a test
 // proves none can fire with a live reservation, and unbilled would silently free a hold if one ever fired after provider contact.
@@ -62,20 +62,28 @@ export class TokenService {
       // Convert at the dearer of what was held and what the dearest eligible model would have cost:
       // the request may have been served, and billed, by a model other than the one asked for.
       const prices = Object.fromEntries(Object.entries(reservation.priceVersions).map(([model, version]) => [model, version.price]));
-      const conservative = Math.max(reservation.costUsd, worstCasePeakCostUsd(prices, reservation.inputTokens, reservation.maxOutputTokens, reservation.createdAt, reservation.provider));
+      // An unpriced served model answered with usage we know: every dimension converts at the larger of the estimate and
+      // what was reported, and never below the requested model at peak with no cache hits (operator decision Q-10).
+      const reported = reservation.reported;
+      const input = Math.max(reservation.inputTokens, reported?.prompt ?? 0);
+      const output = Math.max(reservation.maxOutputTokens, reported?.completion ?? 0, reported?.reasoning ?? 0);
+      const tokens = Math.max(reservation.tokens, input + output);
+      let requestedFloor = 0;
+      try { requestedFloor = preflightCostUsd(reservation.priceVersions[reservation.model].price, input, output, reservation.createdAt); } catch { /* Covered by the candidates below. */ }
+      const conservative = Math.max(reservation.costUsd, requestedFloor, worstCasePeakCostUsd(prices, input, output, reservation.createdAt, reservation.provider));
       for (const row of reservation.rows) {
         row.reserved -= reservation.tokens;
-        row.used += reservation.tokens;
-        row.estimated += reservation.tokens;
+        row.used += tokens;
+        row.estimated += tokens;
         row.costReservedUsd = money(row.costReservedUsd - reservation.costUsd);
         row.costAccountedUsd = money(row.costAccountedUsd + conservative);
         row.costUnmeasuredUsd = money(row.costUnmeasuredUsd + conservative);
         row.unverifiable--;
       }
-      this.receipts.append({ kind: 'expiry', at: now, agent: reservation.agent, provider: reservation.provider, requestedModel: reservation.model, servedModel: reservation.billingModel ?? null, reservationId: reservation.id, tokens: reservation.tokens, heldCostUsd: reservation.costUsd, costUsd: conservative });
+      this.receipts.append({ kind: 'expiry', at: now, agent: reservation.agent, provider: reservation.provider, requestedModel: reservation.model, servedModel: reservation.billingModel ?? null, reservationId: reservation.id, tokens, heldCostUsd: reservation.costUsd, costUsd: conservative });
       // The converted figure replaces the held one so a later manual reconciliation subtracts what
       // was actually charged to the budget, not the understated reservation.
-      reservation.costUsd = conservative;
+      reservation.costUsd = conservative; reservation.tokens = tokens;
       reservation.status = 'estimated';
     }
   }
@@ -86,7 +94,10 @@ export class TokenService {
     if ([...this.rows.values()].some(row => row.unverifiable > 0)) throw new TokenFailure('Usage unverifiable; restart only after checking provider billing.');
     if (!agent) this.stopped = false;
     const resumed: string[] = [];
+    // An unpriced served model's estimate is only a floor: its agent waits for manual reconciliation.
+    const awaiting = new Set([...this.reservations.values()].filter(item => item.status === 'estimated' && item.reported).map(item => item.agent));
     for (const id of agent ? [agent] : this.hooks.ids()) {
+      if (awaiting.has(id)) continue;
       const blocked = [...this.rows.values()].some(row => (row.scope === 'global' || row.scope === 'session' || (row.scope === 'agent' && row.id === id) || (row.scope === 'model' && this.agentModels.get(id)?.has(row.id))) && this.blocked(row));
       if (!blocked && this.paused.delete(id)) resumed.push(id);
     }
@@ -204,7 +215,10 @@ export class TokenService {
       if (billingModel !== adapter.model) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.rerouted', severity: 'warning', payload: `Request for ${adapter.model} was served by ${billingModel}.` });
       // Never the requested model's tariff: a served model without a captured price stays unverifiable.
       const billingPrice = Object.hasOwn(reservation.priceVersions, billingModel) ? reservation.priceVersions[billingModel].price : undefined;
-      if (!billingPrice) throw new UnpricedServedModel(adapter.model, billingModel, reservation.id);
+      if (!billingPrice) {
+        reservation.reported = { prompt: usage.prompt, completion: usage.completion, ...(usage.reasoning === undefined ? {} : { reasoning: usage.reasoning }) };
+        throw new UnpricedServedModel(adapter.model, billingModel, reservation.id);
+      }
       const actualCostUsd = reconciledCostUsd(billingPrice, usage, createdAt, responseAt, true);
       const journal: JournalInterval | null = approximate ? null : { models: [...new Set([adapter.model, billingModel])], from: Math.min(createdAt, responseAt), to: Math.max(createdAt, responseAt) + 1 };
       if (journal) this.catalog.recordReconciliation(journal.models, journal.from, journal.to);
