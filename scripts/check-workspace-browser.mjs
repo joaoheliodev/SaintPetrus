@@ -27,6 +27,8 @@ try {
     await until(() => click('More'), 'More menu');
     return until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('[role=menuitem]')).find(i => i.textContent.trim() === ${JSON.stringify(text)} && !i.hasAttribute('data-disabled')); if (!item) return false; item.click(); return true; })()`), `${text} menu item`);
   };
+  // The agent panel has a Run and a Details tab; a person switches before reaching what is on the other one.
+  const tab = name => until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('.inspector [role=tab]')).find(t => t.textContent.trim() === ${JSON.stringify(name)}); if (!item) return false; item.click(); return item.getAttribute('aria-selected') === 'true'; })()`), `${name} tab`);
   const click = text => evaluate(`(() => { const target = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === ${JSON.stringify(text)} && !b.disabled); if (!target) return false; target.click(); return true; })()`);
   // A real key press always ends with keyup; React Flow matches shortcuts against the keys still held.
   const press = async key => { for (const phase of ['keydown', 'keyup']) { await evaluate(`document.dispatchEvent(new KeyboardEvent('${phase}', { key: '${key}', code: '${key}', bubbles: true }))`); await new Promise(resolve => setTimeout(resolve, 150)); } };
@@ -71,6 +73,7 @@ try {
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 2`), 'second node on the canvas');
   console.log('PASS: agent created through the server');
   await until(() => evaluate(`document.querySelector('.inspector h2')?.textContent === 'Smoke agent'`), 'new agent selected in the inspector');
+  await tab('Details');
   await until(() => click('Edit name and objective'), 'edit button');
   await until(() => evaluate(`!!document.querySelector('form[aria-label="Edit agent"] input')`), 'edit form');
   await type('form[aria-label="Edit agent"] input', 'Renamed smoke agent');
@@ -95,6 +98,7 @@ try {
   await until(async () => (await serverPosition(movedId))?.x > dropped.x + 10, 'mouse drag saved by the server');
   console.log('PASS: a dragged card is saved where it was dropped');
   const mocked = await evaluate(`document.querySelector('.mode-badge')?.textContent === 'MOCK'`);
+  await tab('Run');
   await type('section[aria-label="Run this agent"] textarea', 'Say something short.');
   // Run once asks first with the server's quote: refuse once, then accept.
   decisions.push(false); await until(() => click('Send (1 call)'), 'run button');
@@ -104,8 +108,12 @@ try {
   const answer = await until(() => evaluate(`(text => text && text !== 'Not sent.' ? text : '')(document.querySelector('section[aria-label="Run this agent"] [role=status]')?.textContent)`), 'run result');
   if (mocked) {
     assert.match(answer, /^Mock answer/);
-    await until(() => evaluate(`(() => { const tab = Array.from(document.querySelectorAll('[role=tab]')).find(t => t.textContent === 'Output'); tab?.click(); return document.querySelector('.inspector pre')?.textContent.startsWith('MOCK:'); })()`), 'answer recorded as the agent output');
-    console.log('PASS: agent ran once through the mock and its output was recorded by the server');
+    // The message, the answer, its tokens, latency and cost sit together under the Send button.
+    const exchange = await until(() => evaluate(`(() => { const box = document.querySelector('section[aria-label="Last exchange"]'); const facts = box?.querySelector('.exchange-facts')?.textContent ?? ''; return box && /\\$\\d/.test(facts) ? { message: box.querySelector('.exchange-message')?.textContent, answer: box.querySelector('.exchange-answer')?.textContent, facts } : null; })()`), 'last exchange with its cost');
+    assert.equal(exchange.message, 'Say something short.'); assert.match(exchange.answer, /^MOCK:/); assert.match(exchange.facts, /\d+ tokens.* · \d+ ms · /);
+    const recorded = await evaluate(`fetch('/api/graph', { cache: 'no-store' }).then(r => r.json()).then(g => g.agents.find(a => a.name === 'Renamed smoke agent')?.output ?? '')`);
+    assert.match(recorded, /^MOCK:/, 'the server recorded the answer as the agent output');
+    console.log(`PASS: agent ran once through the mock; the Run tab shows message, answer and "${exchange.facts}"`);
   } else {
     assert.match(answer, /No provider is connected/);
     console.log('PASS: running without a provider explains what is missing');
@@ -144,6 +152,7 @@ try {
   console.log('PASS: connection deletion asks first and honours the answer');
   // Connect two existing agents without a mouse: pick the target in the inspector, Tab to Connect, press Enter.
   await until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('.agent-list-open')).find(b => b.textContent.includes('Renamed smoke agent')); item?.click(); return document.querySelector('.inspector h2')?.textContent === 'Renamed smoke agent'; })()`), 'smoke agent selected');
+  await tab('Details');
   await evaluate(`document.querySelector('section[aria-label="Connect this agent"] select').focus()`);
   await key('ArrowDown');
   await until(() => evaluate(`document.querySelector('section[aria-label="Connect this agent"] select').value !== ''`), 'target chosen from the keyboard');

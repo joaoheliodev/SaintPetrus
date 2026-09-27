@@ -18,6 +18,7 @@ import { EventFeed } from './event-feed';
 import { TokenPanel } from './token-panel';
 import { ProviderStatus, connectionTarget, useProviderStatus } from './provider-status';
 import type { ProviderStatusSnapshot } from '@/lib/providers/runtime';
+import type { RunExchange } from '@/lib/run-exchange';
 import { allowSelectedEdgesOnly } from '@/lib/graph-deletion';
 import { latestMoveSender, settledMoves } from '@/lib/node-moves';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,8 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   const connection = useProviderStatus();
   const importInput = useRef<HTMLInputElement>(null); const exportLink = useRef<HTMLAnchorElement>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  // Each agent's last Run once, in memory only: never sent back, saved or put in browser storage.
+  const [exchanges, setExchanges] = useState<Record<string, RunExchange>>({});
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentNodeType>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AgentEdgeType>([]);
   const [objective, setObjective] = useState(initialGraph.agents[0].context.objective);
@@ -203,7 +206,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         {lonely && <div className="canvas-hint"><p><strong>Two ways to grow the graph</strong></p><p>Drag from the dot on the right edge of a card and release on empty canvas — that creates a subagent already connected.</p><p>Or double-click anywhere empty to drop a standalone agent there.</p>{mockEnabled && <p>Just looking around? <Button variant="link" disabled={pending} onClick={loadDemo}>Load demo…</Button> It replaces this canvas with a fixed demonstration.</p>}</div>}
       </div>
       <section className="event-panel" aria-label="Graph events"><div className="panel-title">Server events · revision {graph.revision}</div><div className="event-list">{events.length ? events.map(event => <p key={event.id}>{event.type} — {event.message}</p>) : <p>Ready. Add an agent to create your first connection.</p>}</div></section>
-    </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} /></div>
+    </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={exchange => setExchanges(current => ({ ...current, [selected.id]: exchange }))} /></div>
     <div className="aux-panels">
       {feedEnabled ? <EventFeed /> : <p className="helper">Live feed disabled on server. Enable SAINTPETRUS_FEED and restart.</p>}
       {previewPort ? <ArtifactPreview port={previewPort} /> : <p className="helper">Preview disabled: it executes LLM-generated code in an isolated sandbox. Enable SAINTPETRUS_PREVIEW on the server and restart.</p>}

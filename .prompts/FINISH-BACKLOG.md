@@ -136,7 +136,7 @@ panel, nothing copied or loaded from it.
 | --- | --- | --- | --- |
 | U1 | Vocabulary and status | No text contradicts another about mode, connection or status | done |
 | U2 | Demo kept apart | No single unconfirmed click replaces the graph | done |
-| U3 | Agent panel with Run and Details | Run an agent and read the answer without scrolling or changing tab | pending |
+| U3 | Agent panel with Run and Details | Run an agent and read the answer without scrolling or changing tab | done |
 | U4 | Screen structure and navigation | Every current function reachable by mouse and keyboard; no route changes | pending |
 | U5 | Budgets | Summary, per-scope blocks, details table with every field and action | pending |
 | U6 | Activity | Drawer and full view, readable monospace lines, `agent.moved` hidden by default | pending |
@@ -158,8 +158,20 @@ panel, nothing copied or loaded from it.
   Pause/Resume demo. The empty canvas offers Load demo as a link. The Coordinator objective moved into the Reset
   graph dialog, which also names that the demo uses it. Graph limits show in both modes; Demo cost only in MOCK.
   Both still send the one existing `budget` command with all three values.
+- U3: the header shows name, status, `model · MODE` (what Run once uses, from the one provider-status reader), role
+  and level. Run is the default tab; the last exchange (message, answer, tokens, latency, cost) sits under Send.
+  The cost is the `costUsd` of the agent's newest `call` receipt from `GET /api/receipts`, read once after the call
+  through the existing accounting reader in `token-panel.tsx` (the fetch ratchet keeps its count at 2); it is never
+  computed in the browser. Exchanges live in workspace memory per agent. Both tabs stay mounted so a draft survives
+  a tab switch. The message field is not focused automatically: selecting a card with the keyboard must keep focus
+  on the canvas so the arrow keys still move it.
 
 #### Questions for João
+
+- **Q-U1** Run once sends the agent's "Instruction" (`context.summary`), a fixed text such as "Manually configured
+  agent. No provider connected." It says "No provider connected" even when one is. Changing it changes what is
+  sent to the provider, so it is out of this round: the Details tab now shows it verbatim under "Instruction sent
+  with Run once". Should it be reworded, or made editable?
 
 ## V0 review of Part 2 (`1445177`)
 

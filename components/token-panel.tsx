@@ -5,6 +5,14 @@ import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { PricePanel } from './price-panel';
+// The one GET reader for accounting evidence: the token snapshot and the receipts behind it.
+export function readAccounting(path: '/api/tokens', signal?: AbortSignal): Promise<TokenSnapshot>;
+export function readAccounting(path: '/api/receipts', signal?: AbortSignal): Promise<unknown>;
+export async function readAccounting(path: '/api/tokens' | '/api/receipts', signal?: AbortSignal) {
+  const response = await fetch(path, { cache: 'no-store', signal });
+  if (!response.ok) throw new Error('Accounting unavailable.');
+  return response.json();
+}
 export function TokenPanel() {
   const [data, setData] = useState<TokenSnapshot>(); const [error, setError] = useState(''); const [pending, setPending] = useState(false);
   const [priceError, setPriceError] = useState('');
@@ -17,9 +25,7 @@ export function TokenPanel() {
     refreshController.current?.abort();
     const controller = new AbortController(); refreshController.current = controller;
     try {
-      const response = await fetch('/api/tokens', { cache: 'no-store', signal: controller.signal });
-      if (!response.ok) throw new Error();
-      const value: TokenSnapshot = await response.json();
+      const value = await readAccounting('/api/tokens', controller.signal);
       if (mounted.current && sequence === refreshSequence.current) { setData(value); setError(''); }
     } catch {
       if (mounted.current && sequence === refreshSequence.current && !controller.signal.aborted) setError('Token controls unavailable. Check local configuration.');
