@@ -63,9 +63,9 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
 | S1 | Key lifecycle audit | Operator asked for where a key travels, how long it lives and how remembered keys are stored and erased | Documented path (field, POST, memory buffers, per-call copies, header), remembered ciphertext location/permissions/erasure verified; gaps fixed or recorded | no | done (this commit; lifecycle table in `SECURITY.md`; UI Forget key added; ef0ad5d) |
-| S2 | Leak audit | Logs, errors, feed, export and API responses must carry no secret or raw provider payload | Each sink checked and tested; findings fixed or recorded | no | done (this commit; no new leak, see findings) |
-| S3 | API route hardening audit | Loopback, Origin, content type, input and response bounds | Every route checked; gaps fixed with tests | no | done (this commit; no new gap, see findings; coverage in Q1) |
-| S4 | Security headers for the local app | No CSP, framing or referrer policy on the main app | Headers on every main-listener response, tested, and the app verified working in Chromium in dev and production | no | done (this commit; `npm run test:e2e` passed in dev and production) |
+| S2 | Leak audit | Logs, errors, feed, export and API responses must carry no secret or raw provider payload | Each sink checked and tested; findings fixed or recorded | no | done (ce115f7; no new leak, see findings) |
+| S3 | API route hardening audit | Loopback, Origin, content type, input and response bounds | Every route checked; gaps fixed with tests | no | done (ce115f7; no new gap, see findings; coverage in Q1) |
+| S4 | Security headers for the local app | No CSP, framing or referrer policy on the main app | Headers on every main-listener response, tested, and the app verified working in Chromium in dev and production | no | done (ce115f7; `npm run test:e2e` passed in dev and production) |
 | S5 | `npm audit` | Operator requirement | Non-breaking fixes applied; remainder recorded | no | done (ef0ad5d; 0 vulnerabilities, nothing to fix; patch/minor updates available but not applied, see findings) |
 | S6 | `.gitignore` coverage | `.env*`, remembered credentials, logs and build artifacts | Patterns cover each class; check-staged and CI still pass | no | done (ef0ad5d) |
 
@@ -73,7 +73,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
-| F1 | Keyless mock by default in `npm run dev` | Definition of Done item 2 | `npm run dev` starts with the mock unless `SAINTPETRUS_MOCK` says otherwise; `npm start` unchanged (mock off) | confirm (D-03) | pending |
+| F1 | Keyless mock by default in `npm run dev` | Definition of Done item 2 | `npm run dev` starts with the mock unless `SAINTPETRUS_MOCK` says otherwise; `npm start` unchanged (mock off) | confirm (D-03) | done (this commit; verified by hand in dev with and without the override) |
 | F2 | Run one call for a selected agent from the inspector | `complete` action exists server-side with no UI; inspector output tab expects provider output | Inspector sends one budgeted call through the existing route for the selected agent; output recorded by the graph owner; works with the mock and no key | no | pending |
 | F3 | Edit agent name and objective | Operator's main flow lists editing | Server-validated `update` command with the create limits; UI in the inspector | no | pending |
 | F4 | Confirm destructive actions | Operator requirement | Reset graph, run mock (resets), pause all (cancels in-flight work), disconnect credential, delete connection, add price validity and apply confirmed usage all require explicit confirmation | no | pending |
@@ -175,6 +175,8 @@ The commit is documentation only and carries no secret or leaky instruction.
 | S4 | server stops sending the headers | killed by "S4 the custom server sends the headers…" |
 | S4 | `frame-ancestors` dropped | killed by "S4 production headers…" |
 | S4 | eval allowed in production | killed by the same test |
+| F1 | default applied even over an explicit value | killed by "F1 the mock default comes only from the dev launcher…" |
+| F1 | default given to `npm start` too | killed by the same test |
 
 ## Phase 2 security findings
 
@@ -208,7 +210,7 @@ The commit is documentation only and carries no secret or leaky instruction.
 - **D-02 Tracked backlog.** `.prompts/` is ignored and vanishes in a fresh clone, but this session can
   end at any time in an ephemeral container. The operator asked for the backlog to be committed, so this
   one file is added with `git add -f`; the ignore rule is unchanged.
-- **D-03 Mock in `npm run dev` (pending implementation, F1).** The Definition of Done asks for
+- **D-03 Mock in `npm run dev` (implemented in F1).** The Definition of Done asks for
   `npm ci && npm run dev` to start in mock mode. The mock makes no network call and spends nothing. Only
   the development launcher changes its default; an explicit `SAINTPETRUS_MOCK=false` (shell or
   `.env.local`) still wins, and `npm start`, used for real validation, keeps the mock off. Reversible;

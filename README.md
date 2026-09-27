@@ -49,13 +49,10 @@ are not part of M0. Existing context/delegation labels are scaffold contracts.
 
 ## Optional mock provider
 
-Mock mode is OFF by default. To enable it, create a local .env.local file with:
-
-```dotenv
-SAINTPETRUS_MOCK=true
-```
-
-Restart the server. The UI will visibly say MOCK MODE. Run mock starts a fixed,
+`npm run dev` starts with the mock on, so the whole panel works without any key;
+`npm start` keeps it off, which is how real validation runs. An explicit setting always
+wins: `SAINTPETRUS_MOCK=false` (shell or `.env.local`) turns it off in development and
+`SAINTPETRUS_MOCK=true` turns it on for `npm start`. Restart after changing it. Run mock starts a fixed,
 synthetic demonstration and resets the current graph. It does not call an LLM.
 Pause mock and Resume mock control the server-side scheduler. The mock budget is
 fictitious: one cent per 30 characters, reserved before output delivery.

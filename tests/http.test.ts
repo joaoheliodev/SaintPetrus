@@ -107,3 +107,18 @@ test('depth limit cannot be bypassed by supplying a parent from the client', asy
   assert.equal((await post({ action: 'add', name: 'TooDeep', objective: 'Chain', parentId: parent })).status, 400);
   assert.deepEqual(runtime().graph.snapshot(), before);
 });
+
+test('F1 the mock default comes only from the dev launcher, and an explicit SAINTPETRUS_MOCK always wins', async () => {
+  const { mockEnabled } = await import('../lib/server/runtime');
+  const saved = { mock: process.env.SAINTPETRUS_MOCK, fallback: process.env.SAINTPETRUS_MOCK_DEFAULT };
+  const set = (name: string, value: string | undefined) => { if (value === undefined) delete process.env[name]; else process.env[name] = value; };
+  try {
+    const cases: [string | undefined, string | undefined, boolean][] = [[undefined, undefined, false], [undefined, 'true', true], ['false', 'true', false], ['true', undefined, true], ['yes', 'true', false]];
+    for (const [mock, fallback, expected] of cases) {
+      set('SAINTPETRUS_MOCK', mock); set('SAINTPETRUS_MOCK_DEFAULT', fallback);
+      assert.equal(mockEnabled(), expected, `SAINTPETRUS_MOCK=${mock} SAINTPETRUS_MOCK_DEFAULT=${fallback}`);
+    }
+    const launcher = await (await import('node:fs/promises')).readFile('scripts/next.mjs', 'utf8');
+    assert.match(launcher, /\.\.\.\(mode === 'dev' \? \{ SAINTPETRUS_MOCK_DEFAULT: 'true' \} : \{\}\)/, 'only dev receives the default');
+  } finally { set('SAINTPETRUS_MOCK', saved.mock); set('SAINTPETRUS_MOCK_DEFAULT', saved.fallback); }
+});
