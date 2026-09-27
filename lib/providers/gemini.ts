@@ -1,6 +1,6 @@
 import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
-import { ProviderFailure, type Completion, type ProviderAdapter, type RequestOptions, type Usage } from './adapter';
+import { fieldNames, ProviderFailure, type Completion, type ProviderAdapter, type RequestOptions, type Usage } from './adapter';
 import { ModelIdError, normalizeModelId } from './model-id';
 import { thinkingCallValid } from './thinking-policy';
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -61,7 +61,11 @@ export class GeminiAdapter implements ProviderAdapter {
         const text = redactText(parts.filter((p: { thought?: boolean; text?: unknown }) => !p.thought && typeof p.text === 'string').map((p: { text: string }) => p.text).join(''));
         // A max-output response was billed and must reconcile, but it is not a successful probe.
         const outcome: Completion['outcome'] = text === '' && candidate?.finishReason === 'MAX_TOKENS' ? 'output_limit' : undefined;
-        return { text, usage, ...(outcome ? { outcome } : {}) };
+        // `modelVersion` names the model that answered, which is the one the invoice prices.
+        let billingModel: string;
+        try { billingModel = normalizeModelId(this.id, payload.modelVersion); }
+        catch { throw new ProviderFailure('upstream', fieldNames(payload)); }
+        return { text, usage, billingModel, ...(outcome ? { outcome } : {}) };
       } catch (error) {
         if (signal.aborted) throw new ProviderFailure('cancelled');
         if (error instanceof ProviderFailure) throw error;

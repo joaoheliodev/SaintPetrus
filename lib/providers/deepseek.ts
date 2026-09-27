@@ -1,6 +1,6 @@
 import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
-import { ProviderFailure, type Completion, type ProviderAdapter, type RequestOptions, type Usage } from './adapter';
+import { fieldNames, ProviderFailure, type Completion, type ProviderAdapter, type RequestOptions, type Usage } from './adapter';
 import { ModelIdError, normalizeModelId } from './model-id';
 import { thinkingCallValid } from './thinking-policy';
 const endpoint = 'https://api.deepseek.com/chat/completions';
@@ -15,18 +15,9 @@ export function deepseekErrorCode(status: number): ProviderFailure['code'] {
   if (status === 429) return 'rate_limited';
   return 'upstream';
 }
-// Key names only, one level deep, capped. A name is never a value and never an error body.
-function usageFieldNames(value: Record<string, unknown>) {
-  const names: string[] = [];
-  for (const [key, item] of Object.entries(value)) {
-    names.push(key);
-    if (record(item)) for (const nested of Object.keys(item)) names.push(`${key}.${nested}`);
-  }
-  return names.slice(0, 32).map(name => name.slice(0, 64));
-}
 export function deepseekUsage(value: unknown): Usage {
   if (!record(value)) throw new ProviderFailure('upstream');
-  const unparsed: () => never = () => { throw new ProviderFailure('upstream', usageFieldNames(value)); };
+  const unparsed: () => never = () => { throw new ProviderFailure('upstream', fieldNames(value)); };
   const prompt = value.prompt_tokens, completion = value.completion_tokens, total = value.total_tokens;
   const cacheHit = value.prompt_cache_hit_tokens, cacheMiss = value.prompt_cache_miss_tokens;
   // The two input bands differ by orders of magnitude, so a missing split is never assumed to be

@@ -120,7 +120,7 @@ export class TokenService {
     this.scopes(this.hooks.ids()[0] ?? 'none', Object.keys(this.policy.models)[0] ?? 'none');
     for (const id of this.hooks.ids()) this.row('agent', id, this.policy.perAgent, this.policy.costLimitsUsd.perAgent);
     for (const id of Object.keys(this.policy.models)) this.row('model', id, this.policy.perModel, this.policy.costLimitsUsd.perModel);
-    const reservations = [...this.reservations.values()].filter(item => item.status !== 'inflight').map(item => ({ id: item.id, agent: item.agent, model: item.model, priceVersionId: item.priceVersionId, tokens: item.tokens, costUsd: item.costUsd, createdAt: item.createdAt, expiresAt: item.expiresAt, status: item.status }));
+    const reservations = [...this.reservations.values()].filter(item => item.status !== 'inflight').map(item => ({ id: item.id, agent: item.agent, model: item.model, ...(item.billingModel ? { servedModel: item.billingModel } : {}), priceVersionId: item.priceVersionId, tokens: item.tokens, costUsd: item.costUsd, createdAt: item.createdAt, expiresAt: item.expiresAt, status: item.status }));
     const prices = Object.fromEntries(Object.entries(this.catalog.capture(this.now())).map(([model, version]) => [model, version.price]));
     return { sessionId: this.sessionId, stopped: this.stopped, paused: [...this.paused], priceDate: this.prices.date, prices, catalog: this.catalog.snapshot(), models: this.policy.models, cacheTtlMs: this.policy.cacheTtlMs, reservationTtlMs: this.policy.reservationTtlMs, reservations, rows: [...this.rows.values()].map(row => ({ ...structuredClone(row), state: this.blocked(row) ? 'stopped' : this.warning(row) ? 'warning' : 'available' })) };
   }
@@ -205,7 +205,7 @@ export class TokenService {
       eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'error', severity: 'error', payload: 'Provider execution failed.' });
       // Names only. A shape we cannot parse pauses the agent, and the names are what makes the next
       // attempt a correction rather than a guess.
-      if (error instanceof ProviderFailure && error.fields?.length) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.usage_unparsed', severity: 'warning', payload: `Unrecognized provider usage shape. Field names received: ${error.fields.join(', ')}. No values recorded.` });
+      if (error instanceof ProviderFailure && error.fields?.length) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.usage_unparsed', severity: 'warning', payload: `Unrecognized provider usage or served model shape. Field names received: ${error.fields.join(', ')}. No values recorded.` });
       // A proven rejection releases the reservation. Lost contact remains unverifiable because the
       // provider may have processed and billed a response that never reached us.
       verdict = adapter.id === 'mock' ? 'unbilled' : failureBillingVerdict(error);

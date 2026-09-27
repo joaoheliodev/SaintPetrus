@@ -148,9 +148,11 @@ credits/free tier and rounding; a locally priced usage result is not an invoice.
   Cached input is already inside prompt; `cachedContentTokenCount` splits hit/miss
   and is not added again. Missing candidates/thoughts/cache fields currently default
   to zero; missing prompt/total, inconsistent totals or nonzero tool usage fail.
-  **The adapter does not return a served identity:** it ignores `modelVersion`,
-  so the proxy reports requested `R` as `billingModel`. Registering a version's
-  tariff alone cannot fix this; see blocking decision G1.
+  **Served identity:** `modelVersion`, normalized without its `models/` prefix,
+  becomes `billingModel` and the price key, as `response.model` does for DeepSeek.
+  Register `R` and every possible served ID before dispatch. A missing or
+  malformed `modelVersion` fails closed as unverifiable and publishes
+  `provider.usage_unparsed` with field names only.
 - **DeepSeek usage:** `prompt_tokens`, `completion_tokens`, `total_tokens` must
   agree; cache hit + miss must equal prompt. Optional cached detail must equal
   cache hits. Reasoning detail, when present, must not exceed completion; it is
@@ -297,7 +299,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
 
 | ID | Verified limitation | Minimum proposal / decision |
 | --- | --- | --- |
-| G1 | Gemini ignores served `modelVersion`; requested ID is used for pricing | Block served-model validation until the authoritative identity is mapped and priced with strict parsing, or explicitly authorize a limited probe with independent billing evidence; no pricing fix is authorized here |
+| G1 | Resolved: Gemini prices the normalized `modelVersion`; a missing or malformed identity fails closed | Register every possible served ID with its price before dispatch; an unpriced served ID stays unverifiable |
 | G2 | No successful per-call receipt, raw usage metadata, separate reasoning count, accounting timestamps or tariff IDs; proxy preflight differs from reservation input | Add a sanitized allowlist of numeric usage, identity, timing, reservation and price-version/cost metadata, never the raw response. Until then isolated deltas and provider records only partially establish the mapping |
 | G3 | No production upstream-dispatch counter; local browser cannot prove absence of server traffic | Approve no-payload host evidence, or add a server-owned dispatch counter/event immediately before transport with a correlation ID and no secrets |
 | G4 | No controllable upstream timeout in live configuration | Operator decides safe external impairment; otherwise leave live timeout unverified. Any future runtime control must be explicit and separately reviewed |

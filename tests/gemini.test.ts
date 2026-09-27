@@ -11,6 +11,7 @@ import { EncryptedVault } from '../lib/security/encrypted-vault';
 import { safeLog, safeStringify } from '../lib/security/redact';
 import { connectionLabel } from '../components/provider-status';
 import { runtime } from '../lib/server/runtime';
+import { eventBus } from '../lib/events/bus';
 const fixture = JSON.parse(await readFile('tests/fixtures/gemini-generate-content.json', 'utf8'));
 const maxTokensFixture = JSON.parse(await readFile('tests/fixtures/gemini-max-tokens.json', 'utf8'));
 const model = 'gemini-2.5-flash-lite';
@@ -23,7 +24,8 @@ test('Gemini fixture reconciles reported input, candidates plus thinking, total 
   const secret = Buffer.from(randomBytes(32).toString('hex')); let calls = 0;
   const configuredModel = 'gemini-2.5-flash';
   const policy: TokenPolicy = { global: 1024, perAgent: 1024, perModel: 1024, perSession: 1024, costLimitsUsd, cacheTtlMs: 0, reservationTtlMs: 300000, models: { [configuredModel]: { provider: 'gemini', max_tokens: 64, temperature: 0, thinking: { mode: 'disabled' } } } };
-  const prices = { date: '2026-09-07', currency: 'USD' as const, models: { [configuredModel]: geminiPrice } };
+  // The fixture answers as flash-lite, so that served model needs its own verified price.
+  const prices = { date: '2026-09-07', currency: 'USD' as const, models: { [configuredModel]: geminiPrice, [model]: geminiPrice } };
   const service = new TokenService(policy, prices, { ids: () => ['a'], pause: () => {}, pauseAll: () => {} });
   try {
     await store.configure('gemini', secret); assert.equal(store.status('gemini').remembered, false);
@@ -39,6 +41,7 @@ test('Gemini fixture reconciles reported input, candidates plus thinking, total 
     });
     const result = await service.execute(new ProviderProxy(), adapter, 'Reply OK.', new AbortController().signal, 'a', 'Brief system prompt');
     assert.equal(calls, 1); assert.equal(result.approximate, false); assert.deepEqual(result.usage, { prompt: 17, completion: 7, total: 24, cachedPromptFullRate: 4, inputBreakdown: { cacheHit: 4, cacheMiss: 13 } });
+    assert.equal(result.model, configuredModel); assert.equal(result.billingModel, model);
     const row = service.snapshot().rows.find(r => r.scope === 'global')!;
     assert.deepEqual(row.actual, { prompt: 17, completion: 7, total: 24 }); assert.equal(row.reserved, 0); assert.equal(row.conservativeCachedInput, 4);
     assert.ok(Math.abs(row.costAccountedUsd - .0000045) < 1e-12);
@@ -119,4 +122,43 @@ test('Gemini RF-01 configuration selects the adapter through the existing API; e
     assert.equal((await configure(request('credentials', { action: 'disconnect', provider: 'gemini' }))).status, 200);
     assert.equal(store.status('gemini').connected, false); assert.equal((await execute(request('provider', { action: 'test' }))).status, 409); assert.equal(calls, 2);
   } finally { store.disconnect('gemini'); host.saintpetrusCredentials = old.credentials; host.saintpetrusSelection = old.selection; host.saintpetrusTokens = old.tokens; globalThis.fetch = old.fetch; await rm(dir, { recursive: true }); }
+});
+
+test('Gemini prices the model named by modelVersion and fails closed without a usable served identity', async () => {
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/gemini-served-');
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
+  const secret = Buffer.from(randomBytes(32).toString('hex'));
+  const requested = 'gemini-test-requested', served = 'gemini-test-served';
+  const policy: TokenPolicy = { global: 1024, perAgent: 1024, perModel: 1024, perSession: 1024, costLimitsUsd, cacheTtlMs: 0, reservationTtlMs: 300000, models: { [requested]: { provider: 'gemini', max_tokens: 64, temperature: 0, thinking: { mode: 'disabled' } } } };
+  // Ten times the requested rates, so a charge at the requested price cannot pass for the served one.
+  const dearer = { ...geminiPrice, offPeak: { inputCacheHitPerMillion: 1, inputCacheMissPerMillion: 1, outputPerMillion: 4 }, peak: { inputCacheHitPerMillion: 1, inputCacheMissPerMillion: 1, outputPerMillion: 4 } };
+  const service = (priced: boolean) => new TokenService(policy, { date: '2026-09-07', currency: 'USD', models: { [requested]: geminiPrice, ...(priced ? { [served]: dearer } : {}) } }, { ids: () => ['a'], pause: () => {}, pauseAll: () => {} });
+  const call = (tokens: TokenService, reply: object) => tokens.execute(new ProviderProxy(), new GeminiAdapter(requested, store, async () => Response.json(reply)), 'Reply OK.', new AbortController().signal, 'a', 'System');
+  const global = (tokens: TokenService) => tokens.snapshot().rows.find(row => row.scope === 'global')!;
+  try {
+    await store.configure('gemini', secret);
+    for (const modelVersion of [served, `models/${served}`]) {
+      const tokens = service(true);
+      const result = await call(tokens, { ...fixture, modelVersion });
+      assert.equal(result.model, requested); assert.equal(result.billingModel, served, modelVersion);
+      // 4 cached and 13 uncached input tokens at 1 and 7 output tokens at 4 per million, never the requested 0.1 and 0.4.
+      assert.ok(Math.abs(global(tokens).costAccountedUsd - (4 + 13 + 7 * 4) / 1e6) < 1e-12, modelVersion);
+      assert.equal(tokens.snapshot().rows.find(row => row.scope === 'model')!.id, requested, 'budget rows stay keyed by the requested model');
+    }
+    const unpriced = service(false);
+    await assert.rejects(call(unpriced, { ...fixture, modelVersion: served }));
+    const [held] = unpriced.snapshot().reservations;
+    assert.equal(held.status, 'unverifiable'); assert.equal(held.model, requested); assert.equal(held.servedModel, served);
+    assert.deepEqual(global(unpriced).actual, { prompt: 0, completion: 0, total: 0 }); assert.equal(global(unpriced).costAccountedUsd, 0);
+    const marker = 'VALUE-THAT-MUST-NOT-BE-RECORDED';
+    for (const modelVersion of [undefined, '', 'models/', `${marker} model`, 'models/a/b', 42]) {
+      const tokens = service(true); const before = eventBus().snapshot().cursor;
+      await assert.rejects(call(tokens, { ...fixture, modelVersion }), /upstream/, String(modelVersion));
+      assert.equal(global(tokens).unverifiable, 1, String(modelVersion)); assert.equal(global(tokens).costAccountedUsd, 0);
+      const reported = eventBus().snapshot(before).events.find(event => event.type === 'provider.usage_unparsed');
+      assert.ok(reported, `a missing identity must name the fields it saw: ${String(modelVersion)}`);
+      assert.match(reported.payload, /usageMetadata\.promptTokenCount/);
+      assert.doesNotMatch(reported.payload, new RegExp(`${marker}|\\b17\\b|\\b24\\b`), 'names only, never values');
+    }
+  } finally { store.disconnect('gemini'); secret.fill(0); await rm(dir, { recursive: true }); }
 });

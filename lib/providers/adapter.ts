@@ -11,6 +11,17 @@ export interface ProviderAdapter {
   readonly model: string;
   complete(input: string, signal: AbortSignal, options?: RequestOptions): Promise<Completion>;
 }
+const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+// Key names only, one level deep, capped. A name is never a value and never an error body.
+export function fieldNames(value: unknown): string[] | undefined {
+  if (!record(value)) return undefined;
+  const names: string[] = [];
+  for (const [key, item] of Object.entries(value)) {
+    names.push(key);
+    if (record(item)) for (const nested of Object.keys(item)) names.push(`${key}.${nested}`);
+  }
+  return names.slice(0, 32).map(name => name.slice(0, 64));
+}
 export const providerFailureCodes = ['unconfigured', 'disabled', 'invalid_request', 'invalid_model_format', 'model_not_allowlisted', 'unauthorized', 'insufficient_balance', 'not_found', 'rate_limited', 'upstream', 'timeout', 'cancelled', 'busy'] as const;
 export type ProviderFailureCode = typeof providerFailureCodes[number];
 export class ProviderFailure extends Error {
