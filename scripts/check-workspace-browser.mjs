@@ -133,6 +133,14 @@ try {
   await until(() => evaluate(`!!document.querySelector('form[aria-label="Add price validity"]')`), 'price form');
   assert.deepEqual(await unnamed(), [], 'price controls are named');
   console.log('PASS: budget and price controls loaded from the server');
+  // Activity names each action for a person; the arrow-key and drag moves above are hidden until asked for.
+  await until(() => click('Activity'), 'Activity view');
+  await until(() => evaluate(`document.querySelector('.activity-view .activity-lines')?.textContent.includes('Agent created')`), 'activity lines');
+  assert.equal(await evaluate(`document.querySelector('.activity-view .activity-lines').textContent.includes('Card moved')`), false, 'card moves hidden by default');
+  await evaluate(`document.querySelector('.activity-view .activity-bar input').click()`);
+  await until(() => evaluate(`document.querySelector('.activity-view .activity-lines').textContent.includes('Card moved')`), 'card moves shown on request');
+  assert.deepEqual(await unnamed(), [], 'activity controls are named');
+  console.log('PASS: Activity shows readable lines and hides card moves until asked');
   await until(() => click('Connection'), 'Connection view');
   await until(() => evaluate(`document.body.textContent.includes('Keys go only to this local backend') && document.body.textContent.includes('Optional features')`), 'connection view');
   assert.deepEqual(await unnamed(), [], 'connection controls are named');

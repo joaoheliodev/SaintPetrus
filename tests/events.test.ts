@@ -71,8 +71,8 @@ test('every SSE update replaces the client with the complete server-retained win
 });
 test('event readers contain no competing order, retention or duplicate policy', () => {
   const feed = readFileSync(new URL('../components/event-feed.tsx', import.meta.url), 'utf8');
-  const workspace = readFileSync(new URL('../components/workspace.tsx', import.meta.url), 'utf8');
-  const graphPanel = workspace.split('aria-label="Graph events"')[1]!.split('</section>')[0]!;
+  const activity = readFileSync(new URL('../components/activity-log.tsx', import.meta.url), 'utf8');
+  const graphPanel = activity.split('aria-label="Graph events"')[1]!.split('</section>')[0]!;
   const readerPolicy = /new Map|\.sort\(|\.reverse\(|\.slice\(/;
 
   assert.doesNotMatch(feed, readerPolicy);

@@ -2,7 +2,7 @@
 // Adapted canvas geometry and interactions; all mutations go to the local server.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Position, MarkerType, useEdgesState, useNodesState, useReactFlow, type Edge, type EdgeChange, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
-import { Bot, CornerDownRight, Crown, Download, Ellipsis, Gauge, GitBranch, History, LayoutGrid, Maximize, Plug, Tag, Pause, Play, Plus, RotateCcw, ShieldCheck, Upload, Workflow, X } from 'lucide-react';
+import { Bot, ChevronDown, ChevronUp, CornerDownRight, Crown, Download, Ellipsis, Gauge, GitBranch, History, LayoutGrid, Maximize, Plug, Tag, Pause, Play, Plus, RotateCcw, ShieldCheck, Upload, Workflow, X } from 'lucide-react';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -17,6 +17,7 @@ import { AgentStatusBadge } from './agent-status-badge';
 import { agentPlacement } from '@/lib/agent-status';
 import { ArtifactPreview } from './artifact-preview';
 import { EventFeed } from './event-feed';
+import { GraphActivity } from './activity-log';
 import { ConnectionChip, ConnectionView, connectionTarget, useProviderStatus } from './provider-status';
 import type { ProviderStatusSnapshot } from '@/lib/providers/runtime';
 import type { RunExchange } from '@/lib/run-exchange';
@@ -52,7 +53,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   const { command, importGraph, pending } = useGraphTransport(initialGraph);
   const connection = useProviderStatus(); const tokens = useTokenSnapshot();
   // Which view fills the main column; presentation state in memory only.
-  const [view, setView] = useState<View>('workspace');
+  const [view, setView] = useState<View>('workspace'); const [drawerOpen, setDrawerOpen] = useState(true);
   const importInput = useRef<HTMLInputElement>(null); const exportLink = useRef<HTMLAnchorElement>(null);
   const [resetOpen, setResetOpen] = useState(false);
   // Each agent's last Run once, in memory only: never sent back, saved or put in browser storage.
@@ -221,12 +222,16 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       <div className="canvas-area"><ConnectionContext.Provider value={connection.status}><ReactFlow<AgentNodeType, AgentEdgeType> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={changes} onEdgesChange={edgeChanges} onBeforeDelete={confirmDeletion} onEdgesDelete={deleteEdges} onNodeClick={(_, n) => select(n.id)} onConnect={c => connect(c.source, c.target)} onConnectEnd={connectEnd} onPaneClick={() => useProjection.setState({ notice: '' })} onDoubleClick={paneDoubleClick} zoomOnDoubleClick={false} minZoom={.25} maxZoom={1.5} deleteKeyCode={['Backspace', 'Delete']} colorMode="dark" fitView fitViewOptions={{ maxZoom: 1, padding: .25 }} aria-label="Agent graph"><Background /><Controls showInteractive={false} /><MiniMap pannable zoomable style={MINIMAP} /></ReactFlow></ConnectionContext.Provider>
         {lonely && <div className="canvas-hint"><p><strong>Two ways to grow the graph</strong></p><p>Drag from the dot on the right edge of a card and release on empty canvas — that creates a subagent already connected.</p><p>Or double-click anywhere empty to drop a standalone agent there.</p>{mockEnabled && <p>Just looking around? <Button variant="link" disabled={pending} onClick={loadDemo}>Load demo…</Button> It replaces this canvas with a fixed demonstration.</p>}</div>}
       </div>
-      <Tabs className="drawer" defaultValue="activity"><TabsList aria-label="Canvas panels"><TabsTrigger value="activity">Activity</TabsTrigger>{previewPort && <TabsTrigger value="preview">Preview</TabsTrigger>}</TabsList>
-        <TabsContent value="activity" keepMounted><section className="event-panel" aria-label="Graph events"><div className="panel-title">Server events · revision {graph.revision}</div><div className="event-list">{events.length ? events.map(event => <p key={event.id}>{event.type} — {event.message}</p>) : <p>Ready. Add an agent to create your first connection.</p>}</div></section></TabsContent>
+      <Tabs className={cn('drawer', !drawerOpen && 'is-collapsed')} defaultValue="activity"><div className="drawer-bar"><TabsList aria-label="Canvas panels"><TabsTrigger value="activity">Activity</TabsTrigger>{previewPort && <TabsTrigger value="preview">Preview</TabsTrigger>}</TabsList>
+        <Button variant="ghost" size="sm" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(!drawerOpen)}>{drawerOpen ? <ChevronDown /> : <ChevronUp />}{drawerOpen ? 'Collapse panel' : 'Expand panel'}</Button></div>
+        <TabsContent value="activity" keepMounted><GraphActivity events={events} revision={graph.revision} /></TabsContent>
         {previewPort && <TabsContent value="preview" keepMounted><ArtifactPreview port={previewPort} /></TabsContent>}
       </Tabs>
       </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={exchange => setExchanges(current => ({ ...current, [selected.id]: exchange }))} /></div>
-      {view === 'activity' && <section className="view" aria-labelledby="activity-title"><h1 id="activity-title">Activity</h1>{feedEnabled ? <EventFeed /> : <p className="helper">The live event feed is off. See Optional features in Connection.</p>}</section>}
+      {view === 'activity' && <section className="view activity-view" aria-labelledby="activity-title"><h1 id="activity-title">Activity</h1>
+        <p className="helper">What changed on the canvas, newest first, as the server published it. Card moves and demo output are hidden unless you ask for them.</p>
+        <GraphActivity events={events} revision={graph.revision} />
+        {feedEnabled ? <EventFeed /> : <p className="helper">The live event feed, with agent names, tokens and budget events, is off. See Optional features in Connection.</p>}</section>}
       {view === 'budgets' && <BudgetsView tokens={tokens} agents={graph.agents} />}
       {view === 'prices' && <PricesView tokens={tokens} />}
       {view === 'connection' && <ConnectionView source={connection}><section className="optional-features" aria-labelledby="optional-title"><h2 id="optional-title">Optional features</h2>

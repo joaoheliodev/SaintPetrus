@@ -139,7 +139,7 @@ panel, nothing copied or loaded from it.
 | U3 | Agent panel with Run and Details | Run an agent and read the answer without scrolling or changing tab | done |
 | U4 | Screen structure and navigation | Every current function reachable by mouse and keyboard; no route changes | done |
 | U5 | Budgets | Summary, per-scope blocks, details table with every field and action | done |
-| U6 | Activity | Drawer and full view, readable monospace lines, `agent.moved` hidden by default | pending |
+| U6 | Activity | Drawer and full view, readable monospace lines, `agent.moved` hidden by default | done |
 | U7 | First steps | Checklist derived from server state, dismissible in memory | pending |
 | U8 | In-app confirmations (P3) | Dialog instead of `window.confirm`, same texts, refuse-then-confirm in the browser check | pending |
 | U9 | Command palette (P3, optional) | Ctrl+K filterable list of existing actions | pending |
@@ -182,6 +182,13 @@ panel, nothing copied or loaded from it.
   table, reservations with Apply confirmed usage and the allowlist live under Details with every field. The call
   count is read from `GET /api/receipts` through the accounting reader, again only when the global counters move.
   Agent rows show the agent's name from the graph; a removed agent keeps its id.
+- U6: `lib/activity-log.ts` names each event, gives its relative time and marks `agent.moved` and `mock.delta` (one per
+  demo character) as noise, hidden until "Show card moves and demo output" is ticked. The drawer under the canvas
+  collapses; the Activity view shows the same log plus the live feed when the server has it on, in the same line
+  format. The revision is kept, small. Graph events carry no agent id and no time, so their lines name the action
+  only and the time is when this panel received them (kept in the projection as presentation state); naming the
+  agent would mean inferring it from snapshot diffs, which `docs/reference/state-ownership.md` forbids. The live
+  feed lines do carry the agent's name. The Run once exchange is not merged into the log (it is in the Run tab).
 
 #### Questions for João
 
@@ -189,6 +196,9 @@ panel, nothing copied or loaded from it.
   agent. No provider connected." It says "No provider connected" even when one is. Changing it changes what is
   sent to the provider, so it is out of this round: the Details tab now shows it verbatim under "Instruction sent
   with Run once". Should it be reworded, or made editable?
+- **Q-U2** Graph events do not say which agent they concern, so Activity lines read "Agent created" without a name
+  unless the live feed is on. Adding `agentId` to the graph event would be a small server change (outside this
+  round): worth doing?
 
 ## V0 review of Part 2 (`1445177`)
 
