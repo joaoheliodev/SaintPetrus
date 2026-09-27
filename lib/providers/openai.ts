@@ -18,11 +18,12 @@ export class OpenAIAdapter implements ProviderAdapter {
     try { this.model = normalizeModelId('openai', model); }
     catch (error) { if (error instanceof ModelIdError) throw new ProviderFailure('invalid_model_format'); throw error; }
   }
-  async complete(input: string, signal: AbortSignal, options?: RequestOptions) {
+  async complete(input: string, signal: AbortSignal, options?: RequestOptions, onDispatch?: () => void) {
     if (!thinkingCallValid(this.id, options?.thinking)) throw new ProviderFailure('invalid_request');
     return this.credentials.use('openai', async key => {
       try {
         const generation = options?.thinking?.mode === 'enabled' ? { reasoning: { effort: options.thinking.effort } } : options ? { temperature: options.temperature } : {};
+        onDispatch?.();
         const response = await this.transport(endpoint, { method: 'POST', redirect: 'error', signal,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key.toString('utf8')}` },
           body: JSON.stringify({ model: this.model, input: options?.messages ?? redactText(input), ...(options ? { instructions: options.systemPrompt } : {}), ...generation, max_output_tokens: options?.maxTokens ?? 64, store: false, stream: !!options?.onText }),

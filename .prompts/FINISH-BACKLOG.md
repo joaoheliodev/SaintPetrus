@@ -48,9 +48,9 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | V0 | Review of Part 2 (`1445177`) | Protocol must match the code; gaps found in review get fixes in new commits | Every claim in `docs/provider-validation.md` checked against code; confirmed divergences fixed or listed; no rewrite of `1445177` | no | done (8315a5b; findings below) |
 | V10 | A reset during a call cannot corrupt accounting | Found by V0: the pause hook throws for an agent a graph reset removed, which jams a billed call as unverifiable forever, releases a mock hold twice (negative `reserved`) and replaces a timeout with a generic 400 | Pause recorded by `TokenService` even when the graph hook fails; billed call stays billed, no double release, original failure preserved | no | done (8315a5b) |
 | V1 | Gemini served model identity (G1) | Price key must be the response model; Gemini ignores `modelVersion` | Adapter returns normalized `modelVersion` (no `models/` prefix) as the served model; missing or malformed identity fails closed as unverifiable; pricing uses the served model; requested and served models recorded separately | no | done (869583f; `servedModel` on reservations now, `requestedModel`/`servedModel` on receipts in V3) |
-| V2 | Served model without captured tariff (all providers) | Current path reports a `budget.refused` event and a "reconciled" reroute message for a call that was billed and not reconciled | Reservation kept unverifiable, agent paused, explicit feed event naming requested/served model and reservation; never released; requested tariff never used; reroute event no longer claims reconciliation first | no | done (this commit) |
+| V2 | Served model without captured tariff (all providers) | Current path reports a `budget.refused` event and a "reconciled" reroute message for a call that was billed and not reconciled | Reservation kept unverifiable, agent paused, explicit feed event naming requested/served model and reservation; never released; requested tariff never used; reroute event no longer claims reconciliation first | no | done (e28cff0) |
 | V3 | Per-call accounting receipt (G2) | No per-call record of usage, identity, tariff and timing | Bounded in-memory journal of redacted receipts (numbers, ids, codes only), linked to the persisted reconciliation interval, exposed by a local read-only GET; eviction reported | no | pending |
-| V4 | Upstream dispatch counter per provider (G3) | Nothing proves a refused call never left the server | Server-owned count incremented immediately before transport, per provider, exposed read-only; tests prove every preflight refusal leaves it unchanged and a dispatched call adds exactly one | no | pending |
+| V4 | Upstream dispatch counter per provider (G3) | Nothing proves a refused call never left the server | Server-owned count incremented immediately before transport, per provider, exposed read-only; tests prove every preflight refusal leaves it unchanged and a dispatched call adds exactly one | no | done (this commit; `dispatches` on `GET /api/provider`) |
 | V5 | Validation timeout control (G4) | V2 of the protocol cannot force a timeout | Off by default; read only at startup; never taken from `/api/provider` bodies; applies inside the proxy after preflight and reservation, so budgets still bind; invalid values refuse startup; visible in provider status | no | pending |
 | V6 | `npm run key -- set deepseek` (G7) | Terminal helper omits DeepSeek | DeepSeek accepted with the same rules as Gemini (hidden TTY input, no argv secret, opt-in remember); regression test without spawning processes | no | pending |
 | V7 | Empty visible output never verifies a probe (G11) | `connection-state.md` requires usable output; empty text with a non-limit finish reason is marked verified | Empty-text probe keeps billed usage, does not verify, reports a distinct error; badge not "Connected" | no | pending |
@@ -129,7 +129,7 @@ The commit is documentation only and carries no secret or leaky instruction.
   reservation (resume refused until restart), a mock call released its hold twice (`reserved: -127`),
   and a timeout surfaced as "Agent not found." Fixed in V10.
 - **Protocol claim without a test:** selecting an explicit agent with `agentId` on `/api/provider`
-  (only the forged-ID refusal is tested). Covered with V4.
+  (only the forged-ID refusal is tested). Covered with F2, which adds the UI for it.
 
 ## Mutation log
 
@@ -146,6 +146,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | V2 | reroute event claims reconciliation again | killed by both served-model tests |
 | V2 | requested tariff used when the served one is missing | killed by three tests (DeepSeek, route, every provider) |
 | V2 | route drops the structured 409 | killed by "The provider route reports an unpriced served model…" |
+| V4 | proxy stops recording dispatches | killed by both ledger tests |
+| V4 | DeepSeek records before its local thinking refusal | killed by both ledger tests |
+| V4 | correlation ID dropped | killed by the preflight/positive-control test |
 
 ## Decisões tomadas (decisions taken)
 

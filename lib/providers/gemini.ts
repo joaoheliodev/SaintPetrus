@@ -34,13 +34,14 @@ export class GeminiAdapter implements ProviderAdapter {
     try { this.model = normalizeModelId('gemini', model); }
     catch (error) { if (error instanceof ModelIdError) throw new ProviderFailure('invalid_model_format'); throw error; }
   }
-  async complete(input: string, signal: AbortSignal, options?: RequestOptions) {
+  async complete(input: string, signal: AbortSignal, options?: RequestOptions, onDispatch?: () => void) {
     if (!thinkingCallValid(this.id, options?.thinking)) throw new ProviderFailure('invalid_request');
     return this.credentials.use('gemini', async key => {
       try {
         const messages = options?.messages ?? [{ role: 'user' as const, content: input }];
         const system = [options?.systemPrompt ?? '', ...messages.filter(m => m.role === 'system').map(m => m.content)].filter(Boolean).join('\n');
         const contents = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: redactText(m.content) }] }));
+        onDispatch?.();
         const response = await this.transport(`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`, {
           method: 'POST', redirect: 'error', signal,
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key.toString('utf8') },

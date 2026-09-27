@@ -71,7 +71,7 @@ Fill this locally. No credential belongs in this document or the results table.
 | Stage / owner | What happens | Operator evidence |
 | --- | --- | --- |
 | Local selection: `lib/providers/runtime.ts` | Validates provider and normalized allowlisted `R`; constructs adapter | Local `GET /api/provider`, credential-free execution body; configured is not verified |
-| Preflight: `TokenService.execute` in `lib/tokens/service.ts` | Checks pause, policy, active captured tariffs and four token/USD ceilings | Local 409 on refusal; `budget.refused`; row/paused snapshots. Upstream absence needs independent evidence (G3) |
+| Preflight: `TokenService.execute` in `lib/tokens/service.ts` | Checks pause, policy, active captured tariffs and four token/USD ceilings | Local 409 on refusal; `budget.refused`; row/paused snapshots. `dispatches` on `GET /api/provider` stays unchanged: the server-side proof of no upstream call |
 | Reservation: same service | Synchronous holds in all four rows before `ProviderProxy.execute` | `/api/tokens`: `reserved`, `costReservedUsd`; a fast call may finish before observation. Inflight IDs are omitted |
 | I/O: `lib/providers/proxy.ts`, provider adapter | One active request, 15-second proxy timeout; fixed endpoint, no redirects, bounded response | Connection latency/status; local API result. Browser network shows local requests, not the server's provider transport |
 | Reconciliation: service + captured `PriceCatalog` | Parses usage, prices served ID, releases holds, adds actual totals/cost; journals interval before row changes | Response `usage`, `billingModel`; four row deltas; catalog versions. Successful per-call accounting receipt is missing (G2) |
@@ -230,8 +230,9 @@ The UI warning can be verified this way; the **warning event** is emitted only
 after a reconciled call is at or above 80%. Record it if V1 naturally crosses the
 threshold. Otherwise live event coverage remains unverified; obtaining it would
 require a separately approved call, not an automatic retry. The existing tests
-cover that event. For hard stops, pair the local 409 with a no-payload upstream
-dispatch observation (G3). Browser DevTools alone does not prove zero backend I/O.
+cover that event. For hard stops, pair the local 409 with the `dispatches`
+snapshot from `GET /api/provider` before and after: `total` and the provider's
+count must not change. Browser DevTools alone does not prove zero backend I/O.
 
 ### V2: timeout, expiry and manual reconciliation
 
@@ -308,7 +309,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
 | --- | --- | --- |
 | G1 | Resolved: Gemini prices the normalized `modelVersion`; a missing or malformed identity fails closed | Register every possible served ID with its price before dispatch; an unpriced served ID stays unverifiable |
 | G2 | No successful per-call receipt, raw usage metadata, separate reasoning count, accounting timestamps or tariff IDs; proxy preflight differs from reservation input | Add a sanitized allowlist of numeric usage, identity, timing, reservation and price-version/cost metadata, never the raw response. Until then isolated deltas and provider records only partially establish the mapping |
-| G3 | No production upstream-dispatch counter; local browser cannot prove absence of server traffic | Approve no-payload host evidence, or add a server-owned dispatch counter/event immediately before transport with a correlation ID and no secrets |
+| G3 | Resolved: `GET /api/provider` returns `dispatches` (`total`, `byProvider`, the latest 50 with `sequence`, `provider`, `model`, `correlationId` = reservation ID, `at`), recorded by the proxy immediately before transport, never for a local refusal or cache hit | Process-local; restart clears it. It counts requests that left, not what the provider billed |
 | G4 | No controllable upstream timeout in live configuration | Operator decides safe external impairment; otherwise leave live timeout unverified. Any future runtime control must be explicit and separately reviewed |
 | G5 | Feed tokens are message totals: omit billed output-limit responses, expiry/manual adjustments. The reroute text no longer claims reconciliation, and an unpriced served model has its own `provider.unpriced` event | Keep feed as activity evidence; per-call accounting evidence belongs to receipts (G2) |
 | G6 | Token/price receipt export absent; graph export omits ledger, inflight reservations and captures | Propose sanitized accounting export carrying four scopes and captured tariff identities; save local snapshots meanwhile |

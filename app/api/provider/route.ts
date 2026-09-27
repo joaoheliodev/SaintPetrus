@@ -10,7 +10,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   if (!localRequest(request, false)) return safeJson({ error: 'Local requests only.' }, 403);
-  return safeJson(providerStatus());
+  // Dispatches are the server's own evidence of which requests left for a provider; they carry no payload.
+  return safeJson({ ...providerStatus(), dispatches: providerProxy().dispatches.snapshot() });
 }
 export async function POST(request: Request) {
   if (!localRequest(request, true)) return safeJson({ error: 'Same-origin local requests only.' }, 403);

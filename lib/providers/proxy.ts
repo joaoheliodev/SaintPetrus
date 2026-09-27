@@ -1,12 +1,16 @@
 import { ProviderFailure, type ProviderAdapter, type RequestOptions } from './adapter';
 import { heuristicTokenCounter, type TokenCounter } from '../core/token-estimate';
 import { redactText } from '../security/redact';
+import { DispatchLedger, type Dispatch } from './dispatch-ledger';
+// `correlationId` ties an upstream dispatch to the caller's record (the reservation) without carrying any payload.
+export type DispatchTrace = { correlationId?: string; onDispatch?: (dispatch: Dispatch) => void };
 export class ProviderProxy {
   private active = false;
   private controller?: AbortController;
+  readonly dispatches = new DispatchLedger();
   cancel() { this.controller?.abort(); }
   constructor(private readonly timeoutMs = 15000, private readonly tokenCounter: TokenCounter = heuristicTokenCounter) {}
-  async execute(adapter: ProviderAdapter, input: unknown, parentSignal: AbortSignal, options?: RequestOptions) {
+  async execute(adapter: ProviderAdapter, input: unknown, parentSignal: AbortSignal, options?: RequestOptions, trace?: DispatchTrace) {
     if (typeof input !== 'string' || !input.trim() || input.length > 2000) throw new ProviderFailure('invalid_request');
     if (this.active) throw new ProviderFailure('busy');
     this.active = true;
@@ -19,7 +23,10 @@ export class ProviderProxy {
       controller.signal.throwIfAborted();
       const sanitized = redactText(input);
       const preflight = { tokens: this.tokenCounter.count(sanitized), approximate: this.tokenCounter.approximate, counterName: this.tokenCounter.name };
-      const result = await adapter.complete(sanitized, controller.signal, options);
+      const result = await adapter.complete(sanitized, controller.signal, options, () => {
+        const dispatch = this.dispatches.record(adapter.id, adapter.model, trace?.correlationId ?? null);
+        trace?.onDispatch?.(dispatch);
+      });
       controller.signal.throwIfAborted();
       return { usage: result.usage, preflight, provider: adapter.id, model: adapter.model, billingModel: result.billingModel ?? adapter.model, mocked: adapter.id === 'mock', text: redactText(result.text), latencyMs: Math.round(performance.now() - started), ...(result.outcome ? { outcome: result.outcome } : {}) };
     } catch (error) {

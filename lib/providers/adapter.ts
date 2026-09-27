@@ -9,7 +9,8 @@ export type Completion = { text: string; usage?: Usage; outcome?: 'output_limit'
 export interface ProviderAdapter {
   readonly id: ModelProvider;
   readonly model: string;
-  complete(input: string, signal: AbortSignal, options?: RequestOptions): Promise<Completion>;
+  // `onDispatch` runs immediately before the request leaves for the provider, never for a local refusal.
+  complete(input: string, signal: AbortSignal, options?: RequestOptions, onDispatch?: () => void): Promise<Completion>;
 }
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 // Key names only, one level deep, capped. A name is never a value and never an error body.

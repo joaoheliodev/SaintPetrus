@@ -47,7 +47,7 @@ export class DeepSeekAdapter implements ProviderAdapter {
     try { this.model = normalizeModelId('deepseek', model); }
     catch (error) { if (error instanceof ModelIdError) throw new ProviderFailure('invalid_model_format'); throw error; }
   }
-  async complete(input: string, signal: AbortSignal, options?: RequestOptions): Promise<Completion> {
+  async complete(input: string, signal: AbortSignal, options?: RequestOptions, onDispatch?: () => void): Promise<Completion> {
     // Reasoning is on by default at high effort upstream, so an unstated thinking mode is refused
     // here rather than silently spending the whole output budget on a chain of thought.
     if (!options || !thinkingCallValid(this.id, options.thinking) || !options.thinking) throw new ProviderFailure('invalid_request');
@@ -56,6 +56,7 @@ export class DeepSeekAdapter implements ProviderAdapter {
       try {
         const system = [options.systemPrompt, ...options.messages.filter(m => m.role === 'system').map(m => m.content)].filter(Boolean).join('\n');
         const messages = [...(system ? [{ role: 'system', content: redactText(system) }] : []), ...options.messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: redactText(m.content) }))];
+        onDispatch?.();
         const response = await this.transport(endpoint, {
           method: 'POST', redirect: 'error', signal,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key.toString('utf8')}` },

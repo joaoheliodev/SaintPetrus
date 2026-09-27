@@ -169,7 +169,7 @@ export class TokenService {
     if (previewEnabled()) options.onText = text => observeArtifact(agent, this.hooks.role?.(agent) ?? agent, text);
     let verdict: BillingVerdict = 'unverifiable';
     try {
-      const result = await proxy.execute(adapter, input, signal, options);
+      const result = await proxy.execute(adapter, input, signal, options, { correlationId: reservation.id });
       const approximate = adapter.id === 'mock';
       const usage = approximate ? { prompt: inputEstimate, completion: this.counter.count(result.text), total: 0 } : result.usage;
       if (!usage) this.refuse(agent, 'Provider usage missing.');
