@@ -3,24 +3,39 @@
 import assert from 'node:assert/strict';
 import { launchChromium } from './disposable-chromium.mjs';
 const port = Number(process.env.TEST_APP_PORT ?? 3310);
-const problems = []; const dialogs = []; const decisions = []; let documentHeaders; let session;
+const problems = []; const dialogs = []; const focusStarts = []; let documentHeaders; let session;
 const { call, close } = await launchChromium({ timeoutMs: 180000, onEvent: ({ method, params }, send) => {
   if (method === 'Log.entryAdded' && /Content Security Policy|Refused to/i.test(params.entry.text)) problems.push(`CSP: ${params.entry.text}`);
   if (method === 'Runtime.exceptionThrown') problems.push(`Exception: ${params.exceptionDetails.exception?.description ?? params.exceptionDetails.text}`);
   if (method === 'Runtime.consoleAPICalled' && params.type === 'error') problems.push(`console.error: ${params.args.map(arg => arg.value ?? arg.description ?? '').join(' ')}`);
   if (method === 'Network.responseReceived' && params.type === 'Document' && params.response.url.startsWith(`http://127.0.0.1:${port}/`)) documentHeaders = params.response.headers;
-  // Destructive actions ask first; the check records each question and answers from `decisions`, accepting by default.
-  if (method === 'Page.javascriptDialogOpening') { dialogs.push(params.message); send('Page.handleJavaScriptDialog', { accept: decisions.length ? decisions.shift() : true }, session).catch(() => {}); }
+  // Every confirmation is an in-app dialog now; a native one would mean a window.confirm came back.
+  if (method === 'Page.javascriptDialogOpening') { problems.push(`Native dialog: ${params.message}`); send('Page.handleJavaScriptDialog', { accept: false }, session).catch(() => {}); }
 } });
 try {
   const { targetId } = await call('Target.createTarget', { url: 'about:blank' });
   ({ sessionId: session } = await call('Target.attachToTarget', { targetId, flatten: true }));
   for (const domain of ['Page', 'Runtime', 'Log', 'Network']) await call(`${domain}.enable`, {}, session);
+  // Destructive actions ask first in an in-app dialog. The page records each question, where focus starts, and answers
+  // with its buttons from window.__decisions, accepting by default; `decide` queues an answer, `sync` collects questions.
+  await call('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    window.__dialogs = []; window.__decisions = []; const seen = new WeakSet();
+    new MutationObserver(() => {
+      const dialog = document.querySelector('[data-confirm]'); if (!dialog || seen.has(dialog)) return; seen.add(dialog);
+      setTimeout(() => {
+        const text = dialog.querySelector('.confirm-title')?.textContent + ' ' + (dialog.querySelector('.confirm-detail')?.textContent ?? '');
+        window.__dialogs.push({ text: text.trim(), focus: document.activeElement?.textContent ?? '' });
+        const buttons = dialog.querySelectorAll('.confirm-actions button'); buttons[(window.__decisions.length ? window.__decisions.shift() : true) ? 1 : 0]?.click();
+      }, 200);
+    }).observe(document, { childList: true, subtree: true });
+  })()` }, session);
   const evaluate = async expression => {
     const result = await call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, session);
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
     return result.result.value;
   };
+  const decide = answer => evaluate(`window.__decisions.push(${answer})`);
+  const sync = async () => { for (const item of await evaluate('window.__dialogs.splice(0)')) { dialogs.push(item.text); focusStarts.push(item.focus); } return dialogs; };
   const until = async (fn, label) => { for (let i = 0; i < 300; i++) { const value = await fn(); if (value) return value; await new Promise(resolve => setTimeout(resolve, 100)); } throw new Error(`Timed out: ${label}`); };
   // Graph-replacing actions live in the More menu: open it, then pick the item by its visible name.
   const menu = async text => {
@@ -104,8 +119,8 @@ try {
   await tab('Run');
   await type('section[aria-label="Run this agent"] textarea', 'Say something short.');
   // Run once asks first with the server's quote: refuse once, then accept.
-  decisions.push(false); await until(() => click('Send (1 call)'), 'run button');
-  await until(() => dialogs.some(text => text.startsWith('Send one call to ') && text.includes(' tokens')), 'run question with the reserved maximum');
+  await decide(false); await until(() => click('Send (1 call)'), 'run button');
+  await until(async () => (await sync()).some(text => text.startsWith('Send one call to ') && text.includes(' tokens')), 'run question with the reserved maximum');
   await until(async () => await evaluate(`document.querySelector('section[aria-label="Run this agent"] [role=status]')?.textContent`) === 'Not sent.', 'declined run not sent');
   await until(() => click('Send (1 call)'), 'run button');
   const answer = await until(() => evaluate(`(text => text && text !== 'Not sent.' ? text : '')(document.querySelector('section[aria-label="Run this agent"] [role=status]')?.textContent)`), 'run result');
@@ -162,9 +177,9 @@ try {
   // Delete the connection from the keyboard: first refuse, then confirm.
   const edgeId = await evaluate(`document.querySelector('.react-flow__edge')?.getAttribute('data-id')`);
   const pressDelete = async () => { await evaluate(`document.querySelector('.react-flow__edge-path, .react-flow__edge-interaction')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`); await until(() => evaluate(`document.querySelector('.react-flow__edge.selected') !== null`), 'edge selected'); await press('Delete'); };
-  decisions.push(false); await pressDelete(); await until(() => dialogs.some(text => text.startsWith('Delete the selected connection')), 'deletion question');
+  await decide(false); await pressDelete(); await until(async () => (await sync()).some(text => text.startsWith('Delete the selected connection')), 'deletion question');
   await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await edges(), 1, 'a refused deletion keeps the connection');
-  const asked = dialogs.length; await pressDelete(); await until(() => dialogs.length > asked, 'second deletion question');
+  const asked = (await sync()).length; await pressDelete(); await until(async () => (await sync()).length > asked, 'second deletion question');
   await until(async () => await edges() === 0, 'confirmed deletion');
   assert.ok(edgeId, 'the edge had an identity');
   console.log('PASS: connection deletion asks first and honours the answer');
@@ -179,7 +194,7 @@ try {
   await until(async () => await edges() === 1, 'connection created from the keyboard');
   console.log('PASS: two agents connected from the keyboard');
   // Walk the whole page with Tab from a fresh load; every stop, cards and connections included, must show where focus is.
-  await call('Page.reload', {}, session);
+  await sync(); await call('Page.reload', {}, session);
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 3 && document.querySelectorAll('.react-flow__edge').length === 1`), 'canvas after reload');
   const hidden = []; let stops = 0;
   for (; stops < 150; stops++) {
@@ -194,23 +209,25 @@ try {
   console.log(`PASS: ${stops} Tab stops, each with a visible focus indicator`);
   if (mocked) {
     // The demo replaces the canvas: it is one menu away and asks first; refusing keeps every agent.
-    decisions.push(false); await menu('Load demo…'); await until(() => dialogs.some(text => text.startsWith('Load the demo?')), 'load demo question');
+    await decide(false); await menu('Load demo…'); await until(async () => (await sync()).some(text => text.startsWith('Load the demo?')), 'load demo question');
     await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await nodes(), 3, 'a refused demo keeps the graph');
     console.log('PASS: the demo is behind a menu and a confirmation');
   }
   await menu('Reset graph…');
   await until(() => evaluate(`!!document.querySelector('[role=dialog] #objective') && document.body.textContent.includes('The objective the Coordinator receives when the graph is reset')`), 'reset dialog with the coordinator objective');
-  decisions.push(false); await until(() => click('Reset graph'), 'Reset graph button'); await until(() => dialogs.some(text => text.startsWith('Reset the graph?')), 'reset question');
+  await decide(false); await until(() => click('Reset graph'), 'Reset graph button'); await until(async () => (await sync()).some(text => text.startsWith('Reset the graph?')), 'reset question');
   await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await nodes(), 3, 'a refused reset keeps the graph');
   await until(() => click('Reset graph'), 'Reset graph button'); await until(async () => await nodes() === 1, 'graph reset after confirmation');
   console.log('PASS: reset asks first and honours the answer');
   await until(async () => await firstSteps() === 'First steps · 0 of 3', 'checklist back on a reset canvas');
   await until(() => click('Dismiss'), 'dismiss first steps'); await until(async () => await firstSteps() === 'gone', 'checklist dismissed');
   console.log('PASS: first steps follow the graph and can be dismissed');
-  await until(() => click('Pause all agents'), 'Pause all agents button'); await until(() => dialogs.some(text => text.startsWith('Pause every agent?')), 'pause question');
+  await until(() => click('Pause all agents'), 'Pause all agents button'); await until(async () => (await sync()).some(text => text.startsWith('Pause every agent?')), 'pause question');
   await until(() => evaluate(`document.querySelector('.react-flow__node .status')?.textContent.includes('Paused')`), 'agents paused');
   console.log('PASS: pause all asks first and pauses every agent');
   await new Promise(resolve => setTimeout(resolve, 500));
   assert.deepEqual(problems, [], 'no CSP violation, uncaught exception or console error');
-  console.log(`PASS: no CSP violations, exceptions or console errors${dialogs.length ? `; confirmations seen: ${dialogs.length}` : ''}.`);
+  await sync();
+  assert.ok(dialogs.length >= 7 && focusStarts.every(focus => focus === 'Cancel'), `every confirmation opened in the app with focus on Cancel: ${JSON.stringify(focusStarts)}`);
+  console.log(`PASS: no CSP violations, exceptions or console errors; ${dialogs.length} in-app confirmations, each opening on Cancel.`);
 } finally { await close(); }

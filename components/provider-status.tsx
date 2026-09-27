@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
+import { useConfirm } from './confirm-dialog';
 import type { ConnectionState, ProviderStatusSnapshot } from '../lib/providers/runtime';
 const keyedProviders = ['openai', 'gemini', 'deepseek'];
 type RefreshPriority = 'poll' | 'explicit';
@@ -111,7 +112,7 @@ export function ConnectionView({ source, children }: { source: ProviderStatusSou
   const [provider, setProvider] = useState(() => initialProvider(status));
   const [model, setModel] = useState(() => status && keyedProviders.includes(status.provider) ? status.model : ''); const [custom, setCustom] = useState('');
   const [show, setShow] = useState(false); const [remember, setRemember] = useState(false);
-  const realMode = status?.mode === 'real';
+  const realMode = status?.mode === 'real'; const confirm = useConfirm();
   // Uncontrolled, transient field: no credential in React state or browser storage. Leaving the view removes it with its value.
   const keyField = useRef<HTMLInputElement>(null);
   async function configure(action: 'set' | 'disconnect' | 'forget') {
@@ -140,8 +141,8 @@ export function ConnectionView({ source, children }: { source: ProviderStatusSou
       : verificationMessage(status, data?.error));
   }
   async function run(action: 'connect' | 'test' | 'disconnect' | 'forget') {
-    if (action === 'disconnect' && !window.confirm(`Disconnect the ${status?.provider ?? ''} key? It is cleared from backend memory and a call in flight is cancelled.`)) return;
-    if (action === 'forget' && !window.confirm(`Forget the ${status?.provider ?? ''} key? This clears it from backend memory and deletes any encrypted copy saved on this machine. It cannot be undone.`)) return;
+    if (action === 'disconnect' && !await confirm({ message: `Disconnect the ${status?.provider ?? ''} key? It is cleared from backend memory and a call in flight is cancelled.`, confirmLabel: 'Disconnect', destructive: true })) return;
+    if (action === 'forget' && !await confirm({ message: `Forget the ${status?.provider ?? ''} key? This clears it from backend memory and deletes any encrypted copy saved on this machine. It cannot be undone.`, confirmLabel: 'Forget key', destructive: true })) return;
     setPending(true); setResult('');
     try {
       if (action === 'disconnect') { await configure('disconnect'); setResult('Disconnected. Credential removed from the backend.'); return; }

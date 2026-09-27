@@ -10,12 +10,12 @@ test('U2 every command that replaces the canvas is sent only after a confirmatio
   for (const action of ['start', 'preview-mock', 'reset']) {
     const sending = lines.filter(line => line.includes(`command({ action: '${action}'`));
     assert.ok(sending.length > 0, `${action} is still reachable`);
-    for (const line of sending) assert.match(line, /window\.confirm\('(Load the demo\?|Load the preview demo\?|Reset the graph\?)|if \(await command\(\{ action: 'reset'/, `${action} asks first`);
+    for (const line of sending) assert.match(line, /await confirm\(\{ message: '(Load the demo\?|Load the preview demo\?|Reset the graph\?)|if \(await command\(\{ action: 'reset'/, `${action} asks first`);
   }
   // resetGraph confirms before its awaited command on the previous line.
-  assert.match(source, /async function resetGraph\(\) \{\n\s+if \(!window\.confirm\('Reset the graph\?/);
+  assert.match(source, /async function resetGraph\(\) \{\n\s+if \(!await confirm\(\{ message: 'Reset the graph\?/);
   // Import still confirms with the file name before replacing anything.
-  assert.match(source, /window\.confirm\(`Import \$\{file\.name\}\?/);
+  assert.match(source, /confirm\(\{ message: `Import \$\{file\.name\}\?/);
 });
 
 test('U2 the demo is loaded from the More menu or the empty canvas, never from the main toolbar', async () => {

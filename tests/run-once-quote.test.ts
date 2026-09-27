@@ -81,6 +81,6 @@ test('A-09 Run once asks first with the quoted maximum', async () => {
   assert.match(runQuestion({ provider: 'openai', model: 'test-model', cached: true, reservedTokens: 0, reservedCostUsd: 0 }), /nothing is reserved/);
   assert.match(runQuestion(null), /did not say how much/);
   const inspector = await readFile('components/agent-inspector.tsx', 'utf8');
-  const quote = inspector.indexOf("action: 'quote'"), ask = inspector.indexOf('window.confirm(runQuestion('), send = inspector.indexOf("action: 'complete'");
+  const quote = inspector.indexOf("action: 'quote'"), ask = inspector.indexOf('await confirm({ message: runQuestion('), send = inspector.indexOf("action: 'complete'");
   assert.ok(quote > 0 && quote < ask && ask < send, 'quote, then ask, then send');
 });

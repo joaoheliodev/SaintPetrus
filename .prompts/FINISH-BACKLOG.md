@@ -141,7 +141,7 @@ panel, nothing copied or loaded from it.
 | U5 | Budgets | Summary, per-scope blocks, details table with every field and action | done |
 | U6 | Activity | Drawer and full view, readable monospace lines, `agent.moved` hidden by default | done |
 | U7 | First steps | Checklist derived from server state, dismissible in memory | done |
-| U8 | In-app confirmations (P3) | Dialog instead of `window.confirm`, same texts, refuse-then-confirm in the browser check | pending |
+| U8 | In-app confirmations (P3) | Dialog instead of `window.confirm`, same texts, refuse-then-confirm in the browser check | done |
 | U9 | Command palette (P3, optional) | Ctrl+K filterable list of existing actions | pending |
 | U10 | Finish | Dev indicator, README, CHANGELOG, STATUS, floor | pending |
 
@@ -193,6 +193,11 @@ panel, nothing copied or loaded from it.
   non-blank output) from the server graph. A slim bar above the canvas (an overlay covered cards) shows while the graph is unfinished,
   says how to do the next step, replaces the old two-ways hint and keeps the empty-canvas Load demo link. Dismiss lasts
   until reload (memory only).
+- U8: all twelve `window.confirm` calls go through `useConfirm()` (`components/confirm-dialog.tsx`, base-ui AlertDialog):
+  same question text, first sentence as the title, a named action button, focus on Cancel. Without the provider the
+  answer is no. The browser check answers the in-app dialog with its own buttons (a page script queues answers and
+  records each question and where focus started), still refuses before confirming, asserts every dialog opened on
+  Cancel and treats a native dialog as a failure. The remove question now says "stays in Budgets" (it said Tokens).
 
 #### Questions for João
 

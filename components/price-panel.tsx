@@ -4,6 +4,7 @@ import type { TokenSnapshot } from '../lib/tokens/service';
 import type { ModelPrice } from '../lib/tokens/pricing';
 import { modelProviders } from '../lib/providers/model-id';
 import { Button } from './ui/button';
+import { useConfirm } from './confirm-dialog';
 
 type Props = {
   catalog: TokenSnapshot['catalog'] | undefined;
@@ -35,7 +36,7 @@ function PriceDetails({ price }: { price: ModelPrice }) {
 export function PricePanel({ catalog, pending, error, onAppend }: Props) {
   const [windows, setWindows] = useState<number[]>([]);
   const [saved, setSaved] = useState(false);
-  const nextWindow = useRef(0);
+  const nextWindow = useRef(0); const confirm = useConfirm();
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -43,7 +44,7 @@ export function PricePanel({ catalog, pending, error, onAppend }: Props) {
     // Draft conversion is UX only; the server validates every field before writing.
     const number = (name: string) => { const value = data.get(name); return value === null || value === '' ? null : Number(value); };
     const band = (name: string) => Object.fromEntries(rateFields.map(field => [field.name, number(`${name}.${field.name}`)]));
-    if (!window.confirm('Add this price validity? It closes the open validity at the new effective date, and stored validities are never edited or deleted.')) return;
+    if (!await confirm({ message: 'Add this price validity? It closes the open validity at the new effective date, and stored validities are never edited or deleted.', confirmLabel: 'Add validity' })) return;
     setSaved(false);
     const accepted = await onAppend({ model: data.get('model'), price: {
       provider: data.get('provider'), effectiveAt: data.get('effectiveAt'), verifiedAt: data.get('verifiedAt'), sourceUrl: data.get('sourceUrl'),

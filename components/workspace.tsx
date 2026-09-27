@@ -18,6 +18,7 @@ import { agentPlacement } from '@/lib/agent-status';
 import { ArtifactPreview } from './artifact-preview';
 import { EventFeed } from './event-feed';
 import { GraphActivity } from './activity-log';
+import { ConfirmProvider, useConfirm } from './confirm-dialog';
 import { ConnectionChip, ConnectionView, connectionTarget, useProviderStatus } from './provider-status';
 import type { ProviderStatusSnapshot } from '@/lib/providers/runtime';
 import type { RunExchange } from '@/lib/run-exchange';
@@ -52,7 +53,7 @@ type Props = { initialGraph: Graph; mockEnabled: boolean; feedEnabled?: boolean;
 function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previewPort }: Props) {
   const { graph, selectedId, notice, events, select } = useProjection();
   const { command, importGraph, pending } = useGraphTransport(initialGraph);
-  const connection = useProviderStatus(); const tokens = useTokenSnapshot();
+  const connection = useProviderStatus(); const tokens = useTokenSnapshot(); const confirm = useConfirm();
   // Which view fills the main column; presentation state in memory only.
   const [view, setView] = useState<View>('workspace'); const [drawerOpen, setDrawerOpen] = useState(true);
   // Dismissing the checklist lasts until the page reloads: no browser storage.
@@ -122,8 +123,8 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   // Keyboard deletion reaches only selected connections, and only after the user confirms.
   const confirmDeletion = useCallback(async (candidates: { nodes: AgentNodeType[]; edges: AgentEdgeType[] }) => {
     const allowed = await allowSelectedEdgesOnly(candidates);
-    return allowed.edges.length > 0 && window.confirm(`Delete ${allowed.edges.length === 1 ? 'the selected connection' : `${allowed.edges.length} selected connections`}? This cannot be undone.`) ? allowed : false;
-  }, []);
+    return allowed.edges.length > 0 && await confirm({ message: `Delete ${allowed.edges.length === 1 ? 'the selected connection' : `${allowed.edges.length} selected connections`}? This cannot be undone.`, confirmLabel: 'Delete', destructive: true }) ? allowed : false;
+  }, [confirm]);
   async function deleteEdges(items: AgentEdgeType[]) {
     for (const edge of items) await command({ action: 'disconnect', id: edge.id });
   }
@@ -164,10 +165,10 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
     openDraft({ parentId: null, position: dropPoint(event.nativeEvent) });
   }
   // Each of these replaces the whole canvas, so each asks first; the texts are the ones the browser check answers.
-  function loadDemo() { if (window.confirm('Load the demo? It replaces the current graph with a fixed synthetic demo; your agents and connections are removed.')) void command({ action: 'start', objective }); }
-  function loadPreviewDemo() { if (window.confirm('Load the preview demo? It replaces the current graph with a synthetic preview demonstration; your agents and connections are removed.')) void command({ action: 'preview-mock' }); }
+  async function loadDemo() { if (await confirm({ message: 'Load the demo? It replaces the current graph with a fixed synthetic demo; your agents and connections are removed.', confirmLabel: 'Load demo', destructive: true })) void command({ action: 'start', objective }); }
+  async function loadPreviewDemo() { if (await confirm({ message: 'Load the preview demo? It replaces the current graph with a synthetic preview demonstration; your agents and connections are removed.', confirmLabel: 'Load preview demo', destructive: true })) void command({ action: 'preview-mock' }); }
   async function resetGraph() {
-    if (!window.confirm('Reset the graph? Every agent except the coordinator, every connection and all output are removed. This cannot be undone.')) return;
+    if (!await confirm({ message: 'Reset the graph? Every agent except the coordinator, every connection and all output are removed. This cannot be undone.', confirmLabel: 'Reset graph', destructive: true })) return;
     if (await command({ action: 'reset', objective })) setResetOpen(false);
   }
   const applyLimits = () => command({ action: 'budget', depth: limits.maxDepth, nodes: limits.maxNodes, cents: limits.maxCostCents });
@@ -221,7 +222,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         </MenuContent>
       </Menu>
       <a ref={exportLink} href="/api/graph/export" download hidden tabIndex={-1}>Export graph</a>
-      <input ref={importInput} type="file" accept="application/json,.json" hidden aria-label="Graph file to import" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file && window.confirm(`Import ${file.name}? It replaces every agent, connection and output on the canvas. Token accounting is not part of the file and is unchanged.`)) void file.text().then(importGraph); }} />
+      <input ref={importInput} type="file" accept="application/json,.json" hidden aria-label="Graph file to import" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void confirm({ message: `Import ${file.name}? It replaces every agent, connection and output on the canvas. Token accounting is not part of the file and is unchanged.`, confirmLabel: 'Import graph', destructive: true }).then(yes => yes ? file.text().then(importGraph) : null); }} />
     </div></div>
       {!steps.complete && !stepsDismissed && <section className="first-steps" aria-labelledby="first-steps-title">
         <h2 id="first-steps-title">First steps · {steps.done} of {steps.steps.length}</h2>
@@ -266,4 +267,4 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
     </DialogContent></Dialog>
   </main>;
 }
-export default function Workspace(props: Props) { return <ReactFlowProvider><CanvasWorkspace {...props} /></ReactFlowProvider>; }
+export default function Workspace(props: Props) { return <ReactFlowProvider><ConfirmProvider><CanvasWorkspace {...props} /></ConfirmProvider></ReactFlowProvider>; }

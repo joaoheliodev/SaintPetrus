@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import type { Agent, Graph } from '../lib/orchestrator';
 import { connectionTarget, postProviderAction, verificationMessage } from './provider-status';
 import { AgentStatusBadge } from './agent-status-badge';
+import { useConfirm } from './confirm-dialog';
 import { agentPlacement } from '../lib/agent-status';
 // The confirmation names the maximum the server will hold before sending; the call itself is checked again.
 export function runQuestion(quote: unknown): string {
@@ -33,8 +34,9 @@ export function AgentInspector({ agent, agents, pending, command, connect, conne
   async function save() { if (await command({ action: 'update', id: agent.id, name, objective })) setEditing(false); }
   // The server refuses a removal while the agent's accounting is unsettled, and the coordinator is never removable.
   const removable = agents[0]?.id !== agent.id;
-  function remove() {
-    if (window.confirm(`Remove ${agent.name}? Its connections are deleted and it leaves the canvas; its accounting stays in Tokens, marked as a removed agent. This cannot be undone.`)) void command({ action: 'remove-agent', id: agent.id });
+  const confirm = useConfirm();
+  async function remove() {
+    if (await confirm({ message: `Remove ${agent.name}? Its connections are deleted and it leaves the canvas; its accounting stays in Budgets, marked as a removed agent. This cannot be undone.`, confirmLabel: 'Remove agent', destructive: true })) void command({ action: 'remove-agent', id: agent.id });
   }
   // The keyboard path to what a drag between two cards does; the canvas validates and the server decides.
   const [target, setTarget] = useState(''); const others = agents.filter(other => other.id !== agent.id);
@@ -48,7 +50,7 @@ export function AgentInspector({ agent, agents, pending, command, connect, conne
     try {
       const quoted = await postProviderAction(JSON.stringify({ action: 'quote', input: message, agentId: agent.id }));
       if (!quoted.ok) { setResult(refusal(quoted.status, quoted.data?.error)); return; }
-      if (!window.confirm(runQuestion(quoted.data?.quote))) { setResult('Not sent.'); return; }
+      if (!await confirm({ message: runQuestion(quoted.data?.quote), confirmLabel: 'Send (1 call)' })) { setResult('Not sent.'); return; }
       const sent = message;
       const { ok, status, data } = await postProviderAction(JSON.stringify({ action: 'complete', input: sent, agentId: agent.id }));
       if (!ok) { setResult(refusal(status, data?.error)); return; }

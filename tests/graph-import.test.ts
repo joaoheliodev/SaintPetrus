@@ -176,6 +176,6 @@ test('A-04 the server restores the graph before it listens and saves the last ch
   assert.match(server, /process\.on\(signal, \(\) => \{ try \{ graphStore\.flush\(\);/);
   assert.match(server, /new GraphStore\(userDataDirectory\(\)/);
   const [workspace, transport] = await Promise.all(['components/workspace.tsx', 'lib/use-graph-transport.ts'].map(path => readFile(path, 'utf8')));
-  assert.match(workspace, /window\.confirm\(`Import \$\{file\.name\}\? It replaces every agent[^`]*`\)\) void file\.text\(\)\.then\(importGraph\)/, 'import asks first');
+  assert.match(workspace, /void confirm\(\{ message: `Import \$\{file\.name\}\? It replaces every agent[^`]*`, confirmLabel: 'Import graph', destructive: true \}\)\.then\(yes => yes \? file\.text\(\)\.then\(importGraph\) : null\)/, 'import asks first');
   assert.match(transport, /send\('\/api\/graph\/import', file, 'import'\)/);
 });

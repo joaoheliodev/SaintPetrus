@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TokenSnapshot } from '../lib/tokens/service';
 import { Button } from './ui/button';
 import { PricePanel } from './price-panel';
+import { useConfirm } from './confirm-dialog';
 import { Gauge } from 'lucide-react';
 import { budgetMeter, budgetStatus, callCount, idle, percent, rowUsage, scopes, usd, type BudgetRow } from '../lib/budget-summary';
 import { cn } from '../lib/utils';
@@ -60,8 +61,8 @@ export function useTokenSnapshot() {
 }
 export type TokenSource = ReturnType<typeof useTokenSnapshot>;
 export function PauseAllButton({ tokens }: { tokens: TokenSource }) {
-  const { pending, command } = tokens;
-  return <Button variant="outline" disabled={pending} onClick={() => { if (window.confirm('Pause every agent? A provider call in flight is cancelled and stays unverifiable until its reservation expires.')) void command({ action: 'kill' }); }}>Pause all agents</Button>;
+  const { pending, command } = tokens; const confirm = useConfirm();
+  return <Button variant="outline" disabled={pending} onClick={async () => { if (await confirm({ message: 'Pause every agent? A provider call in flight is cancelled and stays unverifiable until its reservation expires.', confirmLabel: 'Pause all agents', destructive: true })) void command({ action: 'kill' }); }}>Pause all agents</Button>;
 }
 const meterStates: Record<string, string> = { available: '', warning: ' · warning', stopped: ' · stopped' };
 // The top-bar meter, from the same snapshot as Budgets: the fullest of the global and session scopes.
@@ -89,7 +90,7 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
   const [reconciliation, setReconciliation] = useState<Record<string, { prompt: string; completion: string; costUsd: string }>>({});
-  const [allScopes, setAllScopes] = useState(false); const [calls, setCalls] = useState<ReturnType<typeof callCount>>();
+  const confirm = useConfirm(); const [allScopes, setAllScopes] = useState(false); const [calls, setCalls] = useState<ReturnType<typeof callCount>>();
   const total = data?.rows.find(row => row.scope === 'global');
   const name = (row: BudgetRow) => row.scope === 'agent' ? agents.find(agent => agent.id === row.id)?.name ?? row.id : row.scope === 'global' ? 'All calls' : row.scope === 'session' ? 'This server run' : row.id;
   // Receipts are read again only when the global counters move, i.e. after a call settles.
@@ -130,7 +131,7 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
         {data && data.reservations.length === 0 && <p>No held or expired reservations.</p>}
         {data?.reservations.map(item => { const values = reconciliation[item.id] ?? { prompt: '', completion: '', costUsd: '' }; return <section key={item.id} className="context-note">
           <span>{item.status === 'estimated' ? '⚠ Expired estimate' : '■ Awaiting usage'} · {item.agent} · {item.model}{item.servedModel && item.servedModel !== item.model ? ` · served by ${item.servedModel}` : ''} · {item.tokens} tokens and USD {item.costUsd.toFixed(9)} reserved · ID {item.id}</span>
-          {item.status === 'estimated' && <><input aria-label={`Confirmed prompt tokens ${item.id}`} type="number" min={0} value={values.prompt} onChange={event => setReconciliation({ ...reconciliation, [item.id]: { ...values, prompt: event.target.value } })} /><input aria-label={`Confirmed completion tokens ${item.id}`} type="number" min={0} value={values.completion} onChange={event => setReconciliation({ ...reconciliation, [item.id]: { ...values, completion: event.target.value } })} /><input aria-label={`Confirmed cost USD ${item.id}`} type="number" min={0} step="any" value={values.costUsd} onChange={event => setReconciliation({ ...reconciliation, [item.id]: { ...values, costUsd: event.target.value } })} /><Button disabled={pending || values.prompt === '' || values.completion === '' || values.costUsd === ''} variant="outline" onClick={() => { if (window.confirm(`Replace the expired estimate ${item.id} with this confirmed usage and cost? This cannot be undone.`)) void command({ action: 'reconcile', reservationId: item.id, prompt: Number(values.prompt), completion: Number(values.completion), costUsd: Number(values.costUsd) }); }}>Apply confirmed usage</Button></>}
+          {item.status === 'estimated' && <><input aria-label={`Confirmed prompt tokens ${item.id}`} type="number" min={0} value={values.prompt} onChange={event => setReconciliation({ ...reconciliation, [item.id]: { ...values, prompt: event.target.value } })} /><input aria-label={`Confirmed completion tokens ${item.id}`} type="number" min={0} value={values.completion} onChange={event => setReconciliation({ ...reconciliation, [item.id]: { ...values, completion: event.target.value } })} /><input aria-label={`Confirmed cost USD ${item.id}`} type="number" min={0} step="any" value={values.costUsd} onChange={event => setReconciliation({ ...reconciliation, [item.id]: { ...values, costUsd: event.target.value } })} /><Button disabled={pending || values.prompt === '' || values.completion === '' || values.costUsd === ''} variant="outline" onClick={async () => { if (await confirm({ message: `Replace the expired estimate ${item.id} with this confirmed usage and cost? This cannot be undone.`, confirmLabel: 'Apply confirmed usage', destructive: true })) void command({ action: 'reconcile', reservationId: item.id, prompt: Number(values.prompt), completion: Number(values.completion), costUsd: Number(values.costUsd) }); }}>Apply confirmed usage</Button></>}
         </section>; })}
         <p>Resume eligible agents is in the summary above.</p>
         <h3>Model allowlist</h3>
