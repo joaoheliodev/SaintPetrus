@@ -98,7 +98,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | D2 | `docs/architecture.md` | Operator requirement | Modules and the path of one call | no | done (this commit) |
 | D3 | `SECURITY.md` threat model | Operator requirement | Threat model; reporting contact left as a marked placeholder | contact (Q-05) | done (this commit; the contact stays a marked placeholder until Q-05 is answered) |
 | D4 | `CHANGELOG.md` | Operator requirement | What this session delivered | no | done (this commit; kept current until the final commit) |
-| D5 | CI workflow | Operator requirement | Lint, typechecks, tests, build and Gitleaks on push and PR (workflow already exists; verify and adjust) | no | pending |
+| D5 | CI workflow | Operator requirement | Lint, typechecks, tests, build and Gitleaks on push and PR (workflow already exists; verify and adjust) | no | done (this commit; verified: Gitleaks over full history, tracked-path check, `npm ci`, audit, lint, both typechecks, tests and build on every push and PR. Added: the test run is held to the AGENTS.md floor with zero failures, cancellations, skips and todos) |
 | D6 | LICENSE | Operator requirement: do not choose one | Question Q-06 | yes | blocked (operator decision) |
 | D7 | Permanent rules from this prompt into `AGENTS.md` | `AGENTS.md` requires prompt rules to be written down before acting on them | Test hygiene, dependency policy and published-secret stop rule added; floor kept current | no | pending |
 
@@ -207,6 +207,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | Q3 | Connect enabled before a target is chosen | killed by the same test |
 | Q3 | inspector select edge drawn with `--border` | killed by "Q3 field edges and the focus ring keep 3:1…" |
 | Q3 | card and connection focus override removed | killed by "Q3 cards and connections show keyboard focus…"; before the fix the browser check listed the three cards and the edge as invisible focus stops |
+| D5 | floor check off by one | killed by "D5 a shrinking, skipping, failing or unreadable run is refused" |
+| D5 | one skipped test tolerated | killed by the same test |
+| D5 | CI step without `shell: bash` (no pipefail) | killed by "D5 CI holds every run to the floor…" |
 
 ## Phase 2 security findings
 

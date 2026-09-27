@@ -27,5 +27,9 @@ jobs:
       - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - name: Tests, at or above the floor in AGENTS.md, none skipped
+        shell: bash
+        run: |
+          npm test 2>&1 | tee test-output.txt
+          node scripts/check-test-floor.mjs test-output.txt
       - run: npm run build
