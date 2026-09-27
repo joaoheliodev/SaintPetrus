@@ -97,7 +97,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | D1 | README rewrite | Discrepancies listed in `docs/provider-validation.md` | What, requirements, install, mock run, main flow, key entry, security model, limits, validation status | no | done (this commit; README rewritten from the code; the discrepancy list in `docs/provider-validation.md` is replaced by a note) |
 | D2 | `docs/architecture.md` | Operator requirement | Modules and the path of one call | no | done (this commit) |
 | D3 | `SECURITY.md` threat model | Operator requirement | Threat model; reporting contact left as a marked placeholder | contact (Q-05) | done (this commit; the contact stays a marked placeholder until Q-05 is answered) |
-| D4 | `CHANGELOG.md` | Operator requirement | What this session delivered | no | pending |
+| D4 | `CHANGELOG.md` | Operator requirement | What this session delivered | no | done (this commit; kept current until the final commit) |
 | D5 | CI workflow | Operator requirement | Lint, typechecks, tests, build and Gitleaks on push and PR (workflow already exists; verify and adjust) | no | pending |
 | D6 | LICENSE | Operator requirement: do not choose one | Question Q-06 | yes | blocked (operator decision) |
 | D7 | Permanent rules from this prompt into `AGENTS.md` | `AGENTS.md` requires prompt rules to be written down before acting on them | Test hygiene, dependency policy and published-secret stop rule added; floor kept current | no | pending |
