@@ -2,11 +2,13 @@
 
 Branch: `night/provider-validation-ready`, continuing `night/provider-validation` from the operator's price-admin commit `0662647` on `night/price-admin`, following `night/price-schema`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`; timestamped events live in the append-only `NIGHT-LOG.md`.
 
-## Verification checkpoint (2026-09-26)
+## Verification checkpoint (2026-09-27)
 
-Run without any API key: lint, the app ES2017 and core ES2022 typechecks and npm test passed. An explicit in-process run confirmed 338 tests in 29 suites, zero failures or skips; the default runner reports test-file processes in this sandbox. The production build was not rerun by this agent; the operator reported approving the price-admin build and Prices browser check on September 23. No provider request was made, including `GET /models`.
-
-The suite covers the delivered behavior below with synthetic fixtures only. Browser checks and the results of earlier rounds are historical evidence from the commits and handoffs that delivered them, and were not repeated.
+Run in a cloud session without any API key: lint, both typechecks, the full suite at the floor stated in
+`AGENTS.md` with zero failures or skips, and `npm run build` passed before every commit of the finishing
+session. Gitleaks found nothing in the staged diff of any commit, in the working directory or in the full
+history. The browser check (`npm run test:e2e`) passed in development and in production. CI passed on every
+push of the branch. No provider request was made, including `GET /models`.
 
 ## Delivered
 
@@ -19,6 +21,7 @@ The suite covers the delivered behavior below with synthetic fixtures only. Brow
 - **Price schema.** Optional `expiresAt` with a preflight horizon covering the reservation TTL (P1); the enforced total `costAccountedUsd` named apart from its unmeasured part `costUnmeasuredUsd` (P2).
 - **Provider-scoped expiry floor (P3).** Implemented: capture the validated provider and tariff candidates; narrow only when every usable candidate has price-side provider metadata, otherwise retain the global floor. Charge at least the original hold in all four scopes. Request allowlisting does not remove price-only reroute candidates.
 - **Round C.** Orphan permanent rules moved into `AGENTS.md`, local refusal verdicts proven unreachable with a live reservation, and the deferred price dimensions and first real call protocol documented.
+- **Finishing session (2026-09-27).** Served-model price keys for Gemini and OpenAI; an unpriced served model stays `unverifiable`; unreadable usage names its fields; per-call receipts (`GET /api/receipts`) and an upstream dispatch counter; a startup-only validation timeout; DeepSeek in the terminal key helper; an empty probe never verifies. Forget key in the panel; a content security policy on every response. The panel works keyless in `npm run dev`; agents can be edited, run once and connected from the keyboard; destructive actions ask first; keyboard moves are saved; focus and field contrast meet WCAG AA. README, `docs/architecture.md`, the `SECURITY.md` threat model and `CHANGELOG.md` rewritten or added; CI holds the test floor. The backlog, decisions and questions for the operator live in `.prompts/FINISH-BACKLOG.md`.
 
 ## Not verified or pending
 
@@ -26,10 +29,14 @@ The suite covers the delivered behavior below with synthetic fixtures only. Brow
 - Step 1B also owes a forced real provider error with fragment checks, 429 and timeout if feasible, context export and enabled-feed credential scans, and sanitized real fixtures with a regression fix for each observed divergence.
 - DeepSeek has no model ID and no price in configuration, so selecting it is refused with `model_not_allowlisted` until the operator enters both from the browser.
 - The configured OpenAI and Gemini rates were verified on 2026-09-07. Account and model availability are unverified.
+- OpenAI is priced by the dated snapshot its response names, and only the alias has a price, so an OpenAI call stays `unverifiable` and pauses its agent until the operator registers the snapshot's price (Q-07).
 - The response cache is off (`cacheTtlMs` 0) until a real key is validated, so the per-model determinism declarations are dormant.
 - Long-context tiers and cache-write pricing are not modeled; see `docs/reference/deferred-price-dimensions.md`.
 - The Responses streaming path and real error, quota and timeout handling are tested only with synthetic transport.
 - The full RF-02 panel is pending. RF-03 and RF-04 are out of scope.
+- Agent removal, graph import and persistence are not implemented; they wait on operator decisions (Q-03, Q-04).
+- There is no LICENSE file; choosing one is the operator's decision (Q-06). The security contact in `SECURITY.md` is a marked placeholder (Q-05).
+- Accessibility was checked in Chromium (contrast, control names, visible focus, keyboard paths), not with a screen reader.
 
 ## Open debts and limits
 
