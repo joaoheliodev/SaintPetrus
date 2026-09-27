@@ -1,6 +1,7 @@
 // The suite may grow but never shrink or skip: AGENTS.md states the floor and CI holds every run to it.
+// TAP prints `# tests 396`; the spec reporter, the default on a terminal and in newer Node, prints `ℹ tests 396`.
 const count = (output, name) => {
-  const values = [...output.matchAll(new RegExp(`^# ${name} (\\d+)$`, 'gm'))];
+  const values = [...output.matchAll(new RegExp(`^(?:#|ℹ) ${name} (\\d+)$`, 'gm'))];
   return values.length ? Number(values.at(-1)[1]) : undefined;
 };
 

@@ -24,3 +24,10 @@ test('D5 CI holds every run to the floor in AGENTS.md', () => {
   assert.match(ci, /shell: bash\n\s+run: \|\n\s+npm test 2>&1 \| tee test-output\.txt\n\s+node scripts\/check-test-floor\.mjs test-output\.txt/, 'the run keeps pipefail and checks the same output');
   assert.equal(testFloorProblems(`# tests ${readFileSync('AGENTS.md', 'utf8').match(/It stands at (\d+) today\./)?.[1]}\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0`, readFileSync('AGENTS.md', 'utf8')).length, 0, 'the repository floor is readable');
 });
+
+test('R1 the floor check reads the spec reporter as well as TAP, so newer Node cannot fail it by format alone', () => {
+  const spec = (tests: number, skipped = 0) => ['✔ something (1ms)', `ℹ tests ${tests}`, 'ℹ suites 2', `ℹ pass ${tests}`, 'ℹ fail 0', 'ℹ cancelled 0', `ℹ skipped ${skipped}`, 'ℹ todo 0', 'ℹ duration_ms 12'].join('\n');
+  assert.deepEqual(testFloorProblems(spec(10), agents), []);
+  assert.match(testFloorProblems(spec(9), agents).join(), /below the floor of 10/);
+  assert.match(testFloorProblems(spec(10, 1), agents).join(), /skipped: 1/);
+});

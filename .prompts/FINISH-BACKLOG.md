@@ -227,6 +227,7 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R1-08 | OpenAI stream back to lax usage | killed by "R1 the OpenAI adapter refuses an unreadable usage on both paths…" |
 | R1-08 | reasoning above output accepted | killed by "R1 OpenAI usage is parsed strictly…" |
 | R1-13 | `busy` message removed | killed by "R1 the panel says which actions call a provider…" |
+| R1-13 | floor parser back to TAP only | killed by "R1 the floor check reads the spec reporter as well as TAP…" |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
