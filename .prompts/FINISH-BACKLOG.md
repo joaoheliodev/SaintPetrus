@@ -86,15 +86,15 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
 | Q1 | Coverage for critical modules | Token, credential, event and preview routes have uncovered branches | New tests with mocked transport only; coverage recorded | no | done (this commit; `tests/route-boundaries.test.ts`: token, price, provider, credential, graph and artifact-stream route boundaries; non-test line coverage 94.4% (baseline 93%), branches 91.9%, functions 87.7%, measured with `--experimental-test-coverage --test-coverage-exclude='tests/**'`) |
-| Q2 | Browser end-to-end smoke check | Chromium is preinstalled in this environment | Dependency-free CDP script for the main flow in mock mode, outside the gate; run result recorded | no | in progress (`scripts/check-workspace-browser.mjs` added with S4; extended with Phase 3) |
+| Q2 | Browser end-to-end smoke check | Chromium is preinstalled in this environment | Dependency-free CDP script for the main flow in mock mode, outside the gate; run result recorded | no | done (this commit documents `npm run test:e2e`; last runs green in dev and production after c8be837: main flow, keyboard move, drag, keyboard connect, 35/29 visible Tab stops, control names in four states, confirmations, no CSP violations or console errors) |
 | Q3 | Basic accessibility | Keyboard, labels, visible focus, contrast | Focus-visible styles, labelled controls, keyboard paths checked; contrast of tokens measured | no | done (this commit; contrast and field edges d6a0a59, D-08; arrow-key and group moves saved 3aa99bc; focus on cards and connections made visible and a keyboard path to connect agents added here, D-09; the browser check names every control in four states and walks 35 Tab stops in dev, 29 in production, all visibly focused. Not done: no screen-reader session, React Flow live-region announcements unverified) |
-| Q4 | Dead code | Only when unused is proven | Removals backed by search evidence, or none | no | pending |
+| Q4 | Dead code | Only when unused is proven | Removals backed by search evidence, or none | no | done (this commit; none removed. Evidence: every source file is imported, every dependency is referenced, and exports used only by tests are either test seams used inside their own module or the published `lib/core` API, whose removal would also delete tests) |
 
 ### Phase 5 — documentation and DX (P3)
 
 | ID | Title | Reason | Acceptance criterion | Operator | Status |
 | --- | --- | --- | --- | --- | --- |
-| D1 | README rewrite | Discrepancies listed in `docs/provider-validation.md` | What, requirements, install, mock run, main flow, key entry, security model, limits, validation status | no | pending |
+| D1 | README rewrite | Discrepancies listed in `docs/provider-validation.md` | What, requirements, install, mock run, main flow, key entry, security model, limits, validation status | no | done (this commit; README rewritten from the code; the discrepancy list in `docs/provider-validation.md` is replaced by a note) |
 | D2 | `docs/architecture.md` | Operator requirement | Modules and the path of one call | no | pending |
 | D3 | `SECURITY.md` threat model | Operator requirement | Threat model; reporting contact left as a marked placeholder | contact (Q-05) | pending |
 | D4 | `CHANGELOG.md` | Operator requirement | What this session delivered | no | pending |

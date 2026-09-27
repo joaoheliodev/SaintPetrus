@@ -368,16 +368,10 @@ gaps block the chosen provider; evidence and fragment-check methods; feed enable
 timeout and disposable-key error procedures. Nothing in this protocol authorizes an
 agent call. A step with unresolved evidence stays blocked, even if its mock passes.
 
-## README discrepancies (listed only; README unchanged)
+## README
 
-- Opening scope omits Gemini/DeepSeek and live Prices administration.
-- Manual graph says polling; graph snapshots now use SSE.
-- Credentials says Connect stores without testing; the button now verifies once.
-- Proxy says streaming is unimplemented despite the optional OpenAI preview path.
-- Token controls describe initial file/restart administration and OpenAI usage
-  fields without the provider-specific contracts or captured tariff versions.
-- Expiry wording implies only the original hold, omitting the larger eligible
-  floor; cache wording omits explicit determinism/thinking requirements and hash.
-- Historical model/rate examples are not current operator verification. Do not
-  reuse them as validation inputs. First-real-call reference also has historical
-  schedule examples: current operator-verified catalog is the authority.
+The README was rewritten to match the code: provider scope, live price administration, the event stream,
+Connect and verify, the streaming preview path, served-model price keys, the expiry floor and the disabled
+response cache. Historical model and rate examples, here and in `docs/reference/first-real-call.md`, are not
+current operator verification and must not be reused as validation inputs: the operator-verified catalog is
+the authority.
