@@ -2,7 +2,7 @@
 // Adapted canvas geometry and interactions; all mutations go to the local server.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Position, MarkerType, useEdgesState, useNodesState, useReactFlow, type Edge, type EdgeChange, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
-import { Bot, ChevronDown, ChevronUp, Circle, CircleCheck, CornerDownRight, Crown, Download, Ellipsis, Gauge, GitBranch, History, LayoutGrid, Maximize, Plug, Tag, Pause, Play, Plus, RotateCcw, ShieldCheck, Upload, Workflow, X } from 'lucide-react';
+import { Bot, ChevronDown, ChevronUp, Circle, CircleCheck, CornerDownRight, Crown, Download, Ellipsis, Gauge, GitBranch, History, LayoutGrid, Maximize, Plug, Search, Tag, Pause, Play, Plus, RotateCcw, ShieldCheck, Upload, Workflow, X } from 'lucide-react';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -12,7 +12,9 @@ import { connectionFeedback, type Agent, type Graph } from '@/lib/orchestrator';
 import { useProjection } from '@/lib/store';
 import { useGraphTransport } from '@/lib/use-graph-transport';
 import { AgentInspector } from './agent-inspector';
-import { BudgetMeter, BudgetsView, PauseAllButton, PricesView, useTokenSnapshot } from './token-panel';
+import { BudgetMeter, BudgetsView, PauseAllButton, PricesView, askToPauseAll, useTokenSnapshot } from './token-panel';
+import { CommandPalette } from './command-palette';
+import type { Command } from '@/lib/command-search';
 import { AgentStatusBadge } from './agent-status-badge';
 import { agentPlacement } from '@/lib/agent-status';
 import { ArtifactPreview } from './artifact-preview';
@@ -57,7 +59,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   // Which view fills the main column; presentation state in memory only.
   const [view, setView] = useState<View>('workspace'); const [drawerOpen, setDrawerOpen] = useState(true);
   // Dismissing the checklist lasts until the page reloads: no browser storage.
-  const [stepsDismissed, setStepsDismissed] = useState(false);
+  const [stepsDismissed, setStepsDismissed] = useState(false); const [paletteOpen, setPaletteOpen] = useState(false);
   const importInput = useRef<HTMLInputElement>(null); const exportLink = useRef<HTMLAnchorElement>(null);
   const [resetOpen, setResetOpen] = useState(false);
   // Each agent's last Run once, in memory only: never sent back, saved or put in browser storage.
@@ -179,6 +181,19 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
     { id: 'workspace', label: 'Workspace', icon: LayoutGrid }, { id: 'activity', label: 'Activity', icon: History },
     { id: 'budgets', label: 'Budgets', icon: Gauge }, { id: 'prices', label: 'Prices', icon: Tag }, { id: 'connection', label: 'Connection', icon: Plug },
   ];
+  const commands: Command[] = [
+    ...views.map(item => ({ id: `view-${item.id}`, label: `Go to ${item.label}`, group: 'View', run: () => setView(item.id) })),
+    { id: 'add-agent', label: 'Add agent', group: 'Canvas', disabled: pending, run: () => { setView('workspace'); openDraft({ parentId: null }); } },
+    { id: 'add-subagent', label: `Add subagent under ${selected.name}`, group: 'Canvas', disabled: pending, run: () => { setView('workspace'); openDraft({ parentId: selected.id }); } },
+    { id: 'fit', label: 'Fit all', group: 'Canvas', run: () => { setView('workspace'); void flow.fitView({ padding: .2, maxZoom: 1, duration: 300 }); } },
+    { id: 'import', label: 'Import graph…', group: 'Graph', disabled: pending || active, run: () => importInput.current?.click() },
+    { id: 'export', label: 'Export graph', group: 'Graph', run: () => exportLink.current?.click() },
+    { id: 'reset', label: 'Reset graph…', group: 'Graph', disabled: pending || active, run: () => { setView('workspace'); setResetOpen(true); } },
+    ...(mockEnabled ? [{ id: 'demo', label: 'Load demo…', group: 'Graph', disabled: pending || active, run: () => void loadDemo() }] : []),
+    ...(mockEnabled && previewPort ? [{ id: 'preview-demo', label: 'Load preview demo…', group: 'Graph', disabled: pending || active, run: () => void loadPreviewDemo() }] : []),
+    { id: 'pause-all', label: 'Pause all agents…', group: 'Budgets', disabled: tokens.pending, run: () => void askToPauseAll(tokens.command, confirm) },
+    ...graph.agents.map(agent => ({ id: `agent-${agent.id}`, label: `Open ${agent.name}`, group: 'Agent', run: () => openAgent(agent) })),
+  ];
   function openAgent(agent: Agent) { setView('workspace'); select(agent.id); void flow.setCenter(agent.position.x + 145, agent.position.y + 100, { zoom: .9, duration: 300 }); }
   return <main className="app-shell">
     <aside className="sidebar" aria-label="Navigation">
@@ -203,7 +218,8 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       </div>
     </aside>
     <div className="main-column">
-      <header className="topbar"><ConnectionChip source={connection} open={() => setView('connection')} /><BudgetMeter snapshot={tokens.data} open={() => setView('budgets')} /><div className="topbar-actions"><PauseAllButton tokens={tokens} /></div></header>
+      <header className="topbar"><ConnectionChip source={connection} open={() => setView('connection')} /><BudgetMeter snapshot={tokens.data} open={() => setView('budgets')} /><div className="topbar-actions"><Button variant="ghost" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Control+K"><Search />Commands<kbd>Ctrl K</kbd></Button><PauseAllButton tokens={tokens} /></div></header>
+      <CommandPalette commands={commands} open={paletteOpen} onOpenChange={setPaletteOpen} />
       {/* The canvas stays laid out under the other views: React Flow measures nodes and draws its background from its own size. */}
       <div className={cn('workspace-view', view !== 'workspace' && 'is-away')} inert={view !== 'workspace'}><div className="center-panel"><div className="canvas-toolbar"><span>Canvas · {graph.agents.length} {graph.agents.length === 1 ? 'agent' : 'agents'} · {graph.edges.length} {graph.edges.length === 1 ? 'connection' : 'connections'}</span><div className="project-actions">
       <Button disabled={pending} onClick={() => openDraft({ parentId: null })}><Plus />Add agent</Button>

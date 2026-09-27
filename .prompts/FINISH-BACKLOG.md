@@ -142,7 +142,7 @@ panel, nothing copied or loaded from it.
 | U6 | Activity | Drawer and full view, readable monospace lines, `agent.moved` hidden by default | done |
 | U7 | First steps | Checklist derived from server state, dismissible in memory | done |
 | U8 | In-app confirmations (P3) | Dialog instead of `window.confirm`, same texts, refuse-then-confirm in the browser check | done |
-| U9 | Command palette (P3, optional) | Ctrl+K filterable list of existing actions | pending |
+| U9 | Command palette (P3, optional) | Ctrl+K filterable list of existing actions | done |
 | U10 | Finish | Dev indicator, README, CHANGELOG, STATUS, floor | pending |
 
 #### Decisions taken
@@ -198,6 +198,10 @@ panel, nothing copied or loaded from it.
   answer is no. The browser check answers the in-app dialog with its own buttons (a page script queues answers and
   records each question and where focus started), still refuses before confirming, asserts every dialog opened on
   Cancel and treats a native dialog as a failure. The remove question now says "stays in Budgets" (it said Tokens).
+- U9: Ctrl+K (Cmd+K) opens a palette over the existing Dialog, listing views, canvas and graph actions, Pause all
+  agents and every agent by name. Every word typed must appear (`lib/command-search.ts`); the order never changes and
+  disabled actions are left out. Each entry calls the same handler as its button, confirmations included; Pause all
+  moved into `askToPauseAll` so the button and the palette share it. The top bar shows "Commands Ctrl K".
 
 #### Questions for João
 

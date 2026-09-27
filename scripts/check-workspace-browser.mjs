@@ -147,10 +147,15 @@ try {
   assert.ok(await evaluate(`document.body.textContent.includes('No held or expired reservations.')`), 'empty reservation state is explicit');
   assert.match(await evaluate(`document.querySelector('.budget-status')?.textContent ?? ''`), /\w/, 'the summary says in a sentence how the budgets stand');
   assert.deepEqual(await unnamed(), [], 'budget controls are named');
-  await until(() => click('Prices'), 'Prices view');
+  // Ctrl+K opens the command palette; typing filters it and Enter runs the highlighted command.
+  for (const type of ['rawKeyDown', 'keyUp']) await call('Input.dispatchKeyEvent', { type, key: 'k', code: 'KeyK', windowsVirtualKeyCode: 75, modifiers: 2 }, session);
+  await until(() => evaluate(`document.activeElement?.getAttribute('aria-label') === 'Command'`), 'command palette focused');
+  await type('input[aria-label="Command"]', 'go to prices');
+  await until(() => evaluate(`document.querySelector('[role=option][aria-selected=true]')?.textContent.startsWith('Go to Prices')`), 'palette filtered');
+  await key('Enter');
   await until(() => evaluate(`!!document.querySelector('form[aria-label="Add price validity"]')`), 'price form');
   assert.deepEqual(await unnamed(), [], 'price controls are named');
-  console.log('PASS: budget and price controls loaded from the server');
+  console.log('PASS: budget and price controls loaded from the server; Prices reached with Ctrl+K');
   // Activity names each action for a person; the arrow-key and drag moves above are hidden until asked for.
   await until(() => click('Activity'), 'Activity view');
   await until(() => evaluate(`document.querySelector('.activity-view .activity-lines')?.textContent.includes('Agent created')`), 'activity lines');

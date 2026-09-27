@@ -60,9 +60,13 @@ export function useTokenSnapshot() {
   return { data, error, pending, priceError, command };
 }
 export type TokenSource = ReturnType<typeof useTokenSnapshot>;
+// The kill switch, shared by the top-bar button and the command palette.
+export async function askToPauseAll(command: TokenSource['command'], confirm: ReturnType<typeof useConfirm>) {
+  if (await confirm({ message: 'Pause every agent? A provider call in flight is cancelled and stays unverifiable until its reservation expires.', confirmLabel: 'Pause all agents', destructive: true })) void command({ action: 'kill' });
+}
 export function PauseAllButton({ tokens }: { tokens: TokenSource }) {
   const { pending, command } = tokens; const confirm = useConfirm();
-  return <Button variant="outline" disabled={pending} onClick={async () => { if (await confirm({ message: 'Pause every agent? A provider call in flight is cancelled and stays unverifiable until its reservation expires.', confirmLabel: 'Pause all agents', destructive: true })) void command({ action: 'kill' }); }}>Pause all agents</Button>;
+  return <Button variant="outline" disabled={pending} onClick={() => void askToPauseAll(command, confirm)}>Pause all agents</Button>;
 }
 const meterStates: Record<string, string> = { available: '', warning: ' · warning', stopped: ' · stopped' };
 // The top-bar meter, from the same snapshot as Budgets: the fullest of the global and session scopes.

@@ -205,6 +205,15 @@ button.provider-badge:hover { background: var(--secondary); }
 .confirm-dialog { position: fixed; top: 50%; left: 50%; z-index: 71; transform: translate(-50%, -50%); width: min(30rem, calc(100vw - 32px)); display: grid; gap: 10px; padding: 18px 20px; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 16px 40px rgb(0 0 0 / .45); }
 .confirm-title { font-size: 16px; font-weight: 600; } .confirm-detail { color: var(--muted-foreground); }
 .confirm-actions { justify-content: flex-end; margin-top: 6px; }
+kbd { padding: 0 5px; border: 1px solid var(--border); border-radius: 4px; font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted-foreground); }
+.command-palette { top: 12vh; translate: -50% 0; --tw-translate-y: 0; width: min(36rem, calc(100vw - 32px)); max-width: none; gap: 0; padding: 0; }
+.command-input { display: flex; align-items: center; gap: 8px; margin: 10px 10px 4px; padding: 0 10px; border: 1px solid var(--input); border-radius: 6px; background: var(--background); }
+/* The label draws the field's edge and its focus ring, so the text box inside it has neither. */
+.command-input > input { margin: 0; border-width: 0; background: transparent; padding: 10px 0; } .command-input > input:focus-visible { outline: none; }
+.command-input:has(> input:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
+.command-list { margin: 0; padding: 6px; list-style: none; max-height: 50vh; overflow: auto; }
+.command-list [role=option] { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+.command-list [role=option] small { color: var(--muted-foreground); } .command-list [role=option][aria-selected=true] { background: var(--accent); }
 @media (max-width: 1280px) { .inspector { width: 320px; } }
 @media (max-height: 780px) { .drawer { height: 150px; } }
 @media (max-width: 900px) { .app-shell { height: auto; min-height: 100dvh; overflow: visible; grid-template-columns: 1fr; } .sidebar { max-height: none; border-right: 0; border-bottom: 1px solid var(--border); } .workspace-view { flex-wrap: wrap; } .center-panel { flex-basis: 100%; height: 620px; } .inspector { width: 100%; } .topbar { flex-wrap: wrap; } }
