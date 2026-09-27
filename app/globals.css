@@ -85,6 +85,9 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 21px; } h2 { font-size: 17px; } h3 
 .topbar, .projectbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 22px; border-bottom: 1px solid var(--border); background: var(--card); }
 .brand, .project-actions, .status { display: flex; align-items: center; gap: 10px; }
 .brand strong { font-size: 21px; } .brand svg { color: var(--primary); }
+/* Always on screen: whether a click can reach a paid provider. */
+.mode-badge { padding: 2px 10px; border: 1px solid var(--input); border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: .06em; color: var(--muted-foreground); }
+.mode-badge.is-real { color: var(--destructive); border-color: var(--destructive); }
 .projectbar h1 small { font-size: 14px; color: var(--muted-foreground); margin-left: 8px; }
 .workspace-body { display: flex; flex: 1; min-height: 0; }
 .setup-panel { width: 240px; flex-shrink: 0; overflow-y: auto; border-right: 1px solid var(--border); background: var(--card); }

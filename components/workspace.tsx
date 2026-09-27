@@ -144,7 +144,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   const parentName = draft?.parentId ? graph.agents.find(a => a.id === draft.parentId)?.name : undefined;
   const lonely = graph.agents.length === 1 && !graph.edges.length;
   return <main className="app-shell">
-    <header className="topbar"><div className="brand"><Workflow /><strong>SaintPetrus</strong></div><ProviderStatus /><TokenPanel /></header>
+    <header className="topbar"><div className="brand"><Workflow /><strong>SaintPetrus</strong><span className={cn('mode-badge', mockEnabled ? 'is-mock' : 'is-real')} title={mockEnabled ? 'MOCK mode: no provider is reachable.' : 'REAL mode: calls can reach a provider and cost money.'}>{mockEnabled ? 'MOCK' : 'REAL'}</span></div><ProviderStatus /><TokenPanel /></header>
     <div className="projectbar"><h1>Agent workspace <small>M0</small></h1><div className="project-actions">
       <Button variant="outline" disabled={pending} onClick={() => { if (window.confirm('Reset the graph? Every agent except the coordinator, every connection and all output are removed. This cannot be undone.')) void command({ action: 'reset', objective }); }}><RotateCcw />Reset graph</Button>
       <a className={buttonVariants({ variant: 'outline' })} href="/api/graph/export" download>Export context</a>
@@ -180,7 +180,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       {feedEnabled ? <EventFeed /> : <p className="helper">Live feed disabled on server. Enable SAINTPETRUS_FEED and restart.</p>}
       {previewPort ? <ArtifactPreview port={previewPort} /> : <p className="helper">Preview disabled: it executes LLM-generated code in an isolated sandbox. Enable SAINTPETRUS_PREVIEW on the server and restart.</p>}
     </div>
-    <footer className="statusbar">Local server · 127.0.0.1 <span>{mockEnabled ? `Mock: ${graph.status}` : 'Mock disabled'}</span></footer>
+    <footer className="statusbar">Local server · 127.0.0.1 <span>{mockEnabled ? `Mock: ${graph.status}` : 'REAL mode · Mock disabled'}</span></footer>
     {notice && <div role="alert" className="notice"><ShieldCheck /><span>{notice}</span><Button variant="ghost" size="icon" aria-label="Dismiss notice" onClick={() => useProjection.setState({ notice: '' })}><X /></Button></div>}
     <Dialog open={!!draft} onOpenChange={open => setDraft(open ? draft : null)}><DialogContent>
       <DialogTitle>{parentName ? 'Add subagent' : 'Add agent'}</DialogTitle>

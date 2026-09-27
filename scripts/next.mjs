@@ -12,9 +12,9 @@ if (!/^\d+$/.test(port) || Number(port) < 1024 || Number(port) > 65535) {
   process.exit(1);
 }
 const args = mode === 'build' ? [require.resolve('next/dist/bin/next'), 'build', '--webpack'] : ['--import', 'tsx', 'scripts/server.ts', mode];
-// Development starts with the keyless mock unless SAINTPETRUS_MOCK is set; start and build never get this default.
+// Every mode starts with the keyless mock; SAINTPETRUS_MODE=real is the only way to real providers.
 const child = spawn(process.execPath, args, {
-  stdio: 'inherit', env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ...(mode === 'dev' ? { SAINTPETRUS_MOCK_DEFAULT: 'true' } : {}) },
+  stdio: 'inherit', env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
 });
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
 child.on('exit', code => process.exit(code ?? 1));

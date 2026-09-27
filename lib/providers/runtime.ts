@@ -11,7 +11,7 @@ import type { Credentials } from '../security/credentials';
 // Every provider except the synthetic one authenticates with a stored credential.
 export type KeyedProvider = Exclude<ModelProvider, 'mock'>;
 export type ConnectionState = 'disconnected' | 'configured' | 'verified' | 'rejected' | 'incomplete';
-export type ProviderStatusSnapshot = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable: boolean; verified: boolean; verifiedAt?: number; failureCode?: string; state: ConnectionState; validationTimeoutMs?: number; remembered?: boolean };
+export type ProviderStatusSnapshot = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable: boolean; verified: boolean; verifiedAt?: number; failureCode?: string; state: ConnectionState; validationTimeoutMs?: number; remembered?: boolean; mode: 'mock' | 'real' };
 const keyedProvider = (value: unknown): value is KeyedProvider => isModelProvider(value) && value !== 'mock';
 const adapters: Record<KeyedProvider, new (model: string, credentials: Credentials) => ProviderAdapter> = { gemini: GeminiAdapter, openai: OpenAIAdapter, deepseek: DeepSeekAdapter };
 type ModelAllowlist = Readonly<Record<string, { provider: ModelProvider }>>;
@@ -42,7 +42,9 @@ export function recordVerification(ok: boolean, code?: string, generation = veri
 }
 export function providerStatus(): ProviderStatusSnapshot {
   const mockAvailable = mockEnabled();
-  const selected = state.saintpetrusSelection?.provider ?? process.env.SAINTPETRUS_PROVIDER ?? (mockAvailable ? 'mock' : 'none');
+  // Mock mode never reaches a keyed provider, and real mode never answers with the mock.
+  const requested = state.saintpetrusSelection?.provider ?? process.env.SAINTPETRUS_PROVIDER ?? 'none';
+  const selected = mockAvailable ? 'mock' : requested === 'mock' ? 'none' : requested;
   const base = (() => {
     if (selected === 'mock') return { provider: 'mock', model: 'mock-v1', connected: mockAvailable, mocked: true };
     if (keyedProvider(selected)) { const model = state.saintpetrusSelection?.model ?? process.env.SAINTPETRUS_MODEL ?? ''; const stored = credentials().status(selected); return { provider: selected, model, connected: stored.connected && !!model, mocked: false, remembered: stored.remembered }; }
@@ -55,7 +57,7 @@ export function providerStatus(): ProviderStatusSnapshot {
   const incomplete = current?.code === 'output_limit' || current?.code === 'empty_output';
   const state_: ConnectionState = !base.connected ? 'disconnected' : incomplete ? 'incomplete' : current?.ok ? 'verified' : current ? 'rejected' : 'configured';
   const { timeoutMs } = providerProxy();
-  return { ...base, mockAvailable, verified: current?.ok === true, verifiedAt: current?.ok ? current.at : undefined, failureCode: current && !current.ok ? current.code : undefined, state: state_, ...(timeoutMs === DEFAULT_PROVIDER_TIMEOUT_MS ? {} : { validationTimeoutMs: timeoutMs }) };
+  return { ...base, mockAvailable, mode: mockAvailable ? 'mock' : 'real', verified: current?.ok === true, verifiedAt: current?.ok ? current.at : undefined, failureCode: current && !current.ok ? current.code : undefined, state: state_, ...(timeoutMs === DEFAULT_PROVIDER_TIMEOUT_MS ? {} : { validationTimeoutMs: timeoutMs }) };
 }
 export function configuredAdapter(): ProviderAdapter {
   const status = providerStatus();
@@ -68,6 +70,7 @@ export function configuredAdapter(): ProviderAdapter {
 export function validateSelection(provider: unknown, model: unknown, models: ModelAllowlist): ValidatedSelection {
   if (provider === 'mock' && mockEnabled() && model === 'mock-v1') return { provider, model };
   if (!keyedProvider(provider)) throw new ProviderFailure('invalid_request');
+  if (mockEnabled()) throw new ProviderFailure('disabled');
   let normalized: string;
   try { normalized = normalizeModelId(provider, model); }
   catch (error) { if (error instanceof ModelIdError) throw new ProviderFailure('invalid_model_format'); throw error; }

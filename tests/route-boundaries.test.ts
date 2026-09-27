@@ -10,6 +10,7 @@ import { ArtifactStore } from '../lib/preview/store';
 import { TokenService } from '../lib/tokens/service';
 import { runtime } from '../lib/server/runtime';
 import type { TokenPolicy } from '../lib/tokens/config';
+import { withRunMode } from './run-mode';
 
 const origin = 'http://127.0.0.1:3000';
 const post = (path: string, body: string, headers: Record<string, string> = {}) => new Request(`${origin}/api/${path}`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', ...headers }, body });
@@ -86,20 +87,19 @@ test('Q1 graph commands validate moves, limits and mock runs on the server', asy
   const command = async (body: object) => graphPost(post('graph', JSON.stringify(body)));
   assert.equal((await command({ action: 'move', id: 'root', x: 100.5, y: -20 })).status, 200);
   assert.deepEqual(graph.snapshot().agents[0].position, { x: 100.5, y: -20 });
-  for (const body of [{ action: 'move', id: 'root', x: '1', y: 2 }, { action: 'move', id: 'root', x: 1e9, y: 0 }, { action: 'budget', depth: 2, nodes: 5 }, { action: 'budget', depth: 99, nodes: 5, cents: 10 }, { action: 'preview-mock' }, { action: 'start', objective: 'Mock disabled' }]) {
-    assert.equal((await command(body)).status, 400, JSON.stringify(body));
-  }
+  // The mock runs are refused only in REAL mode.
+  await withRunMode('real', async () => {
+    for (const body of [{ action: 'move', id: 'root', x: '1', y: 2 }, { action: 'move', id: 'root', x: 1e9, y: 0 }, { action: 'budget', depth: 2, nodes: 5 }, { action: 'budget', depth: 99, nodes: 5, cents: 10 }, { action: 'preview-mock' }, { action: 'start', objective: 'Mock disabled' }]) {
+      assert.equal((await command(body)).status, 400, JSON.stringify(body));
+    }  });
+
   assert.equal((await command({ action: 'budget', depth: 2, nodes: 5, cents: 10 })).status, 200);
   assert.deepEqual(graph.snapshot().budget, { maxDepth: 2, maxNodes: 5, maxCostCents: 10 });
-  const previous = process.env.SAINTPETRUS_MOCK; process.env.SAINTPETRUS_MOCK = 'true';
   try {
     assert.equal((await command({ action: 'start', objective: 'Mock run' })).status, 200); assert.equal(graph.snapshot().status, 'running');
     assert.equal((await command({ action: 'pause' })).status, 200); assert.equal(graph.snapshot().status, 'paused');
     assert.equal((await command({ action: 'resume' })).status, 200); assert.equal(graph.snapshot().status, 'running');
-  } finally {
-    runtime().mock.reset();
-    if (previous === undefined) delete process.env.SAINTPETRUS_MOCK; else process.env.SAINTPETRUS_MOCK = previous;
-  }
+  } finally { runtime().mock.reset(); }
 });
 
 test('Q1 the artifact stream is local only and opens with the current versions', async () => {

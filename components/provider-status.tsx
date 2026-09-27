@@ -51,6 +51,7 @@ const failures: Record<number, string> = {
 };
 const codeFailures: Record<string, string> = {
   unconfigured: 'No provider is connected. Open Connect AI and connect one first.',
+  disabled: 'Real providers are off in MOCK mode. Restart the server with SAINTPETRUS_MODE=real to use one.',
   // The proxy runs one call at a time; a second one is refused before it leaves and holds nothing.
   busy: 'Another provider call is still running. Nothing was sent or charged; try again when it finishes.',
   empty_output: 'The provider answered without visible text, so the connection is not verified. Usage was charged; check the model and prompt before testing again.',
@@ -72,6 +73,7 @@ export function ProviderStatus() {
   const [open, setOpen] = useState(false); const [provider, setProvider] = useState('openai');
   const [model, setModel] = useState(''); const [custom, setCustom] = useState('');
   const [show, setShow] = useState(false); const [remember, setRemember] = useState(false);
+  const realMode = status?.mode === 'real';
   const [unavailable, setUnavailable] = useState(false);
   // Uncontrolled, transient field: no credential in React state or browser storage.
   const keyField = useRef<HTMLInputElement>(null);
@@ -147,9 +149,10 @@ export function ProviderStatus() {
         <DialogTitle>Connect AI</DialogTitle>
         <DialogDescription>Keys go only to this local backend. Connecting makes one minimal call to prove the key works, and can incur provider charges. Memory only by default.</DialogDescription>
         <label>Provider<select value={provider} disabled={pending} onChange={event => { setProvider(event.target.value); setModel(''); setCustom(''); if (keyField.current) keyField.current.value = ''; setShow(false); }}>
-          <option value="openai">OpenAI</option><option value="gemini">Google Gemini</option><option value="deepseek">DeepSeek</option>{status?.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
+          {status?.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
+          <option value="openai" disabled={!realMode}>OpenAI{realMode ? '' : ' (REAL mode only)'}</option><option value="gemini" disabled={!realMode}>Google Gemini{realMode ? '' : ' (REAL mode only)'}</option><option value="deepseek" disabled={!realMode}>DeepSeek{realMode ? '' : ' (REAL mode only)'}</option>
         </select></label>
-        <p>Additional providers are not available in this adapter yet.</p>
+        <p>{realMode ? 'REAL mode: a connected provider is called for real and can charge you.' : 'MOCK mode: real providers are off and no key is stored. Restart with SAINTPETRUS_MODE=real to use one.'}</p>
         <label>Default model<select value={provider === 'mock' ? 'mock-v1' : model} disabled={pending || provider === 'mock'} onChange={event => setModel(event.target.value)}>
           {provider === 'mock' ? <option value="mock-v1">mock-v1</option> : <><option value="">Enter model ID…</option>{status?.provider === provider && status.model && <option value={status.model}>{status.model}</option>}</>}
         </select></label>

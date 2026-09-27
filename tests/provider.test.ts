@@ -12,6 +12,7 @@ import { safeLog, safeStringify } from '../lib/security/redact';
 import { POST } from '../app/api/provider/route';
 import { GET as exportGraph } from '../app/api/graph/export/route';
 import { runtime } from '../lib/server/runtime';
+import { withRunMode } from './run-mode';
 const freePrice = { effectiveAt: '1970-01-01', verifiedAt: '1970-01-01', peakWindowsUtc: [], offPeak: { inputCacheHitPerMillion: 0, inputCacheMissPerMillion: 0, outputPerMillion: 0 }, peak: { inputCacheHitPerMillion: 0, inputCacheMissPerMillion: 0, outputPerMillion: 0 } };
 const costLimitsUsd = { global: 1, perAgent: 1, perModel: 1, perSession: 1 };
 function tokenFixture() {
@@ -93,8 +94,8 @@ test('M2 frontend test request carries no credential; server rejects credential 
     assert.equal((await POST(req)).status, 200);
     assert.equal((await POST(request({ action: 'test', key: 'sk-REPLACE_ME' }))).status, 400);
     assert.equal((await POST(request({ action: 'test', url: 'https://example.invalid' }))).status, 400);
-    process.env.SAINTPETRUS_MOCK = 'false';
-    assert.equal((await POST(request({ action: 'test' }))).status, 409);
+    // In REAL mode the mock is gone and nothing is connected.
+    await withRunMode('real', async () => assert.equal((await POST(request({ action: 'test' }))).status, 409));
     const client = await readFile('components/provider-status.tsx', 'utf8');
     assert.ok(client.includes("JSON.stringify({ action: 'test' })"));
     assert.ok(!/Authorization|localStorage|sessionStorage/.test(client));
@@ -106,7 +107,7 @@ test('M2 frontend test request carries no credential; server rejects credential 
   }
 });
 
-test('M2 adapter keeps credentials in backend header; proxy redacts output, log, stack, API error and export', async () => {
+test('M2 adapter keeps credentials in backend header; proxy redacts output, log, stack, API error and export', () => withRunMode('real', async () => {
   await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/proxy-');
   const restoreTokens = tokenFixture();
   const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden in this test'); } }));
@@ -152,9 +153,9 @@ test('M2 adapter keeps credentials in backend header; proxy redacts output, log,
     if (previousModel === undefined) delete process.env.SAINTPETRUS_MODEL; else process.env.SAINTPETRUS_MODEL = previousModel;
     await rm(dir, { recursive: true });
   }
-});
+}));
 
-test('RF-01 same-origin UI configures memory-only credentials, tests once, and disconnects', async () => {
+test('RF-01 same-origin UI configures memory-only credentials, tests once, and disconnects', () => withRunMode('real', async () => {
   await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/ui-');
   const restoreTokens = tokenFixture();
   const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
@@ -185,7 +186,7 @@ test('RF-01 same-origin UI configures memory-only credentials, tests once, and d
     assert.equal(store.status('openai').connected, false);
     assert.equal((await POST(request({ action: 'test' }))).status, 409); assert.equal(calls, 1);
   } finally { restoreTokens(); store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }
-});
+}));
 
 test('B proxy invokes the injected core TokenCounter on the request path', async () => {
   const { tokenCounterFrom } = await import('../lib/core/token-estimate'); let measured = '';
@@ -194,7 +195,7 @@ test('B proxy invokes the injected core TokenCounter on the request path', async
   assert.equal(measured, 'Actual request'); assert.deepEqual(result.preflight, { tokens: 7, approximate: true, counterName: 'integration-test' });
 });
 
-test('connection state is proved by a live call, never by a stored credential, and dies with it', async () => {
+test('connection state is proved by a live call, never by a stored credential, and dies with it', () => withRunMode('real', async () => {
   await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/verify-');
   const restoreTokens = tokenFixture();
   const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
@@ -240,7 +241,7 @@ test('connection state is proved by a live call, never by a stored credential, a
     await configure(browserRequest({ action: 'disconnect', provider: 'openai' }));
     assert.equal(providerStatus().state, 'disconnected');
   } finally { restoreTokens(); clearVerification(); store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }
-});
+}));
 
 test('F2 running one agent records the answer as that agent output; a connection probe records nothing', async () => {
   const { loadConfig } = await import('../lib/tokens/config');

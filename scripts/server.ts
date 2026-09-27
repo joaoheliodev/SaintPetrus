@@ -7,6 +7,7 @@ import { optionalEventRoutes } from '../lib/events/http';
 import { graphRoutes } from '../lib/server/graph-http';
 import { runtime } from '../lib/server/runtime';
 import { pinnedValidationTimeoutMs } from '../lib/providers/runtime';
+import { pinnedRunMode, retiredModeVariables } from '../lib/server/runtime';
 import { securityHeaders } from '../lib/server/security-headers';
 import { legacyVaultDirectory, vaultDirectory } from '../lib/server/user-data';
 import { migrateLegacyVault } from '../lib/security/vault-migration';
@@ -17,6 +18,12 @@ await app.prepare();
 // Pinned once, after Next has loaded .env files; the proxy the routes build later keeps it for the process lifetime.
 // Only the value: this file runs its own copy of the modules, so it must not build the proxy (lib/providers/runtime.ts).
 // Next already traps uncaught errors here, so an invalid value has to end the process explicitly.
+const retired = retiredModeVariables();
+if (retired.length) { console.error(`${retired.join(' and ')} ${retired.length > 1 ? 'are' : 'is'} no longer supported: the mock is the default and SAINTPETRUS_MODE=real opts into real providers. Remove them and restart.`); await app.close(); process.exit(1); }
+let mode: string;
+try { mode = pinnedRunMode(); }
+catch (error) { console.error(error instanceof Error ? error.message : 'Invalid SAINTPETRUS_MODE.'); await app.close(); process.exit(1); }
+console.warn(mode === 'real' ? 'REAL mode: calls can reach a provider and cost money.' : 'MOCK mode: no provider is reachable. Start with SAINTPETRUS_MODE=real for real providers.');
 let validationTimeout: number | undefined;
 try { validationTimeout = pinnedValidationTimeoutMs(); }
 catch (error) { console.error(error instanceof Error ? error.message : 'Invalid validation timeout.'); await app.close(); process.exit(1); }

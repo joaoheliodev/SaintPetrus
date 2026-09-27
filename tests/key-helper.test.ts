@@ -6,6 +6,7 @@ import { keyProviders, keyUsage, parseKeyArguments } from '../scripts/key-argume
 import { providers } from '../lib/security/encrypted-vault';
 import { Credentials } from '../lib/security/credentials';
 import { EncryptedVault } from '../lib/security/encrypted-vault';
+import { withRunMode } from './run-mode';
 
 test('The terminal key helper accepts DeepSeek under the same rules as every provider and never an argv secret', async () => {
   assert.deepEqual([...keyProviders].sort(), [...providers].sort(), 'the terminal and the backend credential store must accept the same providers');
@@ -22,7 +23,7 @@ test('The terminal key helper accepts DeepSeek under the same rules as every pro
   assert.match(script, /'X-SaintPetrus-Client': 'terminal'/);
 });
 
-test('A terminal DeepSeek credential reaches memory only, through the local configuration route', async () => {
+test('A terminal DeepSeek credential reaches memory only, through the local configuration route', () => withRunMode('real', async () => {
   const { POST: configure, GET: status } = await import('../app/api/credentials/route');
   await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/key-helper-');
   const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
@@ -40,4 +41,4 @@ test('A terminal DeepSeek credential reaches memory only, through the local conf
     assert.equal((await configure(terminal({ action: 'disconnect', provider: 'deepseek', remember: false }))).status, 200);
     assert.equal(store.status('deepseek').connected, false);
   } finally { store.disconnect('deepseek'); Reflect.set(globalThis, 'saintpetrusCredentials', previous); await rm(dir, { recursive: true }); }
-});
+}));

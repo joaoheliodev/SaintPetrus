@@ -42,12 +42,15 @@ npm start
 
 The build fetches no fonts and makes no provider request.
 
-## Mock mode: the panel without a key
+## MOCK and REAL mode
 
-`npm run dev` starts with the mock provider on; `npm start` starts with it off, which is how real validation
-runs. An explicit `SAINTPETRUS_MOCK=true` or `SAINTPETRUS_MOCK=false` (in the shell or in `.env.local`) always
-wins; restart after changing it. The mock answers every call with synthetic `MOCK:` text, uses no network,
-costs nothing and never writes to the price file.
+Every start runs in **MOCK** mode unless you opt in: `npm run dev` and `npm start` both start with the keyless mock,
+and no keyed provider can be selected, no key is stored and no request can reach a provider. Real providers need
+`SAINTPETRUS_MODE=real` at startup (for example `SAINTPETRUS_MODE=real npm start`); the value is read once and
+cannot change while the server runs, and in REAL mode the mock is off. A badge next to the name in the header always
+says **MOCK** or **REAL**. The former `SAINTPETRUS_MOCK` variables are gone, and the server refuses to start if one
+is still set. The mock answers every call with synthetic `MOCK:` text, uses no network, costs nothing and never
+writes to the price file.
 
 With the mock on, **Run mock** plays a fixed synthetic demonstration (it replaces the current graph, so it asks
 first), **Pause mock** and **Resume mock** control its scheduler, and the "Mock limits" card shows its
@@ -79,7 +82,7 @@ Snapshots arrive over a server-sent event stream, with 300 ms polling only while
 
 ## Connecting a provider
 
-Click **Connect AI**, choose OpenAI, Google Gemini or DeepSeek (or the mock when it is enabled), enter the
+In REAL mode, click **Connect AI**, choose Google Gemini or DeepSeek (in MOCK mode only the mock is offered), enter the
 provider's model ID and paste the key into the password field. **Connect and verify (1 call)** stores the key
 in backend memory and makes exactly one minimal provider call; with a real key that call costs money.
 **Test again** repeats the probe. **Disconnect** clears the key from memory and cancels a call in flight.
@@ -199,7 +202,7 @@ pauses every agent), so it refuses one that already holds work or has a keyed pr
 
 - `PORT=3310 npm run dev`, then `TEST_APP_PORT=3310 npm run test:e2e`: the main flow, keyboard paths, visible
   focus, control names, confirmations and the absence of CSP violations or console errors.
-- `PORT=3210 SAINTPETRUS_PREVIEW=true SAINTPETRUS_MOCK=true npm start`, then `npm run test:browser`: preview
+- `PORT=3210 SAINTPETRUS_PREVIEW=true npm start`, then `npm run test:browser`: preview
   isolation and live updates.
 
 ## Limitations

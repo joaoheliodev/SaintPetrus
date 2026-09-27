@@ -4,11 +4,11 @@ import { readFile } from 'node:fs/promises';
 import { connectionLabel, createProviderStatusRefresher } from '../components/provider-status';
 import type { ProviderStatusSnapshot } from '../lib/providers/runtime';
 
-const snapshot: ProviderStatusSnapshot = { provider: 'gemini', model: 'model', connected: true, mocked: false, mockAvailable: false, verified: true, state: 'verified' };
+const snapshot: ProviderStatusSnapshot = { provider: 'gemini', model: 'model', connected: true, mocked: false, mockAvailable: false, verified: true, state: 'verified', mode: 'real' };
 
 test('provider status UI uses one English vocabulary throughout', async () => {
-  assert.match(connectionLabel({ provider: 'gemini', model: 'model', connected: true, mocked: false, mockAvailable: false, verified: true, state: 'verified' }), /^● Connected/);
-  assert.match(connectionLabel({ provider: 'gemini', model: 'model', connected: true, mocked: false, mockAvailable: false, verified: false, state: 'configured' }), /Configured, not verified/);
+  assert.match(connectionLabel({ provider: 'gemini', model: 'model', connected: true, mocked: false, mockAvailable: false, verified: true, state: 'verified', mode: 'real' }), /^● Connected/);
+  assert.match(connectionLabel({ provider: 'gemini', model: 'model', connected: true, mocked: false, mockAvailable: false, verified: false, state: 'configured', mode: 'real' }), /Configured, not verified/);
   const source = await readFile('components/provider-status.tsx', 'utf8');
   assert.doesNotMatch(source, /\b(agente|chave|desconectado|provedor|tente|falha|informe|operação|verificando|conectar|testar|recusad[oa]|salv[ao])\b/i);
   assert.doesNotMatch(source, /type Status\s*=/, 'The component must import the owner contract instead of duplicating it.');

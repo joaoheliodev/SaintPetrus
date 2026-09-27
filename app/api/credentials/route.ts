@@ -6,6 +6,7 @@ import { validateSelection, selectProvider, clearSelection, providerProxy, clear
 import { safeJson } from '@/lib/security/redact';
 import { ProviderFailure } from '@/lib/providers/adapter';
 import { tokenService } from '@/lib/tokens/runtime';
+import { mockEnabled } from '@/lib/server/runtime';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 let tail: Promise<unknown> = Promise.resolve();
@@ -39,6 +40,8 @@ export async function POST(request: Request) {
       }
       const provider = providerId(data.provider);
       const store = credentials();
+      // In mock mode a key is never stored or loaded: real providers are off until a restart opts in.
+      if (mockEnabled() && (data.action === 'set' || data.action === 'restore')) throw new ProviderFailure('disabled');
       if (data.action === 'set') {
         if (typeof data.key !== 'string' || (data.remember !== undefined && typeof data.remember !== 'boolean')) throw new Error();
         secret = Buffer.from(data.key); delete data.key;
@@ -54,7 +57,7 @@ export async function POST(request: Request) {
       else throw new Error();
       return safeJson(store.status(provider));
     } catch (error) {
-      if (ProviderFailure.is(error) && (error.code === 'invalid_model_format' || error.code === 'model_not_allowlisted')) return safeJson({ error: error.code }, 400);
+      if (ProviderFailure.is(error) && (error.code === 'invalid_model_format' || error.code === 'model_not_allowlisted' || error.code === 'disabled')) return safeJson({ error: error.code }, 400);
       return safeJson({ error: 'Credential operation failed. For persistence, verify that the OS keyring is available and unlocked.' }, 400);
     }
     finally { secret?.fill(0); }

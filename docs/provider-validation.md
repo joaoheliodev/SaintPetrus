@@ -33,7 +33,7 @@ Fill this locally. No credential belongs in this document or the results table.
 | Approved timeout method (`SAINTPETRUS_VALIDATION_TIMEOUT_MS` value or an external impairment) and disposable-key rejection method | |
 
 1. Operator: run the build on this branch before validation. Start only on
-   `127.0.0.1`; disable mock and preview. Enable `SAINTPETRUS_FEED=true` at startup
+   `127.0.0.1` with `SAINTPETRUS_MODE=real` (the header must say REAL); disable preview. Enable `SAINTPETRUS_FEED=true` at startup
    if feed evidence is required. Enabling only its UI is insufficient. Do not
    restart once a possibly billed call is unresolved: counters and reservations
    are process-local. Use the policy's configured TTL, not a new timeout policy, and

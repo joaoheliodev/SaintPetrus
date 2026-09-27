@@ -13,6 +13,7 @@ import { safeLog, safeStringify } from '../lib/security/redact';
 import { connectionLabel } from '../components/provider-status';
 import { runtime } from '../lib/server/runtime';
 import { eventBus } from '../lib/events/bus';
+import { withRunMode } from './run-mode';
 const fixture = JSON.parse(await readFile('tests/fixtures/gemini-generate-content.json', 'utf8'));
 const maxTokensFixture = JSON.parse(await readFile('tests/fixtures/gemini-max-tokens.json', 'utf8'));
 const model = 'gemini-2.5-flash-lite';
@@ -91,7 +92,7 @@ test('Gemini owns its HTTP mapping and rejects unsupported thinking before trans
   assert.equal(calls, 0);
 });
 
-test('Gemini RF-01 configuration selects the adapter through the existing API; execution request carries no key', async () => {
+test('Gemini RF-01 configuration selects the adapter through the existing API; execution request carries no key', () => withRunMode('real', async () => {
   const { POST: configure } = await import('../app/api/credentials/route');
   const { POST: execute } = await import('../app/api/provider/route');
   const { providerStatus } = await import('../lib/providers/runtime');
@@ -123,7 +124,7 @@ test('Gemini RF-01 configuration selects the adapter through the existing API; e
     assert.equal((await configure(request('credentials', { action: 'disconnect', provider: 'gemini' }))).status, 200);
     assert.equal(store.status('gemini').connected, false); assert.equal((await execute(request('provider', { action: 'test' }))).status, 409); assert.equal(calls, 2);
   } finally { store.disconnect('gemini'); host.saintpetrusCredentials = old.credentials; host.saintpetrusSelection = old.selection; host.saintpetrusTokens = old.tokens; globalThis.fetch = old.fetch; await rm(dir, { recursive: true }); }
-});
+}));
 
 test('Gemini prices the model named by modelVersion and fails closed without a usable served identity', async () => {
   await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/gemini-served-');
@@ -204,7 +205,7 @@ test('Reasoning is a count inside completion, present only when the provider rep
   assert.equal(thinking.reasoning, 3); assert.equal(thinking.completion, 5);
 });
 
-test('A probe answered without visible text is incomplete, keeps its billed usage and never verifies the connection', async () => {
+test('A probe answered without visible text is incomplete, keeps its billed usage and never verifies the connection', () => withRunMode('real', async () => {
   const { POST: configure } = await import('../app/api/credentials/route');
   const { POST: execute } = await import('../app/api/provider/route');
   const { providerStatus, clearVerification } = await import('../lib/providers/runtime');
@@ -241,4 +242,4 @@ test('A probe answered without visible text is incomplete, keeps its billed usag
   } finally {
     clearVerification(); store.disconnect('gemini'); for (const [key, value] of old) Reflect.set(globalThis, key, value); globalThis.fetch = transport; await rm(dir, { recursive: true });
   }
-});
+}));

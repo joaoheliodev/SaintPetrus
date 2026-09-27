@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GET, POST } from '../app/api/graph/route';
 import { runtime } from '../lib/server/runtime';
+import { withRunMode } from './run-mode';
 const url = 'http://127.0.0.1:3000/api/graph';
 const post = (body: unknown, origin = 'http://127.0.0.1:3000') => POST(new Request(url, {
   method: 'POST', headers: { origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -32,7 +33,7 @@ test('edge deletion dispatch removes only the requested connection and node dele
   assert.deepEqual(runtime().graph.snapshot(), beforeRejectedNodeDelete);
 });
 
-test('mock flag, origin and payload boundaries fail closed', async () => {
+test('mock flag, origin and payload boundaries fail closed', () => withRunMode('real', async () => {
   const previous = process.env.SAINTPETRUS_MOCK; delete process.env.SAINTPETRUS_MOCK;
   try {
     const before = runtime().graph.snapshot();
@@ -43,7 +44,7 @@ test('mock flag, origin and payload boundaries fail closed', async () => {
     assert.equal((await post({ action: 'add', name: 'a'.repeat(17000), objective: 'Oversized' })).status, 413);
     assert.deepEqual(runtime().graph.snapshot(), before);
   } finally { if (previous === undefined) delete process.env.SAINTPETRUS_MOCK; else process.env.SAINTPETRUS_MOCK = previous; }
-});
+}));
 
 test('invalid JSON returns a fixed error without echoing request contents', async () => {
   const response = await POST(new Request(url, { method: 'POST', headers: {
@@ -108,19 +109,24 @@ test('depth limit cannot be bypassed by supplying a parent from the client', asy
   assert.deepEqual(runtime().graph.snapshot(), before);
 });
 
-test('F1 the mock default comes only from the dev launcher, and an explicit SAINTPETRUS_MOCK always wins', async () => {
-  const { mockEnabled } = await import('../lib/server/runtime');
-  const saved = { mock: process.env.SAINTPETRUS_MOCK, fallback: process.env.SAINTPETRUS_MOCK_DEFAULT };
-  const set = (name: string, value: string | undefined) => { if (value === undefined) delete process.env[name]; else process.env[name] = value; };
+test('A-01 the mock is the default in every mode; only SAINTPETRUS_MODE=real, read once at startup, reaches real providers', async () => {
+  const { runMode, pinnedRunMode, retiredModeVariables } = await import('../lib/server/runtime');
+  assert.equal(runMode(undefined), 'mock'); assert.equal(runMode(''), 'mock'); assert.equal(runMode('mock'), 'mock'); assert.equal(runMode('real'), 'real');
+  for (const value of ['true', 'REAL', 'yes', 'real ']) assert.throws(() => runMode(value), /SAINTPETRUS_MODE/, value);
+  const saved = { pin: Reflect.get(globalThis, 'saintpetrusRunMode'), mode: process.env.SAINTPETRUS_MODE };
   try {
-    const cases: [string | undefined, string | undefined, boolean][] = [[undefined, undefined, false], [undefined, 'true', true], ['false', 'true', false], ['true', undefined, true], ['yes', 'true', false]];
-    for (const [mock, fallback, expected] of cases) {
-      set('SAINTPETRUS_MOCK', mock); set('SAINTPETRUS_MOCK_DEFAULT', fallback);
-      assert.equal(mockEnabled(), expected, `SAINTPETRUS_MOCK=${mock} SAINTPETRUS_MOCK_DEFAULT=${fallback}`);
-    }
-    const launcher = await (await import('node:fs/promises')).readFile('scripts/next.mjs', 'utf8');
-    assert.match(launcher, /\.\.\.\(mode === 'dev' \? \{ SAINTPETRUS_MOCK_DEFAULT: 'true' \} : \{\}\)/, 'only dev receives the default');
-  } finally { set('SAINTPETRUS_MOCK', saved.mock); set('SAINTPETRUS_MOCK_DEFAULT', saved.fallback); }
+    Reflect.set(globalThis, 'saintpetrusRunMode', undefined); process.env.SAINTPETRUS_MODE = 'real';
+    assert.equal(pinnedRunMode(), 'real');
+    process.env.SAINTPETRUS_MODE = 'mock';
+    assert.equal(pinnedRunMode(), 'real', 'a later environment change cannot switch a running server');
+  } finally {
+    Reflect.set(globalThis, 'saintpetrusRunMode', saved.pin);
+    if (saved.mode === undefined) delete process.env.SAINTPETRUS_MODE; else process.env.SAINTPETRUS_MODE = saved.mode;
+  }
+  assert.deepEqual(retiredModeVariables({ SAINTPETRUS_MOCK: 'false', SAINTPETRUS_MOCK_DEFAULT: 'true' }), ['SAINTPETRUS_MOCK', 'SAINTPETRUS_MOCK_DEFAULT']);
+  const [launcher, server] = await Promise.all(['scripts/next.mjs', 'scripts/server.ts'].map(async path => (await import('node:fs/promises')).readFile(path, 'utf8')));
+  assert.ok(!launcher.includes('SAINTPETRUS_MOCK'), 'no launcher default can switch a mode on');
+  assert.match(server, /retiredModeVariables\(\)/); assert.match(server, /pinnedRunMode\(\)/);
 });
 
 test('F3 an agent name and objective can be edited through the server, within the create limits only', async () => {

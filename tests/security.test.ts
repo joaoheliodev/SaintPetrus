@@ -11,6 +11,7 @@ import { GET as exportGraph } from '../app/api/graph/export/route';
 import { GET as graphGet } from '../app/api/graph/route';
 import { GET as status, POST as configure } from '../app/api/credentials/route';
 import { runtime } from '../lib/server/runtime';
+import { withRunMode } from './run-mode';
 async function fixture() {
   await mkdir('.audit', { recursive: true });
   const dir = await mkdtemp('.audit/vault-'); const master = randomBytes(32);
@@ -116,7 +117,7 @@ test('RS-03 macOS master travels via stdin and Windows persists only wrapped mat
   } finally { await f.cleanup(); }
 });
 
-test('RS-02 configured secret never appears in status or API errors', async () => {
+test('RS-02 configured secret never appears in status or API errors', () => withRunMode('real', async () => {
   const f = await fixture(); const candidate = randomBytes(32).toString('hex');
   const host = globalThis as typeof globalThis & { saintpetrusCredentials?: Credentials };
   const previous = host.saintpetrusCredentials; host.saintpetrusCredentials = f.store;
@@ -132,9 +133,9 @@ test('RS-02 configured secret never appears in status or API errors', async () =
     assert.equal(error.status, 400); assert.ok(!(await error.text()).includes(candidate));
     assert.equal((await readdir(f.dir)).length, 0);
   } finally { f.store.disconnect('openai'); host.saintpetrusCredentials = previous; await f.cleanup(); }
-});
+}));
 
-test('S1 the browser can forget a remembered key: memory, saved ciphertext and the call in flight all end', async () => {
+test('S1 the browser can forget a remembered key: memory, saved ciphertext and the call in flight all end', () => withRunMode('real', async () => {
   const f = await fixture(); const key = randomBytes(32).toString('hex');
   const { providerStatus } = await import('../lib/providers/runtime');
   const { ProviderProxy } = await import('../lib/providers/proxy');
@@ -158,4 +159,4 @@ test('S1 the browser can forget a remembered key: memory, saved ciphertext and t
     assert.equal(f.store.status('openai').connected, false);
     assert.equal(providerStatus().remembered, false);
   } finally { f.store.disconnect('openai'); for (const [name, value] of old) Reflect.set(globalThis, name, value); await f.cleanup(); }
-});
+}));

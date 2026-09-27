@@ -12,6 +12,7 @@ import type { TokenPolicy, Prices } from '../lib/tokens/config';
 import { Credentials } from '../lib/security/credentials';
 import { EncryptedVault } from '../lib/security/encrypted-vault';
 import { safeLog, safeStringify } from '../lib/security/redact';
+import { withRunMode } from './run-mode';
 const completion = JSON.parse(await readFile('tests/fixtures/deepseek-chat-completion.json', 'utf8'));
 const cacheMiss = JSON.parse(await readFile('tests/fixtures/deepseek-cache-miss.json', 'utf8'));
 const outputLimit = JSON.parse(await readFile('tests/fixtures/deepseek-max-tokens.json', 'utf8'));
@@ -262,7 +263,7 @@ test('RT-04 reuses an answer only when the policy claims determinism and the req
   assert.throws(() => new TokenService(cachingPolicy('deepseek', model, { mode: 'disabled' }, 'yes' as unknown as boolean), priced(model), hooks), /Invalid local model policy/);
 });
 
-test('D6 DeepSeek is selectable end to end and an exhausted balance never rejects the credential', async () => {
+test('D6 DeepSeek is selectable end to end and an exhausted balance never rejects the credential', () => withRunMode('real', async () => {
   const { POST: configure } = await import('../app/api/credentials/route');
   const { POST: execute } = await import('../app/api/provider/route');
   const { providerStatus, validateSelection } = await import('../lib/providers/runtime');
@@ -318,7 +319,7 @@ test('D6 DeepSeek is selectable end to end and an exhausted balance never reject
       host.saintpetrusCredentials = old.credentials; host.saintpetrusSelection = old.selection; host.saintpetrusTokens = old.tokens; globalThis.fetch = old.fetch;
     }
   });
-});
+}));
 
 test('C5 the connection probe switches reasoning off even when the policy asks for it', async () => {
   await withCredentials(async store => {
@@ -407,7 +408,7 @@ test('A DeepSeek response without a usage object reports its own field names, no
   });
 });
 
-test('The provider route reports an unpriced served model with its reservation and records no verdict', async () => {
+test('The provider route reports an unpriced served model with its reservation and records no verdict', () => withRunMode('real', async () => {
   const { POST: execute } = await import('../app/api/provider/route');
   const { providerStatus, clearVerification } = await import('../lib/providers/runtime');
   const { verificationMessage } = await import('../components/provider-status');
@@ -431,7 +432,7 @@ test('The provider route reports an unpriced served model with its reservation a
       clearVerification(); for (const [key, value] of old) Reflect.set(globalThis, key, value); globalThis.fetch = transport;
     }
   });
-});
+}));
 
 test('R1 a DeepSeek answer without a served model names its fields, like every other provider', async () => {
   await withCredentials(async store => {
