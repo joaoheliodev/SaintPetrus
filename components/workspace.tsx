@@ -166,7 +166,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         <label>Mock cents<input type="number" min={1} max={10000} value={limits.maxCostCents} disabled={active} onChange={e => setLimits({ ...limits, maxCostCents: Number(e.target.value) })} /></label>
         <Button disabled={active || pending} variant="outline" onClick={() => command({ action: 'budget', depth: limits.maxDepth, nodes: limits.maxNodes, cents: limits.maxCostCents })}>Apply limits</Button>
       </section>}
-      <p className="helper setup-section">Local, in-memory graph. No API calls to LLMs. Server restart clears the graph.{mockEnabled && ' Run mock resets the graph to a fixed demonstration.'}</p>
+      <p className="helper setup-section">Local, in-memory graph; a server restart clears it. Only Run once and connection tests call a provider, and only when you click them.{mockEnabled && ' Run mock resets the graph to a fixed demonstration.'}</p>
     </aside><div className="center-panel"><div className="canvas-toolbar"><span>Canvas · {graph.agents.length} nodes · {graph.edges.length} connections</span><div className="project-actions">
       <Button variant="ghost" disabled={pending} onClick={() => openDraft({ parentId: null })}><Plus />Add agent</Button>
       <Button variant="ghost" onClick={() => flow.fitView({ padding: .2, maxZoom: 1, duration: 300 })}><Maximize />Fit all</Button>

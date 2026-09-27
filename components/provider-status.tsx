@@ -51,6 +51,8 @@ const failures: Record<number, string> = {
 };
 const codeFailures: Record<string, string> = {
   unconfigured: 'No provider is connected. Open Connect AI and connect one first.',
+  // The proxy runs one call at a time; a second one is refused before it leaves and holds nothing.
+  busy: 'Another provider call is still running. Nothing was sent or charged; try again when it finishes.',
   empty_output: 'The provider answered without visible text, so the connection is not verified. Usage was charged; check the model and prompt before testing again.',
   served_model_unpriced: 'The provider answered with a model that has no verified price. The call may have been billed, so its reservation stays held and the agent is paused. Add that model in Tokens → Prices, then reconcile the expired estimate with provider-confirmed usage.',
 };

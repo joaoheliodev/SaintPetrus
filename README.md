@@ -145,8 +145,8 @@ A call that fails without trustworthy usage keeps its reservation unresolved. Af
 converts into usage at the greater of what was held and the dearest price eligible for it, at peak with no
 cache hits. Check the provider's billing, then replace that estimate with **Apply confirmed usage**.
 
-`GET /api/receipts` lists the last 200 settled calls with their verdict, served model, price versions and
-dispatch; `GET /api/provider` includes a per-provider count of requests actually dispatched upstream.
+`GET /api/receipts` keeps the last 200 receipts (settled calls, cache hits, expiries and manual reconciliations share
+them) with their verdict, served model, price versions and dispatch; `GET /api/provider` includes a per-provider count of requests actually dispatched upstream.
 Counters, reservations and receipts are process-local and reset on restart; the price file and its journal
 of reconciled intervals persist. The response cache is off (`cacheTtlMs` is 0) until a real key has been
 validated; turning it on is an operator decision.

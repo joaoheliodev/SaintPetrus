@@ -27,3 +27,12 @@ test('Q3 the inspector offers a keyboard path to connect the selected agent to a
   assert.match(section, /<button[^>]*disabled=""[^>]*>.*Connect<\/button>/, 'nothing is sent until a target is chosen');
   assert.match(render([]), /<select disabled=""/, 'with no other agent there is nothing to pick');
 });
+
+test('R1 the panel says which actions call a provider, and a busy proxy is not reported as a budget refusal', async () => {
+  const { verificationMessage } = await import('../components/provider-status');
+  assert.match(verificationMessage(409, 'busy'), /still running/);
+  assert.notEqual(verificationMessage(409, 'busy'), verificationMessage(409), 'busy is not the budget or policy refusal');
+  const workspace = await (await import('node:fs/promises')).readFile('components/workspace.tsx', 'utf8');
+  assert.ok(!workspace.includes('No API calls to LLMs'), 'Run once can call a real provider, so the panel must not deny it');
+  assert.match(workspace, /Only Run once and connection tests call a provider/);
+});
