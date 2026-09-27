@@ -218,6 +218,10 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R1-02 | graph route back to `instanceof` | killed by "R1 a refusal from the graph the server built…" and the ratchet |
 | R1-02 | graph brand never set | killed by "R1 a refusal from the graph the server built…" |
 | R1-15 | preview check without its dialog answer | killed: the check fails (exit 1, "Browser connection closed.") instead of hanging, and leaves no profile or Chromium process (also proves R1-04) |
+| R1-11 | no early rethrow for a settled call | first survived (the test hook failed on every call, so the failure path died before overwriting the verdict); with a one-shot failure it is killed by "R1 a settled call stays settled…" |
+| R1-11 | verdict recorded after the side effects | killed by the same test |
+| R1-12 | service falls back to the requested model | killed by "R1 only the mock is priced as asked…" |
+| R1-12 | proxy falls back to the requested model | killed by the same test |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
@@ -236,8 +240,8 @@ parallel without editing the tree. Each finding is listed with its disposition.
 | R1-08 | minor | OpenAI usage is not parsed strictly: bad usage loses the served model and the field names | pending |
 | R1-09 | minor, plausible | A probe admitted while a new key is being configured can stamp its verdict on the new pair | pending |
 | R1-10 | minor, pre-existing | Expiry of an unpriced served model converts the preflight estimate even when the provider reported more usage | pending |
-| R1-11 | nit, latent | A throw after settlement re-runs failure bookkeeping (double release on the mock, stuck unverifiable count) | pending |
-| R1-12 | nit, latent | `billingModel ?? adapter.model` would price a keyed adapter that omits the served model at the requested tariff | pending |
+| R1-11 | nit, latent | A throw after settlement re-runs failure bookkeeping (double release on the mock, stuck unverifiable count) | fixed (this commit): the `billed` verdict, outcome and price are recorded the moment counters settle, and the failure path rethrows at once for a settled call |
+| R1-12 | nit, latent | `billingModel ?? adapter.model` would price a keyed adapter that omits the served model at the requested tariff | fixed (this commit): only the mock may fall back, in the proxy and in the service; a keyed answer without a served model is `upstream` and stays `unverifiable`. Thirteen test doubles in four files now name their served model as every real adapter does; no assertion changed |
 | R1-13 | nit | Docs: CHANGELOG floor, "200 settled calls" (the 200 are all receipt kinds), first-real-call names claim, 409 `busy` shown as a budget refusal, the floor parser reads only TAP | pending |
 | R1-14 | nit | `AGENTS.md` says `.prompts/` vanishes in a fresh clone, but this backlog is force-tracked (D-02) | pending |
 | R1-15 | major, found while fixing R1-04 | `npm run test:browser` hung since f42e1e1: "Run preview mock" now asks first and the preview check never answered the dialog | fixed (this commit): the check accepts and asserts the question; passes again |

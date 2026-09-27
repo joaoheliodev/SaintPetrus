@@ -196,7 +196,9 @@ export class TokenService {
       // The invoice names the model that answered, not the one that was asked for: providers reroute
       // and bill at the served model's rate. A served model with no operator-verified price cannot be
       // reconciled, and a call that already happened must not be released as if it were free.
-      const billingModel = result.billingModel ?? adapter.model;
+      // Only the synthetic mock is priced as asked; a keyed adapter that names no served model cannot be priced at all.
+      const billingModel = result.billingModel ?? (approximate ? adapter.model : undefined);
+      if (!billingModel) throw new ProviderFailure('upstream');
       reservation.billingModel = billingModel;
       // Published before pricing so the divergence stays on record even when the served model cannot be priced.
       if (billingModel !== adapter.model) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.rerouted', severity: 'warning', payload: `Request for ${adapter.model} was served by ${billingModel}.` });
@@ -213,9 +215,10 @@ export class TokenService {
         row.conservativeCachedInput += usage.cachedPromptFullRate ?? 0;
       }
       this.reservations.delete(reservation.id);
-      if (!result.outcome) observeArtifact(agent, this.hooks.role?.(agent) ?? agent, result.text);
+      // Settled from here on: whatever throws later must not run the failure bookkeeping on a billed call.
       verdict = 'billed'; outcome = result.outcome ?? 'completed';
       priced = { servedPriceVersionId: reservation.priceVersions[billingModel].id, band: intervalTouchesPeak(billingPrice, createdAt, responseAt) ? 'peak' : 'offPeak', costUsd: actualCostUsd, journal };
+      if (!result.outcome) observeArtifact(agent, this.hooks.role?.(agent) ?? agent, result.text);
       if (!result.outcome) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'agent.message', payload: (approximate ? '[Mock] ' : '') + result.text, tokens: { prompt: usage.prompt, completion: usage.completion } });
       if (rows.some(row => this.warning(row))) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'budget.warning', severity: 'warning', payload: 'Token or monetary budget reached 80% or more.' });
       if (rows.some(row => this.blocked(row))) this.pause(agent);
@@ -226,6 +229,7 @@ export class TokenService {
       }
       return { ...result, usage, approximate, cached: false };
     } catch (error) {
+      if (verdict === 'billed') throw error;
       if (error instanceof UnpricedServedModel) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.unpriced', severity: 'error', payload: `${error.servedModel} answered a request for ${error.requestedModel} and has no captured price. Reservation ${error.reservationId} stays unverifiable and the agent is paused; price that model, then reconcile the expired estimate with provider-confirmed usage.` });
       else eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'error', severity: 'error', payload: 'Provider execution failed.' });
       // Names only. A shape we cannot parse pauses the agent, and the names are what makes the next

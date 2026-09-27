@@ -67,7 +67,7 @@ test('Gemini cached prompt tokens reconcile at the conservative full input rate'
   const policy: TokenPolicy = { global: 1024, perAgent: 1024, perModel: 1024, perSession: 1024, costLimitsUsd, cacheTtlMs: 0, reservationTtlMs: 300000, models: { [model]: { provider: 'gemini', max_tokens: 64, temperature: 0, thinking: { mode: 'disabled' } } } };
   const prices = { date: '2026-09-07', currency: 'USD' as const, models: { [model]: geminiPrice } };
   const service = new TokenService(policy, prices, { ids: () => ['a'], pause: () => {}, pauseAll: () => {} });
-  await service.execute(new ProviderProxy(), { id: 'gemini', model, complete: async () => ({ text: 'OK', usage }) }, 'Reply OK.', new AbortController().signal, 'a', 'System');
+  await service.execute(new ProviderProxy(), { id: 'gemini', model, complete: async () => ({ text: 'OK', usage, billingModel: model }) }, 'Reply OK.', new AbortController().signal, 'a', 'System');
   const row = service.snapshot().rows.find(item => item.scope === 'global')!;
   const freeCacheCost = ((usage.prompt - usage.cachedPromptFullRate) * .1 + usage.completion * .4) / 1e6;
   assert.equal(row.conservativeCachedInput, 4);

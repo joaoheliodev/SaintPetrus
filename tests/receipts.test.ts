@@ -103,7 +103,7 @@ test('Receipts carry no prompt, output or credential, and only a local read-only
     const f = setup(60_000);
     Reflect.set(globalThis, 'saintpetrusTokens', f.service);
     const marker = 'PROMPT-OR-OUTPUT-MARKER';
-    const answer = (): Completion => ({ text: `${marker} ${secret.toString()}`, usage: { prompt: 10, completion: 5, total: 15 } });
+    const answer = (): Completion => ({ text: `${marker} ${secret.toString()}`, billingModel: requested, usage: { prompt: 10, completion: 5, total: 15 } });
     await f.run(answer, `${marker} system ${secret.toString()}`, `${marker} input`);
     const cached = await f.run(answer, `${marker} system ${secret.toString()}`, `${marker} input`);
     assert.equal(cached.cached, true);

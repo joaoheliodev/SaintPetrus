@@ -235,7 +235,7 @@ test('RT-04 reuses an answer only when the policy claims determinism and the req
   const twice = async (policy: TokenPolicy, id: string, provider: 'deepseek' | 'openai' | 'mock') => {
     let calls = 0;
     const service = new TokenService(policy, priced(id), hooks, undefined, () => offPeakAt);
-    const adapter = { id: provider, model: id, complete: async () => { calls++; return { text: 'Answer', usage: { prompt: 10, completion: 10, total: 20 } }; } };
+    const adapter = { id: provider, model: id, complete: async () => { calls++; return { text: 'Answer', usage: { prompt: 10, completion: 10, total: 20 }, billingModel: id }; } };
     await service.execute(new ProviderProxy(), adapter, 'Question', signal(), 'a', 'System');
     const second = await service.execute(new ProviderProxy(), adapter, 'Question', signal(), 'a', 'System');
     return { calls, service, secondCached: second.cached };
@@ -339,7 +339,7 @@ test('C5 the connection probe switches reasoning off even when the policy asks f
     openaiPolicy.models[model].provider = 'openai';
     const seen: unknown[] = [];
     const openaiService = new TokenService(openaiPolicy, pricesFor(), hooks, undefined, () => offPeakAt);
-    const openaiAdapter = { id: 'openai' as const, model, complete: async (_input: string, _signal: AbortSignal, options?: { thinking?: unknown }) => { seen.push(options?.thinking); return { text: 'Answer', usage: { prompt: 10, completion: 10, total: 20 } }; } };
+    const openaiAdapter = { id: 'openai' as const, model, complete: async (_input: string, _signal: AbortSignal, options?: { thinking?: unknown }) => { seen.push(options?.thinking); return { text: 'Answer', usage: { prompt: 10, completion: 10, total: 20 }, billingModel: model }; } };
     await openaiService.execute(new ProviderProxy(), openaiAdapter, 'Reply OK.', signal(), 'a', 'System', undefined, true);
     assert.deepEqual(seen[0], { mode: 'enabled', effort: 'minimal' });
   });

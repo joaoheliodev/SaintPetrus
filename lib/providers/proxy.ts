@@ -29,7 +29,7 @@ export class ProviderProxy {
         trace?.onDispatch?.(dispatch);
       });
       controller.signal.throwIfAborted();
-      return { usage: result.usage, preflight, provider: adapter.id, model: adapter.model, billingModel: result.billingModel ?? adapter.model, mocked: adapter.id === 'mock', text: redactText(result.text), latencyMs: Math.round(performance.now() - started), ...(result.outcome ? { outcome: result.outcome } : {}) };
+      return { usage: result.usage, preflight, provider: adapter.id, model: adapter.model, billingModel: result.billingModel ?? (adapter.id === 'mock' ? adapter.model : undefined), mocked: adapter.id === 'mock', text: redactText(result.text), latencyMs: Math.round(performance.now() - started), ...(result.outcome ? { outcome: result.outcome } : {}) };
     } catch (error) {
       if (timedOut) throw new ProviderFailure('timeout');
       if (controller.signal.aborted) throw new ProviderFailure('cancelled');

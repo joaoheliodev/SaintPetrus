@@ -218,7 +218,7 @@ test('F2 synthetic mock usage never rewrites the operator price file; real recon
     const service = new TokenService(policy, document, { ids: () => ['a'], pause: () => {}, pauseAll: () => {} }, undefined, Date.now, new PriceCatalog(structuredClone(document), file));
     await service.execute(new ProviderProxy(), { id: 'mock', model: 'mock-v1', complete: async () => ({ text: 'Synthetic' }) }, 'Question', new AbortController().signal, 'a', 'System');
     assert.equal(await read(file, 'utf8'), original, 'a mock call leaves the file byte-identical');
-    await service.execute(new ProviderProxy(), { id: 'openai', model: 'test-model', complete: async () => ({ text: 'Answer', usage: { prompt: 1, completion: 1, total: 2 } }) }, 'Question', new AbortController().signal, 'a', 'System');
+    await service.execute(new ProviderProxy(), { id: 'openai', model: 'test-model', complete: async () => ({ text: 'Answer', billingModel: 'test-model', usage: { prompt: 1, completion: 1, total: 2 } }) }, 'Question', new AbortController().signal, 'a', 'System');
     assert.deepEqual(JSON.parse(await read(file, 'utf8')).reconciled.map((entry: { models: string[] }) => entry.models), [['test-model']], 'real consumption is still protected');
   } finally { await rm(dir, { recursive: true }); }
 });

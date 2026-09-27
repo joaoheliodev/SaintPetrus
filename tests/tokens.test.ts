@@ -26,7 +26,7 @@ function fixture(limit = 1000, temperature = 0) {
   const paused = new Set<string>(); let now = 0, calls = 0; const ids = ['a', 'b'];
   const service = new TokenService(policy, prices, { ids: () => ids, pause: id => { paused.add(id); }, pauseAll: () => ids.forEach(id => paused.add(id)) }, fixedRatioTokenCounter(1000), () => now);
   const proxy = new ProviderProxy();
-  const adapter: ProviderAdapter = { id: 'openai', model: 'test-model', complete: async () => { calls++; return { text: 'Answer', usage: { prompt: 10, completion: 10, total: 20 } }; } };
+  const adapter: ProviderAdapter = { id: 'openai', model: 'test-model', complete: async () => { calls++; return { text: 'Answer', billingModel: 'test-model', usage: { prompt: 10, completion: 10, total: 20 } }; } };
   const run = (system = 'System', messages?: RequestOptions['messages']) => service.execute(proxy, adapter, 'Question', signal(), 'a', system, messages);
   return { service, policy, prices, proxy, adapter, run, paused, calls: () => calls, advance: (ms = 51) => { now += ms; } };
 }
@@ -87,13 +87,13 @@ test('RF-06 reserves before dispatch and enforces each of four scopes', async ()
 
 test('RF-06 reconciles actual usage, costs, 80% warning and 100% pause', async () => {
   const f = fixture(100);
-  f.adapter.complete = async () => ({ text: 'Answer', usage: { prompt: 50, completion: 30, total: 80 } });
+  f.adapter.complete = async () => ({ text: 'Answer', billingModel: 'test-model', usage: { prompt: 50, completion: 30, total: 80 } });
   await f.run();
   let row = f.service.snapshot().rows.find(row => row.scope === 'global')!;
   assert.deepEqual(row.actual, { prompt: 50, completion: 30, total: 80 }); assert.equal(row.reserved, 0); assert.equal(row.state, 'warning');
   assert.equal(row.costAccountedUsd, (50 * 2 + 30 * 4) / 1e6);
   await assert.rejects(f.run('Different'), /reservation/); assert.ok(f.paused.has('a'));
-  const g = fixture(100); g.adapter.complete = async () => ({ text: 'Answer', usage: { prompt: 60, completion: 40, total: 100 } });
+  const g = fixture(100); g.adapter.complete = async () => ({ text: 'Answer', billingModel: 'test-model', usage: { prompt: 60, completion: 40, total: 100 } });
   await g.run(); row = g.service.snapshot().rows.find(row => row.scope === 'global')!;
   assert.equal(row.state, 'stopped'); assert.ok(g.paused.has('a')); await assert.rejects(g.run(), /paused/);
 });
@@ -217,7 +217,7 @@ test('P3 expiry never charges less than the original hold when current candidate
 
 test('RF-06 does not expire an in-flight reservation', async () => {
   const f = fixture(); let finish: (() => void) | undefined;
-  f.adapter.complete = async () => { await new Promise<void>(resolve => { finish = resolve; }); return { text: 'Answer', usage: { prompt: 5, completion: 5, total: 10 } }; };
+  f.adapter.complete = async () => { await new Promise<void>(resolve => { finish = resolve; }); return { text: 'Answer', billingModel: 'test-model', usage: { prompt: 5, completion: 5, total: 10 } }; };
   const execution = f.run(); f.advance(1000);
   const active = f.service.snapshot().rows.find(row => row.scope === 'global')!;
   assert.equal(active.used, 0); assert.equal(active.reserved, 65); assert.equal(active.unverifiable, 0);
@@ -300,7 +300,7 @@ test('A graph that drops an agent mid-call cannot jam a billed call or release i
     const f = fixture(65); let present = true;
     // The production hook throws once a graph reset has removed the agent.
     const service = new TokenService(f.policy, f.prices, { ids: () => ['a'], pause: () => { if (!present) throw new Error('Agent not found.'); }, pauseAll: () => {} }, fixedRatioTokenCounter(1000), () => 0);
-    const adapter: ProviderAdapter = { id: provider, model, complete: async () => { present = false; return provider === 'mock' ? { text: 'x'.repeat(64_001) } : { text: 'Answer', usage: { prompt: 1, completion: 64, total: 65 } }; } };
+    const adapter: ProviderAdapter = { id: provider, model, complete: async () => { present = false; return provider === 'mock' ? { text: 'x'.repeat(64_001) } : { text: 'Answer', billingModel: model, usage: { prompt: 1, completion: 64, total: 65 } }; } };
     await service.execute(new ProviderProxy(), adapter, 'Question', signal(), 'a', 'System');
     const snapshot = service.snapshot();
     assert.deepEqual(snapshot.reservations, [], provider);
@@ -328,7 +328,7 @@ test('O4 token panel imports the owner contract and has one snapshot writer', ()
 
 test('RF-06 active reservations prevent concurrent budget oversubscription', async () => {
   const f = fixture(100); let finish: (() => void) | undefined;
-  f.adapter.complete = async () => { await new Promise<void>(resolve => { finish = resolve; }); return { text: 'Answer', usage: { prompt: 5, completion: 5, total: 10 } }; };
+  f.adapter.complete = async () => { await new Promise<void>(resolve => { finish = resolve; }); return { text: 'Answer', billingModel: 'test-model', usage: { prompt: 5, completion: 5, total: 10 } }; };
   const first = f.run(); assert.ok(f.service.snapshot().rows.find(row => row.scope === 'global')!.reserved > 0);
   await assert.rejects(f.service.execute(new ProviderProxy(), f.adapter, 'Other', signal(), 'b', 'System'), /reservation/);
   finish!(); await first;
@@ -346,7 +346,7 @@ test('D2 monetary reservations prevent concurrent oversubscription in all four s
     f.adapter.complete = async () => {
       adapterCalls++;
       if (adapterCalls === 1) await new Promise<void>(resolve => { finish = resolve; });
-      return { text: 'Answer', usage: { prompt: 5, completion: 5, total: 10 } };
+      return { text: 'Answer', billingModel: 'test-model', usage: { prompt: 5, completion: 5, total: 10 } };
     };
     const first = f.run();
     try {
@@ -361,14 +361,14 @@ test('D2 monetary reservations prevent concurrent oversubscription in all four s
 test('D2 monetary usage alone drives warning and hard stop', async () => {
   const warning = fixture(1000); warning.policy.costLimitsUsd = costLimits(1000); warning.prices.models['test-model'] = modelPrice(1_000_000, 1_000_000, 1_000_000);
   warning.service.setCostLimit('global', 'all', 65);
-  warning.adapter.complete = async () => ({ text: 'Answer', usage: { prompt: 26, completion: 26, total: 52 } });
+  warning.adapter.complete = async () => ({ text: 'Answer', billingModel: 'test-model', usage: { prompt: 26, completion: 26, total: 52 } });
   await warning.run();
   let row = warning.service.snapshot().rows.find(item => item.scope === 'global')!;
   assert.equal(row.used, 52); assert.equal(row.costAccountedUsd, 52); assert.equal(row.state, 'warning'); assert.equal(warning.paused.has('a'), false);
 
   const stopped = fixture(1000); stopped.policy.costLimitsUsd = costLimits(1000); stopped.prices.models['test-model'] = modelPrice(1_000_000, 1_000_000, 1_000_000);
   stopped.service.setCostLimit('global', 'all', 65);
-  stopped.adapter.complete = async () => ({ text: 'Answer', usage: { prompt: 1, completion: 64, total: 65 } });
+  stopped.adapter.complete = async () => ({ text: 'Answer', billingModel: 'test-model', usage: { prompt: 1, completion: 64, total: 65 } });
   await stopped.run();
   row = stopped.service.snapshot().rows.find(item => item.scope === 'global')!;
   assert.equal(row.costAccountedUsd, 65); assert.equal(row.state, 'stopped'); assert.ok(stopped.paused.has('a'));
@@ -378,7 +378,7 @@ test('P2 preflight adds a new reservation to the accounted cost, not to its unme
   const f = fixture(1000); f.policy.costLimitsUsd = costLimits(1000); f.prices.models['test-model'] = modelPrice(1_000_000, 1_000_000, 1_000_000);
   f.service.setCostLimit('global', 'all', 100);
   let adapterCalls = 0;
-  f.adapter.complete = async () => { adapterCalls++; return { text: 'Answer', usage: { prompt: 1, completion: 39, total: 40 } }; };
+  f.adapter.complete = async () => { adapterCalls++; return { text: 'Answer', billingModel: 'test-model', usage: { prompt: 1, completion: 39, total: 40 } }; };
   await f.run();
   let row = f.service.snapshot().rows.find(item => item.scope === 'global')!;
   assert.equal(row.costAccountedUsd, 40); assert.equal(row.costUnmeasuredUsd, 0); assert.equal(row.costReservedUsd, 0); assert.equal(row.state, 'available'); assert.equal(f.paused.has('a'), false);
@@ -394,7 +394,7 @@ test('D2 TokenService reconciliation passes actual cache split and both call tim
     const prices: Prices = { date: '2026-09-07', currency: 'USD', models: { 'test-model': peakPrice } };
     let now = requestAt;
     const service = new TokenService(policy, prices, { ids: () => ['a'], pause: () => {}, pauseAll: () => {} }, fixedRatioTokenCounter(1000), () => now);
-    const adapter: ProviderAdapter = { id: 'openai', model: 'test-model', complete: async () => { now = responseAt; return { text: 'Answer', usage: { prompt: 1_000_000, completion: 0, total: 1_000_000, inputBreakdown: { cacheHit: 500_000, cacheMiss: 500_000 } } }; } };
+    const adapter: ProviderAdapter = { id: 'openai', model: 'test-model', complete: async () => { now = responseAt; return { text: 'Answer', billingModel: 'test-model', usage: { prompt: 1_000_000, completion: 0, total: 1_000_000, inputBreakdown: { cacheHit: 500_000, cacheMiss: 500_000 } } }; } };
     await service.execute(new ProviderProxy(), adapter, 'Question', signal(), 'a', 'System');
     return service.snapshot().rows.find(row => row.scope === 'global')!.costAccountedUsd;
   };
