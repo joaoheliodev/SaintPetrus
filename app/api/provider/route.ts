@@ -21,10 +21,12 @@ export async function POST(request: Request) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new ProviderFailure('invalid_request');
     const input = data as Record<string, unknown>;
     if (Object.keys(input).some(key => !['action', 'input', 'agentId'].includes(key))) throw new ProviderFailure('invalid_request');
-    if (!['test', 'complete'].includes(String(input.action))) throw new ProviderFailure('invalid_request');
+    if (!['test', 'complete', 'quote'].includes(String(input.action))) throw new ProviderFailure('invalid_request');
     const graph = graphRuntime().graph.snapshot();
     const agent = input.agentId === undefined ? graph.agents[0] : graph.agents.find(a => a.id === input.agentId);
     if (!agent) throw new ProviderFailure('invalid_request');
+    // What Run once would reserve, from the same checks as the call itself; nothing is reserved and nothing leaves.
+    if (input.action === 'quote') return safeJson({ quote: tokenService().quote(configuredAdapter(), input.input, agent.id, agent.context.summary) });
     // The verdict belongs to the key and pair this call uses; a change while it runs makes it stale.
     generation = verificationGeneration();
     const result = await tokenService().execute(providerProxy(), configuredAdapter(), input.action === 'test' ? 'Reply OK.' : input.input, request.signal, agent.id, agent.context.summary, undefined, input.action === 'test');

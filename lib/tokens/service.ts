@@ -154,21 +154,23 @@ export class TokenService {
     eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'budget.refused', severity: 'warning', payload: message });
     throw new TokenFailure(message);
   }
-  async execute(proxy: ProviderProxy, adapter: ProviderAdapter, input: unknown, signal: AbortSignal, agent: string, systemPrompt: string, messages?: RequestOptions['messages'], verification = false) {
+  // Every check a call makes before any I/O. execute and quote share it, so a quote can never be cheaper or more
+  // permissive than the call it describes. fail decides the side effects of a refusal; record whether the agent is tied to the model's budget.
+  private plan(adapter: ProviderAdapter, input: unknown, agent: string, systemPrompt: string, messages: RequestOptions['messages'] | undefined, verification: boolean, fail: (message: string, pause: boolean) => never, record: boolean) {
     this.expireReservations();
-    if (!this.hooks.ids().includes(agent)) this.refuse(agent, 'Unknown agent.');
+    if (!this.hooks.ids().includes(agent)) fail('Unknown agent.', false);
     const model = Object.hasOwn(this.policy.models, adapter.model) ? this.policy.models[adapter.model] : undefined;
-    if (!model || model.provider !== adapter.id) this.refuse(agent, 'Model not allowlisted. Edit local token policy and prices.');
-    if (typeof input !== 'string' || !input.trim() || input.length > 2000) this.refuse(agent, 'Invalid input.');
-    if (this.stopped || this.paused.has(agent)) { this.pause(agent); this.refuse(agent, 'Agent paused.'); }
+    if (!model || model.provider !== adapter.id) fail('Model not allowlisted. Edit local token policy and prices.', false);
+    if (typeof input !== 'string' || !input.trim() || input.length > 2000) fail('Invalid input.', false);
+    if (this.stopped || this.paused.has(agent)) fail('Agent paused.', true);
     const createdAt = this.now();
     const priceVersions = this.catalog.capture(createdAt);
     const selectedPrice = Object.hasOwn(priceVersions, adapter.model) ? priceVersions[adapter.model] : undefined;
-    if (!selectedPrice) this.refuse(agent, 'Model price missing, expired or not yet effective. Add an operator-verified validity before execution.');
+    if (!selectedPrice) fail('Model price missing, expired or not yet effective. Add an operator-verified validity before execution.', false);
     const price = selectedPrice.price;
-    const models = this.agentModels.get(agent) ?? new Set<string>(); models.add(adapter.model); this.agentModels.set(agent, models);
+    if (record) { const models = this.agentModels.get(agent) ?? new Set<string>(); models.add(adapter.model); this.agentModels.set(agent, models); }
     const rows = this.scopes(agent, adapter.model);
-    if (rows.some(row => this.blocked(row))) { this.pause(agent); this.refuse(agent, 'Token or monetary budget exhausted.'); }
+    if (rows.some(row => this.blocked(row))) fail('Token or monetary budget exhausted.', true);
     const requestedThinking = verification ? verificationThinking(model.provider, model.thinking) : model.thinking;
     const options: RequestOptions = { systemPrompt: redactText(systemPrompt), messages: (messages ?? [{ role: 'user', content: input }]).map(m => ({ role: m.role, content: redactText(m.content) })), temperature: model.temperature, maxTokens: model.max_tokens, ...(requestedThinking ? { thinking: requestedThinking } : {}) };
     // The thinking state is part of the key, so a cached answer can never be served to a request
@@ -178,16 +180,26 @@ export class TokenService {
     const inputEstimate = this.counter.count(JSON.stringify({ systemPrompt: options.systemPrompt, messages: options.messages }));
     let reservedCostUsd: number;
     try { reservedCostUsd = preflightCostUsd(price, inputEstimate, options.maxTokens, createdAt, this.policy.reservationTtlMs); }
-    catch { this.refuse(agent, 'Model price unavailable, not yet effective, expired or expires within reservation TTL.'); }
+    catch { return fail('Model price unavailable, not yet effective, expired or expires within reservation TTL.', false); }
     const reusable = reproducible(model, requestedThinking);
-    const cached = !verification && reusable ? this.cache.get(hash) : undefined;
-    if (cached && cached.expires > this.now()) {
+    const entry = !verification && reusable ? this.cache.get(hash) : undefined;
+    const cached = entry && entry.expires > this.now() ? entry : undefined;
+    const reservedTokens = inputEstimate + options.maxTokens;
+    if (!cached && (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costAccountedUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd))) fail('Preflight reservation exceeds token or monetary budget.', true);
+    return { options, hash, inputEstimate, reservedCostUsd, reservedTokens, reusable, cached, rows, createdAt, priceVersions, selectedPrice };
+  }
+  // What a call with this input would reserve, decided by the same checks and without reserving or pausing anything.
+  quote(adapter: ProviderAdapter, input: unknown, agent: string, systemPrompt: string) {
+    const plan = this.plan(adapter, input, agent, systemPrompt, undefined, false, message => { throw new TokenFailure(message); }, false);
+    return { provider: adapter.id, model: adapter.model, cached: plan.cached !== undefined, reservedTokens: plan.cached ? 0 : plan.reservedTokens, reservedCostUsd: plan.cached ? 0 : plan.reservedCostUsd };
+  }
+  async execute(proxy: ProviderProxy, adapter: ProviderAdapter, input: unknown, signal: AbortSignal, agent: string, systemPrompt: string, messages?: RequestOptions['messages'], verification = false) {
+    const { options, hash, inputEstimate, reservedCostUsd, reservedTokens, reusable, cached, rows, createdAt, priceVersions, selectedPrice } = this.plan(adapter, input, agent, systemPrompt, messages, verification, (message, pause) => { if (pause) this.pause(agent); return this.refuse(agent, message); }, true);
+    if (cached) {
       rows.forEach(row => { row.saved += cached.usage.total; });
       this.receipts.append({ kind: 'cache', at: this.now(), agent, provider: adapter.id, requestedModel: adapter.model, servedModel: cached.billingModel, savedTokens: cached.usage.total });
       return { provider: adapter.id, model: adapter.model, billingModel: cached.billingModel, mocked: adapter.id === 'mock', text: redactText(cached.text), latencyMs: 0, cached: true, usage: cached.usage, approximate: cached.approximate };
     }
-    const reservedTokens = inputEstimate + options.maxTokens;
-    if (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costAccountedUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd)) { this.pause(agent); this.refuse(agent, 'Preflight reservation exceeds token or monetary budget.'); }
     // Synchronous reservation across all four scopes happens before any provider I/O.
     rows.forEach(row => { row.reserved += reservedTokens; row.costReservedUsd = money(row.costReservedUsd + reservedCostUsd); });
     const reservation: Reservation = { id: `reservation-${++this.reservationSequence}`, agent, model: adapter.model, provider: adapter.id, priceVersionId: selectedPrice.id, priceVersions, tokens: reservedTokens, costUsd: reservedCostUsd, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, createdAt, expiresAt: null, status: 'inflight', rows };

@@ -38,8 +38,11 @@ Each kind of state has exactly one server owner; read
 This is **Run once** in the inspector. **Connect and verify** takes the same path with a fixed probe message,
 reasoning turned off where the provider allows it, and no response cache.
 
-1. **Browser.** The inspector posts `{ action: 'complete', input, agentId }` to `/api/provider`. The body
-   never carries a key, a model or a URL.
+1. **Browser.** The inspector first posts `{ action: 'quote', input, agentId }` to `/api/provider`. The route
+   answers `{ quote: { provider, model, cached, reservedTokens, reservedCostUsd } }` from `TokenService.quote`,
+   which runs the same admission checks as step 3 without reserving, pausing or sending anything. A refusal
+   answers exactly as the call would. The inspector shows that maximum in a confirmation, and only after it is
+   accepted posts `{ action: 'complete', input, agentId }`. Neither body ever carries a key, a model or a URL.
 2. **Local boundary.** The route checks Host, the exact page Origin and the JSON content type, reads a
    bounded body and refuses unknown fields. The agent must exist in the graph.
 3. **Admission.** `TokenService.execute` expires overdue reservations, then refuses before any I/O when the

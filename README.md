@@ -69,7 +69,9 @@ fictitious budget: one cent per 30 characters, reserved before output is deliver
    saves every settled position.
 5. **Edit** an agent's name and objective from the inspector.
 6. **Run once** sends one message for the selected agent through the connected provider; the answer appears
-   under **Output**. With the mock it is free. With a real provider it is an ordinary budgeted call.
+   under **Output**. It first asks the server what the call would reserve, through the same preflight and budgets
+   as the call itself, and shows that maximum (tokens and dollars) in a confirmation. Nothing is reserved or sent
+   until you accept. With the mock it is free. With a real provider it is an ordinary budgeted call.
 7. **Watch** the server events panel, the connection badge in the header, and **Tokens** for budgets,
    reservations and receipts. An optional live feed is described below.
 8. **Export context** downloads the current graph as redacted JSON. **Import graph** reads such a file back and

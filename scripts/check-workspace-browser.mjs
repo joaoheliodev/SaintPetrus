@@ -91,8 +91,12 @@ try {
   console.log('PASS: a dragged card is saved where it was dropped');
   const mocked = await evaluate(`!document.querySelector('.statusbar')?.textContent.includes('Mock disabled')`);
   await type('section[aria-label="Run this agent"] textarea', 'Say something short.');
+  // Run once asks first with the server's quote: refuse once, then accept.
+  decisions.push(false); await until(() => click('Send (1 call)'), 'run button');
+  await until(() => dialogs.some(text => text.startsWith('Send one call to ') && text.includes(' tokens')), 'run question with the reserved maximum');
+  await until(async () => await evaluate(`document.querySelector('section[aria-label="Run this agent"] [role=status]')?.textContent`) === 'Not sent.', 'declined run not sent');
   await until(() => click('Send (1 call)'), 'run button');
-  const answer = await until(() => evaluate(`document.querySelector('section[aria-label="Run this agent"] [role=status]')?.textContent || ''`), 'run result');
+  const answer = await until(() => evaluate(`(text => text && text !== 'Not sent.' ? text : '')(document.querySelector('section[aria-label="Run this agent"] [role=status]')?.textContent)`), 'run result');
   if (mocked) {
     assert.match(answer, /^Mock answer/);
     await until(() => evaluate(`(() => { const tab = Array.from(document.querySelectorAll('[role=tab]')).find(t => t.textContent === 'Output'); tab?.click(); return document.querySelector('.inspector pre')?.textContent.startsWith('MOCK:'); })()`), 'answer recorded as the agent output');

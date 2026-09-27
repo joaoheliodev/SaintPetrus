@@ -5,6 +5,15 @@ import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import type { Agent, Graph } from '../lib/orchestrator';
 import { postProviderAction, verificationMessage } from './provider-status';
+// The confirmation names the maximum the server will hold before sending; the call itself is checked again.
+export function runQuestion(quote: unknown): string {
+  const field = (name: string) => quote !== null && typeof quote === 'object' ? Reflect.get(quote, name) : undefined;
+  const provider = field('provider'), model = field('model'), tokens = field('reservedTokens'), cost = field('reservedCostUsd');
+  if (typeof model !== 'string' || typeof tokens !== 'number' || typeof cost !== 'number') return 'Send one call? The server did not say how much it reserves.';
+  if (field('cached') === true) return `Send one call to ${model}? A saved answer will be reused: nothing is reserved and no provider is called.`;
+  const price = provider === 'mock' ? 'the mock is free' : `at most $${cost.toFixed(6)} before sending`;
+  return `Send one call to ${model}? It reserves ${tokens} tokens, ${price}. What the provider does not use is released when its usage is confirmed.`;
+}
 export const statusLabels = { paused: 'Paused', ready: 'Ready', running: 'Running', completed: 'Completed', blocked: 'Blocked' };
 type Props = { agent: Agent; agents: readonly Pick<Agent, 'id' | 'name'>[]; pending: boolean; command: (input: Record<string, unknown>) => Promise<Graph | null>; connect: (source: string, target: string) => Promise<void> };
 // Mount with `key={agent.id}` so drafts never carry over from another agent.
@@ -22,14 +31,19 @@ export function AgentInspector({ agent, agents, pending, command, connect }: Pro
   // The keyboard path to what a drag between two cards does; the canvas validates and the server decides.
   const [target, setTarget] = useState(''); const others = agents.filter(other => other.id !== agent.id);
   const [message, setMessage] = useState(''); const [running, setRunning] = useState(false); const [result, setResult] = useState('');
+  // A 409 carries either a known code or the server's own fixed refusal sentence; both are safe to show.
+  const refusal = (status: number, error: unknown) => status === 409 && typeof error === 'string' && !/^[a-z_]+$/.test(error) ? `Stopped by the server: ${error}` : verificationMessage(status, typeof error === 'string' ? error : undefined);
   // One budgeted call through the connected provider; the server records the answer as this agent's output.
+  // It asks first with the server's own quote of the most the call can reserve (operator decision Q-09).
   async function run() {
     setRunning(true); setResult('');
     try {
+      const quoted = await postProviderAction(JSON.stringify({ action: 'quote', input: message, agentId: agent.id }));
+      if (!quoted.ok) { setResult(refusal(quoted.status, quoted.data?.error)); return; }
+      if (!window.confirm(runQuestion(quoted.data?.quote))) { setResult('Not sent.'); return; }
       const { ok, status, data } = await postProviderAction(JSON.stringify({ action: 'complete', input: message, agentId: agent.id }));
       if (ok) setResult(`${data.mocked ? 'Mock answer' : `Answer from ${data.billingModel}`} · ${data.usage?.total ?? 0} tokens · ${data.latencyMs} ms`);
-      // A 409 carries either a known code or the server's own fixed refusal sentence; both are safe to show.
-      else setResult(status === 409 && typeof data?.error === 'string' && !/^[a-z_]+$/.test(data.error) ? `Stopped by the server: ${data.error}` : verificationMessage(status, data?.error));
+      else setResult(refusal(status, data?.error));
     } catch { setResult('Local server unavailable. The call was not confirmed.'); }
     finally { setRunning(false); }
   }
@@ -52,7 +66,7 @@ export function AgentInspector({ agent, agents, pending, command, connect }: Pro
     </section>
     {removable && <section aria-label="Remove this agent"><h3>Remove</h3><Button variant="destructive" disabled={pending} onClick={remove}><Trash2 />Remove agent</Button></section>}
     <section className="inspector-run" aria-label="Run this agent"><h3>Run once</h3>
-      <p className="helper">Sends one budgeted call through the connected provider and shows the answer under Output. The mock is free; a real provider can charge for it.</p>
+      <p className="helper">Sends one budgeted call through the connected provider and shows the answer under Output. It asks first, showing the most the call can reserve. The mock is free; a real provider can charge for it.</p>
       <label>Message<textarea value={message} maxLength={2000} onChange={event => setMessage(event.target.value)} /></label>
       <Button disabled={running || !message.trim()} onClick={run}><Send />{running ? 'Running…' : 'Send (1 call)'}</Button>
       <p role="status">{result}</p>

@@ -121,7 +121,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | A-07 | P0 | Q-07 | OpenAI removed from the allowlist and documented as unsupported until validated; no snapshot or price registered | done (this commit; `gpt-5-nano` removed from `config/token-policy.json`, `config/prices.json` untouched; the panel option is always disabled; tests pin both; mutation of the option killed) |
 | A-03 | P1 | Q-03 yes | Removal with confirmation; refused while the agent has an active, unverifiable or unreconciled reservation; its `agent/A` accounting stays, marked removed | done |
 | A-04 | P1 | Q-04 yes | Graph persisted in the user data directory; import as untrusted input (strict schema, size limit, unknown fields and credentials refused, models through the allowlist); export stays redacted; accounting documented as process-local | done |
-| A-09 | P1 | Q-09 | Run once kept only through the same preflight and budgets, with a confirmation that shows the maximum reserved cost; removed if it duplicates another action | pending |
+| A-09 | P1 | Q-09 | Run once kept only through the same preflight and budgets, with a confirmation that shows the maximum reserved cost; removed if it duplicates another action | done: kept, since no other action sends an agent's own message and records its output (the probe sends a fixed message and records nothing). `quote` shares `TokenService.plan` with `execute` |
 | A-02 | — | Q-02 | The operator validates locally; nothing to implement | done (no change) |
 | A-05 | P3 | Q-05 empty | The security contact placeholder stays | done (no change) |
 | A-06 | P3 | Q-06 empty | No LICENSE is created | done (no change) |

@@ -32,7 +32,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 422 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 427 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -114,7 +114,7 @@ Removing an agent asks first and is refused while the agent has an active, unver
 
 A graph import is untrusted input: strict schema, a size limit, unknown fields and credential-shaped text refused, and every model through the allowlist. The graph format names no model, so a `model` field is refused as unknown; a model field added later must be checked against `policy.models`. The export stays redacted, and accounting stays process-local.
 
-Run once goes through the same preflight and budgets as any call and asks first, showing the maximum cost it reserves.
+Run once goes through the same preflight and budgets as any call and asks first, showing the maximum cost it reserves. The quote and the call share `TokenService.plan`, so the quote cannot be cheaper or more permissive than the call; keep them on one code path. Run once stays because no other action sends an agent's own message and records its output.
 
 ## Reuse before reimplementing
 

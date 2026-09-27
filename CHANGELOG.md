@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: `night/provider-validation-ready` (2026-09-27)
 
 Everything that could be finished without a call to a real provider. No request with a real key was made.
-The test floor rose from 338 to 422.
+The test floor rose from 338 to 427.
 
 ### Provider validation
 
@@ -61,7 +61,9 @@ The test floor rose from 338 to 422.
 - `npm run dev` starts with the keyless mock, so the whole panel works without a key; `npm start` does not,
   and an explicit `SAINTPETRUS_MOCK` always wins.
 - The inspector edits an agent's name and objective, connects the agent to another from the keyboard, and
-  **Run once** sends one budgeted call whose answer becomes the agent's output.
+  **Run once** sends one budgeted call whose answer becomes the agent's output. It asks first, showing the
+  tokens and dollars the call reserves at most, quoted by `POST /api/provider` `{ action: 'quote' }` through the
+  same checks as the call, with nothing reserved or sent.
 - **Forget key** in the connection panel clears the selected provider's key from memory and deletes its remembered
   ciphertext; the terminal helper covers any provider.
 - **Remove** in the inspector deletes an agent and its connections after a confirmation. The route answers 409
