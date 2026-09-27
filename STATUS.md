@@ -1,10 +1,10 @@
 # SaintPetrus — current status
 
-Branch: `night/price-schema`, a linear continuation of `night/m0-m2`, `night/deepseek` and `night/orca`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`; timestamped events live in the append-only `NIGHT-LOG.md`.
+Branch: `night/provider-validation-ready`, continuing `night/provider-validation` from the operator's price-admin commit `0662647` on `night/price-admin`, following `night/price-schema`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`; timestamped events live in the append-only `NIGHT-LOG.md`.
 
-## Verified in round C (2026-09-15)
+## Verification checkpoint (2026-09-26)
 
-Run on this tree without any API key: lint, the app ES2017 and core ES2022 typechecks, 292 tests in 29 suites and the production build passed, as they did after every task in the round, and directory and full-history Gitleaks scans found no leaks. No provider request was made, including `GET /models`.
+Run without any API key: lint, the app ES2017 and core ES2022 typechecks and npm test passed. An explicit in-process run confirmed 338 tests in 29 suites, zero failures or skips; the default runner reports test-file processes in this sandbox. The production build was not rerun by this agent; the operator reported approving the price-admin build and Prices browser check on September 23. No provider request was made, including `GET /models`.
 
 The suite covers the delivered behavior below with synthetic fixtures only. Browser checks and the results of earlier rounds are historical evidence from the commits and handoffs that delivered them, and were not repeated.
 
@@ -17,6 +17,7 @@ The suite covers the delivered behavior below with synthetic fixtures only. Brow
 - **Providers.** OpenAI Responses, Gemini `generateContent`, DeepSeek with its own adapter and strict usage parser, and the mock. Status mapping lives in each adapter, thinking capabilities in one table, and chain of thought stays out of context, events, previews and artifacts.
 - **Repository discipline (Orca O1–O5).** `AGENTS.md`, ratchet tests, exhaustive `unbilled | billed | unverifiable` verdicts, one server owner per state and anchored reference decisions.
 - **Price schema.** Optional `expiresAt` with a preflight horizon covering the reservation TTL (P1); the enforced total `costAccountedUsd` named apart from its unmeasured part `costUnmeasuredUsd` (P2).
+- **Provider-scoped expiry floor (P3).** Implemented: capture the validated provider and tariff candidates; narrow only when every usable candidate has price-side provider metadata, otherwise retain the global floor. Charge at least the original hold in all four scopes. Request allowlisting does not remove price-only reroute candidates.
 - **Round C.** Orphan permanent rules moved into `AGENTS.md`, local refusal verdicts proven unreachable with a live reservation, and the deferred price dimensions and first real call protocol documented.
 
 ## Not verified or pending
@@ -26,7 +27,6 @@ The suite covers the delivered behavior below with synthetic fixtures only. Brow
 - DeepSeek has no model ID and no price in configuration, so selecting it is refused with `model_not_allowlisted` until the operator enters both from the browser.
 - The configured OpenAI and Gemini rates were verified on 2026-09-07. Account and model availability are unverified.
 - The response cache is off (`cacheTtlMs` 0) until a real key is validated, so the per-model determinism declarations are dormant.
-- P3, a provider-scoped worst case for reservation expiry, is a proposal awaiting the operator's monetary decision. The all-model floor stays.
 - Long-context tiers and cache-write pricing are not modeled; see `docs/reference/deferred-price-dimensions.md`.
 - The Responses streaming path and real error, quota and timeout handling are tested only with synthetic transport.
 - The full RF-02 panel is pending. RF-03 and RF-04 are out of scope.
@@ -34,7 +34,7 @@ The suite covers the delivered behavior below with synthetic fixtures only. Brow
 ## Open debts and limits
 
 - Counters, budgets, reservations, graph, events and artifacts are process-local. Restarting clears them; this is not a durable ledger.
-- An unresolved reservation converts after `reservationTtlMs` (300000 ms in the shipped policy) at the greater of the hold and the dearest model at peak with no cache hits, and stays marked as an expired estimate until manual reconciliation.
+- An unresolved reservation converts after `reservationTtlMs` (300000 ms in the shipped policy) at the greater of the hold and the dearest eligible captured model at peak with no cache hits, using P3's provider rule, and stays marked as an expired estimate until manual reconciliation.
 - The input counter is approximate. The monetary ceiling is a guard, not a proof of the invoice.
 - Configured credential fragments of 12 or more characters are redacted; shorter substrings cannot be told apart from ordinary text.
 - Native Windows and macOS keyrings are unverified. The Linux keyring roundtrip passed with synthetic material.
