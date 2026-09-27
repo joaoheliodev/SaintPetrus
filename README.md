@@ -188,8 +188,10 @@ gitleaks git --no-banner --redact=100 --log-opts=--all
 ```
 
 `npm run typecheck` runs twice on purpose: once for the app and once for the dependency-free `lib/core`.
-Two browser checks need Chromium (`CHROMIUM_PATH` overrides `/usr/bin/chromium`) and a running instance; each
-uses a throwaway profile and reaches only `127.0.0.1`:
+Two browser checks need Chromium (`CHROMIUM_PATH` overrides `/usr/bin/chromium`) and a running instance. Each uses a
+throwaway profile in the OS temporary directory, reaches only `127.0.0.1` and removes the profile even when Chromium
+dies or the run is interrupted. The main-flow check changes the instance it runs against (it resets the graph and
+pauses every agent), so it refuses one that already holds work or has a keyed provider connected: start a fresh one.
 
 - `PORT=3310 npm run dev`, then `TEST_APP_PORT=3310 npm run test:e2e`: the main flow, keyboard paths, visible
   focus, control names, confirmations and the absence of CSP violations or console errors.

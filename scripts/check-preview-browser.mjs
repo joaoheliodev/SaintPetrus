@@ -1,37 +1,24 @@
 // Independent disposable Chromium test session; never accesses the user's browser profile.
-import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { once } from 'node:events';
 import assert from 'node:assert/strict';
+import { launchChromium } from './disposable-chromium.mjs';
 const port = Number(process.env.TEST_APP_PORT ?? 3210);
-const profile = await mkdtemp('.audit/chromium-test-');
-const child = spawn(process.env.CHROMIUM_PATH ?? '/usr/bin/chromium', ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-default-apps', '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
-let socket;
-const timeout = setTimeout(() => child.kill('SIGTERM'), 45000);
+const contexts = new Map(); const logs = []; const navigations = []; const dialogs = []; let sessionId;
+const { call, close } = await launchChromium({ timeoutMs: 45000, onEvent: (message, send) => {
+  if (message.method === 'Runtime.executionContextCreated') contexts.set(`${message.sessionId}:${message.params.context.id}`, { ...message.params.context, sessionId: message.sessionId });
+  if (message.method === 'Runtime.executionContextDestroyed') contexts.delete(`${message.sessionId}:${message.params.executionContextId}`);
+  if (message.method === 'Log.entryAdded') logs.push(message.params.entry.text);
+  if (message.method === 'Target.attachedToTarget') {
+    const childSession = message.params.sessionId;
+    for (const domain of ['Page', 'Runtime', 'Log']) send(`${domain}.enable`, {}, childSession).catch(() => {});
+    send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, childSession).catch(() => {});
+  }
+  if (message.method === 'Page.frameNavigated') navigations.push(message.params.frame.url);
+  // Running the preview mock replaces the graph, so the panel asks first; this disposable instance accepts.
+  if (message.method === 'Page.javascriptDialogOpening') { dialogs.push(message.params.message); send('Page.handleJavaScriptDialog', { accept: true }, message.sessionId).catch(() => {}); }
+} });
 try {
-  const endpoint = await new Promise((resolve, reject) => {
-    let output = '';
-    child.stderr.on('data', chunk => { output += chunk; const match = output.match(/DevTools listening on (ws:\/\/127\.0\.0\.1:\d+\/\S+)/); if (match) resolve(match[1]); });
-    child.on('error', reject); child.on('exit', () => reject(new Error('Disposable Chromium exited before debugger connected.')));
-  });
-  socket = new WebSocket(endpoint); await once(socket, 'open');
-  let sequence = 0; const pending = new Map(); const contexts = new Map(); const logs = []; const navigations = [];
-  socket.addEventListener('message', ({ data }) => {
-    const message = JSON.parse(data);
-    if (message.id) { const request = pending.get(message.id); pending.delete(message.id); if (message.error) request?.reject(new Error(message.error.message)); else request?.resolve(message.result); }
-    if (message.method === 'Runtime.executionContextCreated') contexts.set(`${message.sessionId}:${message.params.context.id}`, { ...message.params.context, sessionId: message.sessionId });
-    if (message.method === 'Runtime.executionContextDestroyed') contexts.delete(`${message.sessionId}:${message.params.executionContextId}`);
-    if (message.method === 'Log.entryAdded') logs.push(message.params.entry.text);
-    if (message.method === 'Target.attachedToTarget') {
-      const childSession = message.params.sessionId;
-      for (const domain of ['Page', 'Runtime', 'Log']) void call(`${domain}.enable`, {}, childSession);
-      void call('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, childSession);
-    }
-    if (message.method === 'Page.frameNavigated') navigations.push(message.params.frame.url);
-  });
-  const call = (method, params = {}, sessionId) => new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) })); });
   const { targetId } = await call('Target.createTarget', { url: 'about:blank' });
-  const { sessionId } = await call('Target.attachToTarget', { targetId, flatten: true });
+  ({ sessionId } = await call('Target.attachToTarget', { targetId, flatten: true }));
   for (const domain of ['Page', 'Runtime', 'Log']) await call(`${domain}.enable`, {}, sessionId);
   await call('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, sessionId);
   const evaluate = async (expression, contextId) => {
@@ -76,9 +63,6 @@ try {
   await until(() => evaluate(`Array.from(document.querySelectorAll('[aria-label="Artifact preview"] select option')).some(o=>Number(o.value)>=${baseline + 6})`));
   assert.ok(await evaluate(`document.querySelector('[aria-label="Artifact preview"]').textContent.includes('Version: ${baseline + 2}')`), 'Paused view stays on historical version despite new events');
   assert.equal(await evaluate(`document.querySelector('iframe').getAttribute('sandbox')`), 'allow-scripts');
+  assert.ok(dialogs.length >= 2 && dialogs.every(text => text.startsWith('Run the preview mock?')), 'each run asked before replacing the graph');
   console.log('PASS: live updates, JS rendering, prior version/source, fetch blocked by CSP, navigation blocked by parent CSP, storage/parent inaccessible, allow-scripts only.');
-} finally {
-  clearTimeout(timeout); socket?.close(); child.kill('SIGTERM');
-  await Promise.race([once(child, 'exit'), new Promise(resolve => setTimeout(resolve, 2000))]);
-  await rm(profile, { recursive: true, force: true });
-}
+} finally { await close(); }

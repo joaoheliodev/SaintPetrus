@@ -1,39 +1,18 @@
 // Disposable Chromium smoke check of the main flow against a running local instance; never uses the user's profile.
 // Start the app first, for example `PORT=3310 npm run dev`, then `TEST_APP_PORT=3310 npm run test:e2e`.
-import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { once } from 'node:events';
 import assert from 'node:assert/strict';
+import { launchChromium } from './disposable-chromium.mjs';
 const port = Number(process.env.TEST_APP_PORT ?? 3310);
-await mkdir('.audit', { recursive: true });
-const profile = await mkdtemp('.audit/chromium-workspace-');
-// Chromium refuses to start its sandbox as root (containers); this disposable browser only reaches 127.0.0.1.
-const rootOnly = process.getuid?.() === 0 ? ['--no-sandbox'] : [];
-const child = spawn(process.env.CHROMIUM_PATH ?? '/usr/bin/chromium', [...rootOnly, '--headless', '--no-proxy-server', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-default-apps', '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
-let socket;
-const timeout = setTimeout(() => child.kill('SIGTERM'), 180000);
-const problems = []; const dialogs = []; const decisions = []; let documentHeaders;
+const problems = []; const dialogs = []; const decisions = []; let documentHeaders; let session;
+const { call, close } = await launchChromium({ timeoutMs: 180000, onEvent: ({ method, params }, send) => {
+  if (method === 'Log.entryAdded' && /Content Security Policy|Refused to/i.test(params.entry.text)) problems.push(`CSP: ${params.entry.text}`);
+  if (method === 'Runtime.exceptionThrown') problems.push(`Exception: ${params.exceptionDetails.exception?.description ?? params.exceptionDetails.text}`);
+  if (method === 'Runtime.consoleAPICalled' && params.type === 'error') problems.push(`console.error: ${params.args.map(arg => arg.value ?? arg.description ?? '').join(' ')}`);
+  if (method === 'Network.responseReceived' && params.type === 'Document' && params.response.url.startsWith(`http://127.0.0.1:${port}/`)) documentHeaders = params.response.headers;
+  // Destructive actions ask first; the check records each question and answers from `decisions`, accepting by default.
+  if (method === 'Page.javascriptDialogOpening') { dialogs.push(params.message); send('Page.handleJavaScriptDialog', { accept: decisions.length ? decisions.shift() : true }, session).catch(() => {}); }
+} });
 try {
-  const endpoint = await new Promise((resolve, reject) => {
-    let output = '';
-    child.stderr.on('data', chunk => { output += chunk; const match = output.match(/DevTools listening on (ws:\/\/127\.0\.0\.1:\d+\/\S+)/); if (match) resolve(match[1]); });
-    child.on('error', reject); child.on('exit', () => reject(new Error('Disposable Chromium exited before debugger connected.')));
-  });
-  socket = new WebSocket(endpoint); await once(socket, 'open');
-  let sequence = 0; const pending = new Map();
-  const call = (method, params = {}, sessionId) => new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) })); });
-  let session;
-  socket.addEventListener('message', ({ data }) => {
-    const message = JSON.parse(data);
-    if (message.id) { const request = pending.get(message.id); pending.delete(message.id); if (message.error) request?.reject(new Error(message.error.message)); else request?.resolve(message.result); return; }
-    const { method, params } = message;
-    if (method === 'Log.entryAdded' && /Content Security Policy|Refused to/i.test(params.entry.text)) problems.push(`CSP: ${params.entry.text}`);
-    if (method === 'Runtime.exceptionThrown') problems.push(`Exception: ${params.exceptionDetails.exception?.description ?? params.exceptionDetails.text}`);
-    if (method === 'Runtime.consoleAPICalled' && params.type === 'error') problems.push(`console.error: ${params.args.map(arg => arg.value ?? arg.description ?? '').join(' ')}`);
-    if (method === 'Network.responseReceived' && params.type === 'Document' && params.response.url.startsWith(`http://127.0.0.1:${port}/`)) documentHeaders = params.response.headers;
-    // Destructive actions ask first; the check records each question and answers from `decisions`, accepting by default.
-    if (method === 'Page.javascriptDialogOpening') { dialogs.push(params.message); void call('Page.handleJavaScriptDialog', { accept: decisions.length ? decisions.shift() : true }, session); }
-  });
   const { targetId } = await call('Target.createTarget', { url: 'about:blank' });
   ({ sessionId: session } = await call('Target.attachToTarget', { targetId, flatten: true }));
   for (const domain of ['Page', 'Runtime', 'Log', 'Network']) await call(`${domain}.enable`, {}, session);
@@ -67,6 +46,12 @@ try {
   })()`);
   const type = (selector, value) => evaluate(`(() => { const field = document.querySelector(${JSON.stringify(selector)}); const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), 'value').set; setter.call(field, ${JSON.stringify(value)}); field.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
   await call('Page.navigate', { url: `http://127.0.0.1:${port}` }, session);
+  // This check clicks Send, resets the graph and pauses every agent: it runs only against a fresh instance that has
+  // no keyed provider connected, so it can never make a real, billed call or destroy someone's work.
+  await until(() => evaluate(`location.origin === 'http://127.0.0.1:${port}' && document.readyState === 'complete'`), 'page load');
+  const guard = await evaluate(`(async () => { const provider = await (await fetch('/api/provider', { cache: 'no-store' })).json(); const graph = await (await fetch('/api/graph', { cache: 'no-store' })).json(); const tokens = await (await fetch('/api/tokens', { cache: 'no-store' })).json(); return { keyed: provider.connected === true && provider.mocked !== true, fresh: graph.agents.length === 1 && graph.edges.length === 0 && graph.status === 'idle' && graph.agents[0].status === 'ready' && tokens.stopped === false }; })()`);
+  if (guard.keyed) throw new Error('Refusing to run: a keyed provider is connected and this check would send it a real, billed call. Start a fresh instance with the mock or without a key.');
+  if (!guard.fresh) throw new Error('Refusing to run: this instance is not fresh (a graph, a paused agent or the kill switch), and this check resets the graph and pauses every agent. Start a fresh instance.');
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 1 && document.body.textContent.includes('Coordinator')`), 'canvas with the coordinator');
   assert.ok(documentHeaders, 'the document response was observed');
   const header = name => Object.entries(documentHeaders).find(([key]) => key.toLowerCase() === name)?.[1] ?? '';
@@ -163,7 +148,7 @@ try {
   const hidden = []; let stops = 0;
   for (; stops < 150; stops++) {
     await key('Tab');
-    const focus = await evaluate(`(() => { const element = document.activeElement; if (!element || element === document.body || element.dataset.tabStop) return null; element.dataset.tabStop = 'seen'; if (element.localName === 'nextjs-portal') return { id: 'development overlay', shown: true }; const style = getComputedStyle(element); const path = element.matches('.react-flow__edge') ? element.querySelector('.react-flow__edge-path') : null; const shown = path ? parseFloat(getComputedStyle(path).strokeWidth) >= 3 : (style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) >= 2) || style.boxShadow !== 'none'; return { id: element.outerHTML.slice(0, 160), shown }; })()`);
+    const focus = await evaluate(`(() => { const element = document.activeElement; if (!element || element === document.body || element.dataset.tabStop) return null; element.dataset.tabStop = 'seen'; if (element.localName === 'nextjs-portal') return { id: 'development overlay', shown: true }; const style = getComputedStyle(element); const path = element.matches('.react-flow__edge') ? element.querySelector('.react-flow__edge-path') : null; const shown = path ? parseFloat(getComputedStyle(path).strokeWidth) >= 3 : (style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) >= 2) || style.boxShadow !== 'none'; return { id: element.outerHTML.slice(0, 160) + (shown ? '' : ' (override loaded: ' + Array.from(document.styleSheets).some(sheet => { try { return Array.from(sheet.cssRules).some(rule => rule.cssText.includes('react-flow__node-agent')); } catch { return false; } }) + ')'), shown }; })()`);
     if (!focus) break;
     if (!focus.shown) hidden.push(focus.id);
   }
@@ -181,8 +166,4 @@ try {
   await new Promise(resolve => setTimeout(resolve, 500));
   assert.deepEqual(problems, [], 'no CSP violation, uncaught exception or console error');
   console.log(`PASS: no CSP violations, exceptions or console errors${dialogs.length ? `; confirmations seen: ${dialogs.length}` : ''}.`);
-} finally {
-  clearTimeout(timeout); socket?.close(); child.kill('SIGTERM');
-  await Promise.race([once(child, 'exit'), new Promise(resolve => setTimeout(resolve, 2000))]);
-  await rm(profile, { recursive: true, force: true });
-}
+} finally { await close(); }
