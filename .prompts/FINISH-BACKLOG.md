@@ -49,7 +49,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | V10 | A reset during a call cannot corrupt accounting | Found by V0: the pause hook throws for an agent a graph reset removed, which jams a billed call as unverifiable forever, releases a mock hold twice (negative `reserved`) and replaces a timeout with a generic 400 | Pause recorded by `TokenService` even when the graph hook fails; billed call stays billed, no double release, original failure preserved | no | done (8315a5b) |
 | V1 | Gemini served model identity (G1) | Price key must be the response model; Gemini ignores `modelVersion` | Adapter returns normalized `modelVersion` (no `models/` prefix) as the served model; missing or malformed identity fails closed as unverifiable; pricing uses the served model; requested and served models recorded separately | no | done (869583f; `servedModel` on reservations now, `requestedModel`/`servedModel` on receipts in V3) |
 | V2 | Served model without captured tariff (all providers) | Current path reports a `budget.refused` event and a "reconciled" reroute message for a call that was billed and not reconciled | Reservation kept unverifiable, agent paused, explicit feed event naming requested/served model and reservation; never released; requested tariff never used; reroute event no longer claims reconciliation first | no | done (e28cff0) |
-| V3 | Per-call accounting receipt (G2) | No per-call record of usage, identity, tariff and timing | Bounded in-memory journal of redacted receipts (numbers, ids, codes only), linked to the persisted reconciliation interval, exposed by a local read-only GET; eviction reported | no | in progress (reasoning count in `Usage`: this commit) |
+| V3 | Per-call accounting receipt (G2) | No per-call record of usage, identity, tariff and timing | Bounded in-memory journal of redacted receipts (numbers, ids, codes only), linked to the persisted reconciliation interval, exposed by a local read-only GET; eviction reported | no | done (reasoning count d502544; journal this commit; `GET /api/receipts`) |
 | V4 | Upstream dispatch counter per provider (G3) | Nothing proves a refused call never left the server | Server-owned count incremented immediately before transport, per provider, exposed read-only; tests prove every preflight refusal leaves it unchanged and a dispatched call adds exactly one | no | done (3f6955d; `dispatches` on `GET /api/provider`) |
 | V5 | Validation timeout control (G4) | V2 of the protocol cannot force a timeout | Off by default; read only at startup; never taken from `/api/provider` bodies; applies inside the proxy after preflight and reservation, so budgets still bind; invalid values refuse startup; visible in provider status | no | pending |
 | V6 | `npm run key -- set deepseek` (G7) | Terminal helper omits DeepSeek | DeepSeek accepted with the same rules as Gemini (hidden TTY input, no argv secret, opt-in remember); regression test without spawning processes | no | pending |
@@ -151,6 +151,11 @@ The commit is documentation only and carries no secret or leaky instruction.
 | V4 | correlation ID dropped | killed by the preflight/positive-control test |
 | V3 | Gemini always reports `reasoning` | killed by three Gemini usage tests |
 | V3 | DeepSeek drops `reasoning` | killed by four DeepSeek tests |
+| V3 | call receipt not appended | killed by three receipt tests |
+| V3 | expiry receipt not appended | killed by the unbilled/unverifiable/expiry/manual test |
+| V3 | manual receipt loses its journal interval | killed by the same test |
+| V3 | reported usage dropped | killed by two receipt tests |
+| V3 | journal no longer bounded | killed by the bounded-journal test |
 
 ## Decisões tomadas (decisions taken)
 

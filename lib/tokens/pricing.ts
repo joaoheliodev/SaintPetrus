@@ -104,7 +104,7 @@ export function preflightCostUsd(price: ModelPrice, inputTokens: number, maximum
   return bandCost(price.peak, 0, inputTokens, maximumOutputTokens);
 }
 
-function intervalTouchesPeak(price: ModelPrice, requestAt: number, responseAt: number) {
+export function intervalTouchesPeak(price: ModelPrice, requestAt: number, responseAt: number) {
   const start = Math.min(requestAt, responseAt);
   const end = Math.max(requestAt, responseAt);
   const firstDay = Math.floor(start / DAY_MS) * DAY_MS;

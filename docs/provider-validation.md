@@ -74,10 +74,10 @@ Fill this locally. No credential belongs in this document or the results table.
 | Preflight: `TokenService.execute` in `lib/tokens/service.ts` | Checks pause, policy, active captured tariffs and four token/USD ceilings | Local 409 on refusal; `budget.refused`; row/paused snapshots. `dispatches` on `GET /api/provider` stays unchanged: the server-side proof of no upstream call |
 | Reservation: same service | Synchronous holds in all four rows before `ProviderProxy.execute` | `/api/tokens`: `reserved`, `costReservedUsd`; a fast call may finish before observation. Inflight IDs are omitted |
 | I/O: `lib/providers/proxy.ts`, provider adapter | One active request, 15-second proxy timeout; fixed endpoint, no redirects, bounded response | Connection latency/status; local API result. Browser network shows local requests, not the server's provider transport |
-| Reconciliation: service + captured `PriceCatalog` | Parses usage, prices served ID, releases holds, adds actual totals/cost; journals interval before row changes | Response `usage`, `billingModel`; four row deltas; catalog versions. Successful per-call accounting receipt is missing (G2) |
+| Reconciliation: service + captured `PriceCatalog` | Parses usage, prices served ID, releases holds, adds actual totals/cost; journals interval before row changes | Response `usage`, `billingModel`; four row deltas; catalog versions; a `call` receipt on `GET /api/receipts` with reserved figures, dispatch, reported usage, band, cost and journal interval |
 | Unverifiable: service `finally` | Holds tokens/USD, pauses `A`, sets deadline to failure time + TTL | Reservation ID, `priceVersionId`, `status`, `createdAt`, `expiresAt`; row `unverifiable` |
-| Expiry: `expireReservations` | Converts hold into conservative usage; never refunds uncertain consumption | A GET snapshot after deadline triggers conversion. There is no independent timer; UI polls snapshots |
-| Manual reconciliation | Replaces an expired estimate using provider-confirmed tokens and cost | Same four row deltas; estimate/reservation removed, then explicit resume. It does not produce a detailed receipt |
+| Expiry: `expireReservations` | Converts hold into conservative usage; never refunds uncertain consumption | A GET snapshot or receipts read after deadline triggers conversion and appends an `expiry` receipt. There is no independent timer; UI polls snapshots |
+| Manual reconciliation | Replaces an expired estimate using provider-confirmed tokens and cost | Same four row deltas; estimate/reservation removed, then explicit resume. Appends a `manual` receipt with the replaced estimate and journal interval |
 | Feed / export | Redacted circular SSE window / redacted graph snapshot | `/api/events` when enabled, `/api/graph/export`; neither is a complete billing ledger |
 
 Save before/after `/api/tokens`, `/api/prices`, `/api/provider`, graph export and
@@ -206,8 +206,9 @@ feed `agent.message` tokens, and secret-free graph export. Expect any tariff
 validity chosen at dispatch to remain in force for this reservation.
 
 Raw upstream JSON is not exposed in the browser; internal usage alone cannot prove
-the wire mapping. Provider-confirmed records must show the required counts, or G2
-must be resolved first. Do not enable HTTP-body/header debug logging. If an empty
+the wire mapping. Compare the `call` receipt's `reportedUsage` (prompt, completion,
+cache split, reasoning) with provider-confirmed records; the receipt proves only what
+the adapter parsed. Do not enable HTTP-body/header debug logging. If an empty
 reply, unknown usage, unpriced served ID, invoice discrepancy, or missing evidence
 occurs, stop without a second attempt. Record that criterion as blocked, not passed.
 
@@ -310,7 +311,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
 | ID | Verified limitation | Minimum proposal / decision |
 | --- | --- | --- |
 | G1 | Resolved: Gemini prices the normalized `modelVersion`; a missing or malformed identity fails closed | Register every possible served ID with its price before dispatch; an unpriced served ID stays unverifiable |
-| G2 | No successful per-call receipt, raw usage metadata, separate reasoning count, accounting timestamps or tariff IDs; proxy preflight differs from reservation input | Add a sanitized allowlist of numeric usage, identity, timing, reservation and price-version/cost metadata, never the raw response. Until then isolated deltas and provider records only partially establish the mapping |
+| G2 | Resolved: `GET /api/receipts` serves a bounded (200), newest-first journal of `call`, `cache`, `expiry` and `manual` receipts: requested and served model, captured price versions, reservation figures (`inputTokens` is the reservation input, unlike the proxy's `preflight.tokens`), dispatch, reported usage with cache split and reasoning, band, cost, verdict, outcome and the persisted journal interval. Numbers, identities and codes only | Process-local; eviction is reported, not hidden. Raw provider JSON is still never kept, so the wire mapping needs provider-side evidence |
 | G3 | Resolved: `GET /api/provider` returns `dispatches` (`total`, `byProvider`, the latest 50 with `sequence`, `provider`, `model`, `correlationId` = reservation ID, `at`), recorded by the proxy immediately before transport, never for a local refusal or cache hit | Process-local; restart clears it. It counts requests that left, not what the provider billed |
 | G4 | No controllable upstream timeout in live configuration | Operator decides safe external impairment; otherwise leave live timeout unverified. Any future runtime control must be explicit and separately reviewed |
 | G5 | Feed tokens are message totals: omit billed output-limit responses, expiry/manual adjustments. The reroute text no longer claims reconciliation, and an unpriced served model has its own `provider.unpriced` event | Keep feed as activity evidence; per-call accounting evidence belongs to receipts (G2) |
@@ -342,8 +343,8 @@ No entry is pre-marked passed. Repeat per provider, preserving the process/sessi
 | Disconnection, divergence and proposed regression fixture | | | | | |
 
 Before the **first** real call, the operator must decide: provider/R/S and verified
-rates; output cap and the numerical four-scope/sequence budget; whether G1/G2 block
-the chosen provider; evidence and fragment-check methods; feed enablement; the safe
+rates; output cap and the numerical four-scope/sequence budget; whether the remaining
+gaps block the chosen provider; evidence and fragment-check methods; feed enablement; the safe
 timeout and disposable-key error procedures. Nothing in this protocol authorizes an
 agent call. A step with unresolved evidence stays blocked, even if its mock passes.
 

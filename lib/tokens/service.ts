@@ -4,9 +4,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { heuristicTokenCounter, type TokenCounter } from '../core/token-estimate';
 import { ProviderFailure, type ProviderAdapter, type ProviderFailureCode, type RequestOptions, type Usage } from '../providers/adapter';
 import type { ProviderProxy } from '../providers/proxy';
+import type { Dispatch } from '../providers/dispatch-ledger';
+import { ReceiptJournal, type JournalInterval, type ReceiptUsage } from './receipts';
 import { redactText } from '../security/redact';
 import { reproducible, validateConfig, validCostLimit, validLimit, type TokenPolicy, type Prices } from './config';
-import { preflightCostUsd, reconciledCostUsd, worstCasePeakCostUsd } from './pricing';
+import { intervalTouchesPeak, preflightCostUsd, reconciledCostUsd, worstCasePeakCostUsd } from './pricing';
 import { verificationThinking } from '../providers/thinking-policy';
 import { PriceCatalog } from '../prices/catalog';
 export class TokenFailure extends Error {}
@@ -39,6 +41,7 @@ export class TokenService {
   private cache = new Map<string, { expires: number; text: string; usage: Usage; approximate: boolean; billingModel: string }>();
   private reservations = new Map<string, Reservation>();
   private reservationSequence = 0;
+  private receipts = new ReceiptJournal();
   constructor(readonly policy: TokenPolicy, readonly prices: Prices, private readonly hooks: Hooks, private readonly counter: TokenCounter = heuristicTokenCounter, private readonly now = Date.now, catalog?: PriceCatalog) {
     validateConfig(policy, prices); this.catalog = catalog ?? new PriceCatalog(prices, undefined, now);
   }
@@ -69,6 +72,7 @@ export class TokenService {
         row.costUnmeasuredUsd = money(row.costUnmeasuredUsd + conservative);
         row.unverifiable--;
       }
+      this.receipts.append({ kind: 'expiry', at: now, agent: reservation.agent, provider: reservation.provider, requestedModel: reservation.model, servedModel: reservation.billingModel ?? null, reservationId: reservation.id, tokens: reservation.tokens, heldCostUsd: reservation.costUsd, costUsd: conservative });
       // The converted figure replaces the held one so a later manual reconciliation subtracts what
       // was actually charged to the budget, not the understated reservation.
       reservation.costUsd = conservative;
@@ -94,7 +98,8 @@ export class TokenService {
     const reservation = this.reservations.get(id);
     if (!reservation || reservation.status !== 'estimated') throw new TokenFailure('Unknown estimated reservation.');
     const total = prompt + completion;
-    this.catalog.recordReconciliation([...new Set([reservation.model, reservation.billingModel ?? reservation.model])], reservation.createdAt, Math.max(reservation.createdAt, this.now()) + 1);
+    const journal: JournalInterval = { models: [...new Set([reservation.model, reservation.billingModel ?? reservation.model])], from: reservation.createdAt, to: Math.max(reservation.createdAt, this.now()) + 1 };
+    this.catalog.recordReconciliation(journal.models, journal.from, journal.to);
     for (const row of reservation.rows) {
       row.used += total - reservation.tokens;
       row.estimated -= reservation.tokens;
@@ -103,8 +108,10 @@ export class TokenService {
       row.actual.prompt += prompt; row.actual.completion += completion; row.actual.total += total;
     }
     this.reservations.delete(id);
+    this.receipts.append({ kind: 'manual', at: this.now(), agent: reservation.agent, provider: reservation.provider, requestedModel: reservation.model, servedModel: reservation.billingModel ?? null, reservationId: id, usage: { prompt, completion, total }, replacedCostUsd: reservation.costUsd, costUsd, journal });
     if (reservation.rows.some(row => this.blocked(row))) this.pause(reservation.agent);
   }
+  receiptSnapshot() { this.expireReservations(); return this.receipts.snapshot(); }
   private validScope(scope: string): scope is Scope { return ['global','agent','model','session'].includes(scope); }
   private validScopeId(scope: Scope, id: string) { return !((scope === 'agent' && !this.hooks.ids().includes(id)) || (scope === 'model' && !Object.hasOwn(this.policy.models, id)) || (scope === 'session' && id !== this.sessionId) || (scope === 'global' && id !== 'all')); }
   setLimit(scope: string, id: string, limit: unknown) {
@@ -159,7 +166,11 @@ export class TokenService {
     catch { this.refuse(agent, 'Model price unavailable, not yet effective, expired or expires within reservation TTL.'); }
     const reusable = reproducible(model, requestedThinking);
     const cached = !verification && reusable ? this.cache.get(hash) : undefined;
-    if (cached && cached.expires > this.now()) { rows.forEach(row => { row.saved += cached.usage.total; }); return { provider: adapter.id, model: adapter.model, billingModel: cached.billingModel, mocked: adapter.id === 'mock', text: redactText(cached.text), latencyMs: 0, cached: true, usage: cached.usage, approximate: cached.approximate }; }
+    if (cached && cached.expires > this.now()) {
+      rows.forEach(row => { row.saved += cached.usage.total; });
+      this.receipts.append({ kind: 'cache', at: this.now(), agent, provider: adapter.id, requestedModel: adapter.model, servedModel: cached.billingModel, savedTokens: cached.usage.total });
+      return { provider: adapter.id, model: adapter.model, billingModel: cached.billingModel, mocked: adapter.id === 'mock', text: redactText(cached.text), latencyMs: 0, cached: true, usage: cached.usage, approximate: cached.approximate };
+    }
     const reservedTokens = inputEstimate + options.maxTokens;
     if (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costAccountedUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd)) { this.pause(agent); this.refuse(agent, 'Preflight reservation exceeds token or monetary budget.'); }
     // Synchronous reservation across all four scopes happens before any provider I/O.
@@ -168,14 +179,18 @@ export class TokenService {
     this.reservations.set(reservation.id, reservation);
     if (previewEnabled()) options.onText = text => observeArtifact(agent, this.hooks.role?.(agent) ?? agent, text);
     let verdict: BillingVerdict = 'unverifiable';
+    let outcome = 'completed'; let dispatch: Dispatch | undefined; let reportedUsage: ReceiptUsage | undefined;
+    let priced: { servedPriceVersionId: string; band: 'peak' | 'offPeak'; costUsd: number; journal: JournalInterval } | undefined;
     try {
-      const result = await proxy.execute(adapter, input, signal, options, { correlationId: reservation.id });
+      const result = await proxy.execute(adapter, input, signal, options, { correlationId: reservation.id, onDispatch: sent => { dispatch = sent; } });
       const approximate = adapter.id === 'mock';
       const usage = approximate ? { prompt: inputEstimate, completion: this.counter.count(result.text), total: 0 } : result.usage;
-      if (!usage) this.refuse(agent, 'Provider usage missing.');
+      // After provider contact these are not budget refusals: the call stays unverifiable.
+      if (!usage) throw new TokenFailure('Provider usage missing.');
       if (approximate) usage.total = usage.prompt + usage.completion;
       const split = usage.inputBreakdown;
-      if (![usage.prompt, usage.completion, usage.total].every(validLimit) || usage.total !== usage.prompt + usage.completion || (split !== undefined && (![split.cacheHit, split.cacheMiss].every(validLimit) || split.cacheHit + split.cacheMiss !== usage.prompt))) this.refuse(agent, 'Provider usage invalid.');
+      if (![usage.prompt, usage.completion, usage.total].every(validLimit) || usage.total !== usage.prompt + usage.completion || (split !== undefined && (![split.cacheHit, split.cacheMiss].every(validLimit) || split.cacheHit + split.cacheMiss !== usage.prompt))) throw new TokenFailure('Provider usage invalid.');
+      reportedUsage = { prompt: usage.prompt, completion: usage.completion, total: usage.total, cacheHit: split?.cacheHit ?? 0, cacheMiss: split?.cacheMiss ?? usage.prompt, ...(usage.reasoning === undefined ? {} : { reasoning: usage.reasoning }) };
       const responseAt = this.now();
       // The invoice names the model that answered, not the one that was asked for: providers reroute
       // and bill at the served model's rate. A served model with no operator-verified price cannot be
@@ -188,7 +203,8 @@ export class TokenService {
       const billingPrice = Object.hasOwn(reservation.priceVersions, billingModel) ? reservation.priceVersions[billingModel].price : undefined;
       if (!billingPrice) throw new UnpricedServedModel(adapter.model, billingModel, reservation.id);
       const actualCostUsd = reconciledCostUsd(billingPrice, usage, createdAt, responseAt, true);
-      this.catalog.recordReconciliation([...new Set([adapter.model, billingModel])], Math.min(createdAt, responseAt), Math.max(createdAt, responseAt) + 1);
+      const journal: JournalInterval = { models: [...new Set([adapter.model, billingModel])], from: Math.min(createdAt, responseAt), to: Math.max(createdAt, responseAt) + 1 };
+      this.catalog.recordReconciliation(journal.models, journal.from, journal.to);
       for (const row of rows) {
         row.reserved -= reservedTokens; row.used += usage.total; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); row.costAccountedUsd = money(row.costAccountedUsd + actualCostUsd);
         const totals = approximate ? row.mock : row.actual;
@@ -197,7 +213,8 @@ export class TokenService {
       }
       this.reservations.delete(reservation.id);
       if (!result.outcome) observeArtifact(agent, this.hooks.role?.(agent) ?? agent, result.text);
-      verdict = 'billed';
+      verdict = 'billed'; outcome = result.outcome ?? 'completed';
+      priced = { servedPriceVersionId: reservation.priceVersions[billingModel].id, band: intervalTouchesPeak(billingPrice, createdAt, responseAt) ? 'peak' : 'offPeak', costUsd: actualCostUsd, journal };
       if (!result.outcome) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'agent.message', payload: (approximate ? '[Mock] ' : '') + result.text, tokens: { prompt: usage.prompt, completion: usage.completion } });
       if (rows.some(row => this.warning(row))) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'budget.warning', severity: 'warning', payload: 'Token or monetary budget reached 80% or more.' });
       if (rows.some(row => this.blocked(row))) this.pause(agent);
@@ -216,6 +233,7 @@ export class TokenService {
       // A proven rejection releases the reservation. Lost contact remains unverifiable because the
       // provider may have processed and billed a response that never reached us.
       verdict = error instanceof UnpricedServedModel ? 'unverifiable' : adapter.id === 'mock' ? 'unbilled' : failureBillingVerdict(error);
+      outcome = error instanceof ProviderFailure ? error.code : error instanceof UnpricedServedModel ? 'served_model_unpriced' : error instanceof TokenFailure ? 'usage_unavailable' : 'error';
       throw error;
     } finally {
       if (verdict !== 'billed') {
@@ -226,6 +244,9 @@ export class TokenService {
           this.pause(agent);
         }
       }
+      this.receipts.append({ kind: 'call', at: this.now(), agent, provider: adapter.id, requestedModel: adapter.model, servedModel: reservation.billingModel ?? null, reservationId: reservation.id, verdict, outcome, mocked: adapter.id === 'mock',
+        requestedAt: createdAt, priceVersionId: selectedPrice.id, servedPriceVersionId: priced?.servedPriceVersionId ?? null, dispatch: dispatch ? { sequence: dispatch.sequence, at: dispatch.at } : null,
+        reserved: { tokens: reservedTokens, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, costUsd: reservedCostUsd }, reportedUsage: reportedUsage ?? null, band: priced?.band ?? null, costUsd: priced?.costUsd ?? null, journal: priced?.journal ?? null });
     }
   }
 }
