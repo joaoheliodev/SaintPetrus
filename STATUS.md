@@ -5,10 +5,13 @@ Branch: `night/provider-validation-ready`, continuing `night/provider-validation
 ## Verification checkpoint (2026-09-27)
 
 Run in a cloud session without any API key: lint, both typechecks, the full suite at the floor stated in
-`AGENTS.md` with zero failures or skips, and `npm run build` passed before every commit of the finishing
-session. Gitleaks found nothing in the staged diff of any commit, in the working directory or in the full
-history. The browser check (`npm run test:e2e`) passed in development and in production. CI passed on every
-push of the branch. No provider request was made, including `GET /models`.
+`AGENTS.md` (400 tests in 29 suites at the end) with zero failures or skips, and `npm run build` passed before
+every commit of the finishing session. After a fresh `npm ci`, `npm audit` reported 0 vulnerabilities and the
+keyless `npm run dev` main flow passed the browser check. `npm run test:e2e` passed in development and in
+production and `npm run test:browser` passed. Gitleaks found nothing in the staged diff of any commit, in the
+working directory, in the branch range `0662647..HEAD` or in the full history. CI passed on every push of
+the branch (40 runs). Two independent reviewer agents audited `0662647..HEAD`; their findings and dispositions are in
+`.prompts/FINISH-BACKLOG.md`. No provider request was made, including `GET /models`.
 
 ## Delivered
 
@@ -21,7 +24,7 @@ push of the branch. No provider request was made, including `GET /models`.
 - **Price schema.** Optional `expiresAt` with a preflight horizon covering the reservation TTL (P1); the enforced total `costAccountedUsd` named apart from its unmeasured part `costUnmeasuredUsd` (P2).
 - **Provider-scoped expiry floor (P3).** Implemented: capture the validated provider and tariff candidates; narrow only when every usable candidate has price-side provider metadata, otherwise retain the global floor. Charge at least the original hold in all four scopes. Request allowlisting does not remove price-only reroute candidates.
 - **Round C.** Orphan permanent rules moved into `AGENTS.md`, local refusal verdicts proven unreachable with a live reservation, and the deferred price dimensions and first real call protocol documented.
-- **Finishing session (2026-09-27).** Served-model price keys for Gemini and OpenAI; an unpriced served model stays `unverifiable`; unreadable usage names its fields; per-call receipts (`GET /api/receipts`) and an upstream dispatch counter; a startup-only validation timeout; DeepSeek in the terminal key helper; an empty probe never verifies. Forget key in the panel; a content security policy on every response. The panel works keyless in `npm run dev`; agents can be edited, run once and connected from the keyboard; destructive actions ask first; keyboard moves are saved; focus and field contrast meet WCAG AA. README, `docs/architecture.md`, the `SECURITY.md` threat model and `CHANGELOG.md` rewritten or added; CI holds the test floor. The backlog, decisions and questions for the operator live in `.prompts/FINISH-BACKLOG.md`.
+- **Finishing session (2026-09-27).** Served-model price keys for Gemini and OpenAI; an unpriced served model stays `unverifiable`; unreadable usage names its fields; per-call receipts (`GET /api/receipts`) and an upstream dispatch counter; a startup-only validation timeout; DeepSeek in the terminal key helper; an empty probe never verifies. Forget key in the panel; a content security policy on every response. The panel works keyless in `npm run dev`; agents can be edited, run once and connected from the keyboard; destructive actions ask first; keyboard moves are saved; focus and field contrast meet WCAG AA. README, `docs/architecture.md`, the `SECURITY.md` threat model and `CHANGELOG.md` rewritten or added; CI holds the test floor. The review then fixed a regression of this branch in which the running app lost every provider failure's code (the custom server and the routes hold separate copies of the modules; failures now carry a `Symbol.for` brand), graph refusals that lost their message for the same reason, a browser check that could have made a real call, settled calls that could be failed again, lax OpenAI usage parsing and a verification race. The backlog, decisions and questions for the operator live in `.prompts/FINISH-BACKLOG.md`.
 
 ## Not verified or pending
 
@@ -37,6 +40,9 @@ push of the branch. No provider request was made, including `GET /models`.
 - Agent removal, graph import and persistence are not implemented; they wait on operator decisions (Q-03, Q-04).
 - There is no LICENSE file; choosing one is the operator's decision (Q-06). The security contact in `SECURITY.md` is a marked placeholder (Q-05).
 - Accessibility was checked in Chromium (contrast, control names, visible focus, keyboard paths), not with a screen reader.
+- An unpriced served model's reservation expires into the preflight estimate even when the provider reported more usage; converting at the reported usage waits on the operator (Q-10).
+- When usage cannot be parsed, the served model the response named is not carried into receipts or manual reconciliation (F-01). The panel's Forget key reaches only the selected provider; the terminal helper reaches any (F-02).
+- In `npm run dev` only, about one browser-check run in fifteen found the canvas cards focused without their outline; production never did. The cause is unproven (R1-16).
 
 ## Open debts and limits
 

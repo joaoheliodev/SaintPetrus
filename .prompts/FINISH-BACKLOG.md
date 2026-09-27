@@ -21,13 +21,14 @@ ephemeral session can resume from a fresh clone (see decision D-02).
 
 ## Definition of Done (operator section 12)
 
-- [ ] Every P0 and P1 item is done, or blocked only on an operator decision or on a real provider call.
-- [ ] `npm ci && npm run dev` starts the panel in mock mode without any key, and the main flow works end to end.
-- [ ] Full gate green with at least 338 tests and zero skips.
-- [ ] Gitleaks clean over the branch history.
-- [ ] Every known security gap is recorded.
-- [ ] README, architecture, SECURITY, validation protocol and CHANGELOG are current.
-- [ ] The handoff lets another agent or the operator resume without this conversation.
+- [x] Every P0 and P1 item is done, or blocked only on an operator decision or on a real provider call (F7 on Q-03/Q-04).
+- [x] `npm ci && npm run dev` starts the panel in mock mode without any key, and the main flow works end to end
+  (browser check after a fresh `npm ci`).
+- [x] Full gate green with at least 338 tests and zero skips (400 tests in 29 suites).
+- [x] Gitleaks clean over the branch history (75 commits in the full history, 40 in `0662647..HEAD`, and the directory).
+- [x] Every known security gap is recorded (`SECURITY.md` residual risks, Phase 2 findings, R1 findings, validation gaps).
+- [x] README, architecture, SECURITY, validation protocol and CHANGELOG are current.
+- [x] The handoff lets another agent or the operator resume without this conversation (this file, STATUS.md, NIGHT-LOG.md).
 
 ## Baseline (verified at session start, 2026-09-27)
 
@@ -107,8 +108,8 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | ID | Title | Acceptance criterion | Status |
 | --- | --- | --- | --- |
 | R1 | Independent review of `0662647..HEAD` | Reviewer subagent that did not implement; confirmed findings fixed, discarded ones recorded with reason | done (two reviewers; 16 findings: 12 fixed, 1 documented with follow-up, 1 blocked on Q-10, 1 left to the operator, 1 open observation; see below) |
-| R2 | Final gate and Gitleaks over the branch history | Recorded counts | pending |
-| R3 | STATUS, NIGHT-LOG, handoff, Checklist do João | Updated in the final commit | pending |
+| R2 | Final gate and Gitleaks over the branch history | Recorded counts | done: `npm ci` and `npm audit` (0 vulnerabilities), lint, both typechecks, 400 tests in 29 suites (0 failures, 0 skips), build; `npm run test:e2e` in dev and production and `npm run test:browser` passed; Gitleaks clean on the full history (75 commits), `0662647..HEAD` (40 commits) and the directory |
+| R3 | STATUS, NIGHT-LOG, handoff, Checklist do João | Updated in the final commit | done (this commit) |
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -345,6 +346,34 @@ Follow-ups recorded by the review, not done in this branch:
 - **Q-07** OpenAI now prices the served snapshot (D-05). Which dated IDs and prices should be registered
   before any OpenAI use, or should OpenAI be removed from the allowlist until then?
 
+## Checklist do João
+
+Everything below is yours; nothing in it needs this conversation.
+
+1. **Verify the branch.** `git fetch origin night/provider-validation-ready && git checkout night/provider-validation-ready`,
+   then `npm ci`, `npm run setup:hooks` and `npm run lint && npm run typecheck && npm test && npm run build`. Expect at
+   least 400 tests and zero skips (the floor in `AGENTS.md`), and a green CI run on the branch head.
+2. **Try the keyless panel.** `npm run dev`, open http://127.0.0.1:3000 and walk the main flow: add an agent, edit it,
+   connect two agents (drag, or Connect to in the inspector), move a card with the arrow keys, Run once (mock), open
+   Tokens and Connect AI, export the context, delete a connection, reset. Optional, with Chromium and a fresh instance:
+   `PORT=3310 npm run dev` then `TEST_APP_PORT=3310 npm run test:e2e`; and the preview check from the README.
+3. **Answer the questions** in "Perguntas para o João", above all Q-02 (the real validation plan), Q-05 (security
+   contact), Q-06 (licence), Q-07 (OpenAI snapshot prices) and Q-10 (expiry with reported usage).
+4. **Review the decisions** D-01 to D-09 in "Decisões tomadas" and revert any you disagree with; each is reversible.
+5. **Fill the placeholders.** The security contact in `SECURITY.md`, a `LICENSE` file if you want one, and consider
+   enabling GitHub private vulnerability reporting for the repository.
+6. **Decide on this file.** `.prompts/FINISH-BACKLOG.md` is force-tracked on this branch (D-02); `AGENTS.md` says
+   `.prompts/` does not survive a fresh clone, which stays true for everything else there. Keep it on `main` or untrack
+   it before merging.
+7. **Before any real call**, follow `docs/provider-validation.md` and `docs/reference/first-real-call.md`: allowlist the
+   exact model in `config/token-policy.json`, enter its browser-verified price in Tokens → Prices (for OpenAI, the dated
+   snapshot too), use a disposable key, and check the first call against the invoice before a second one.
+8. **Merge.** No pull request was opened; open one from `night/provider-validation-ready` to `main` when you are ready.
+9. **Optional maintenance.** CI warns that `actions/checkout@v4` and `actions/setup-node@v4` run on a deprecated Node
+   20 runtime; moving to v5 is a major update, so it is yours to approve. Patch and minor updates are available for
+   next, eslint-config-next, tsx, lucide-react, react, @xyflow/react and tailwind; none was applied (0 vulnerabilities).
+10. **Follow-ups** F-01 and F-02 and observation R1-16 are listed with the review findings above.
+
 ## Session log
 
 - Phase 0 inventory complete; this backlog written before any implementation.
@@ -352,4 +381,8 @@ Follow-ups recorded by the review, not done in this branch:
 - Phase 2 complete: S1–S6 done (Forget key UI, CSP and headers, key lifecycle table). Floor 360 → 366.
 - Phase 3 complete except F7 (blocked on Q-03/Q-04): mock by default in dev, edit, Run once, confirmations,
   empty and unavailable states, export link. Floor 366 → 372.
-- Phase 4: Q1 route boundaries (01f4faa), Q3 contrast, keyboard moves, focus and keyboard connect. Floor → 384.
+- Phase 4 complete: Q1–Q4. Floor 372 → 384.
+- Phase 5 complete except D6 (blocked on Q-06): README, architecture, threat model, changelog, CI floor check, rules in
+  `AGENTS.md`. Floor → 387.
+- Phase 6: two independent reviewers; 16 findings dispositioned (12 fixed, including a regression of this branch in
+  which provider failures lost their codes in the running app). Final gate green at 400 tests; Gitleaks clean.

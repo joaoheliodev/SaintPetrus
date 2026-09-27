@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: `night/provider-validation-ready` (2026-09-27)
 
 Everything that could be finished without a call to a real provider. No request with a real key was made.
-The test floor rose from 338 to 384.
+The test floor rose from 338 to 400.
 
 ### Provider validation
 
@@ -39,6 +39,22 @@ The test floor rose from 338 to 384.
   saved. Every settled move is now saved, one request per card at a time, always with the newest position.
 - Keyboard focus on canvas cards and connections was invisible because React Flow's stylesheet removes the
   outline; field edges were drawn at 2.43:1 contrast. Both now meet WCAG AA.
+
+### Fixed after independent review
+
+- In the running app every provider failure lost its code: the custom server built the provider proxy from its own
+  copy of the modules, and the routes' `instanceof` checks failed against it, so a 401, 404, 429, busy or timeout
+  became an unverifiable call answered with 400. Failures now carry a `Symbol.for` brand and the server pins only
+  the timeout value. A regression of this branch, found by both reviewers.
+- Graph refusals answered "Invalid request." in the running app for the same reason; they return their message again.
+- The browser check refuses an instance with a keyed provider connected or with existing work, keeps its profile in
+  the OS temporary directory and always removes it; the preview check answers the confirmation it had been stuck on.
+- A call whose counters have settled can no longer be failed afterwards, and only the mock is ever priced as asked.
+- OpenAI usage is parsed as strictly as the other providers', and DeepSeek names its fields when the served model is
+  missing.
+- A connection probe that finishes after the key or selection changed no longer verifies the new pair.
+- A busy proxy is no longer reported as a budget refusal, the setup panel no longer says no provider is ever
+  called, and the CI floor check reads the spec reporter as well as TAP.
 
 ### Added
 
