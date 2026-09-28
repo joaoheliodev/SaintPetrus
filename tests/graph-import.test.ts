@@ -8,7 +8,7 @@ import { GraphService } from '../lib/server/graph-service';
 import { GRAPH_DOCUMENT_MAX_BYTES, parseGraphDocument } from '../lib/server/graph-document';
 import { GraphStore } from '../lib/server/graph-store';
 import { runtime } from '../lib/server/runtime';
-import { safeStringify } from '../lib/security/redact';
+import { registerSecret, safeStringify } from '../lib/security/redact';
 import { POST as importPost } from '../app/api/graph/import/route';
 import { GET as exportGet } from '../app/api/graph/export/route';
 
@@ -124,13 +124,15 @@ test('A-04 the import route replaces the graph for a local JSON request only, an
 
 test('A-04 the export still redacts, and what it writes imports back', async () => {
   runtime().mock.reset();
-  const key = `sk-${randomBytes(16).toString('hex')}`;
+  // A key configured after the text was written is the one leak the door cannot see: the export still redacts it.
+  const key = randomBytes(16).toString('hex');
   runtime().graph.add({ name: 'Leaky', provider: 'Unconfigured', context: context(`Pasted ${key}`) });
+  const unregister = registerSecret(Buffer.from(key));
   try {
     const text = await (await exportGet(new Request(`${origin}/api/graph/export`))).text();
     assert.ok(!text.includes(key)); assert.match(text, /\[REDACTED\]/);
     assert.equal(parseGraphDocument(text).agents[1].context.objective, 'Pasted [REDACTED]');
-  } finally { runtime().mock.reset(); }
+  } finally { unregister(); runtime().mock.reset(); }
 });
 
 test('A-04 the store saves privately, redacted and coalesced, restores through the same parser and sets a bad file aside', async () => {
@@ -141,10 +143,11 @@ test('A-04 the store saves privately, redacted and coalesced, restores through t
     const warnings: string[] = [];
     const store = new GraphStore(directory, message => { warnings.push(message); }, 60_000);
     const detach = store.attach(graph);
-    const key = `sk-${randomBytes(16).toString('hex')}`;
+    const key = randomBytes(16).toString('hex');
     graph.update('root', { name: 'Coordinator', objective: `Remember ${key}` });
+    const unregister = registerSecret(Buffer.from(key));
     assert.deepEqual(await readdir(root), [], 'nothing is written before the delay');
-    store.flush(); detach();
+    try { store.flush(); } finally { unregister(); } detach();
     const saved = await readFile(join(directory, 'graph.json'), 'utf8');
     assert.ok(!saved.includes(key), 'redacted before it reaches the disk');
     if (process.platform !== 'win32') {

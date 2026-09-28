@@ -2,15 +2,15 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { GraphService } from './graph-service';
-import { GRAPH_DOCUMENT_MAX_BYTES, parseGraphDocument } from './graph-document';
+import { parseGraphDocument } from './graph-document';
 import { safeStringify } from '../security/redact';
 
 export type GraphRestore = { restored: boolean; rejectedAs?: string };
 
 export class GraphStore {
   private timer: ReturnType<typeof setTimeout> | undefined;
-  private pending: string | undefined;
-  private oversized = false;
+  private pending: { snapshot: unknown } | undefined;
+  private refused: string | undefined;
   constructor(private readonly directory: string, private readonly warn: (message: string) => void = () => {}, private readonly delayMs = 250) {}
   get file() { return join(this.directory, 'graph.json'); }
   // A saved file is read through the same strict parser as an import: the store is not more trusted than a file.
@@ -30,8 +30,7 @@ export class GraphStore {
     return graph.subscribe(event => this.schedule(event.snapshot));
   }
   private schedule(snapshot: unknown) {
-    // Redacted like the export: a key pasted into an objective never reaches the disk.
-    this.pending = safeStringify(snapshot);
+    this.pending = { snapshot };
     this.timer ??= setTimeout(() => {
       this.timer = undefined;
       try { this.flush(); } catch { this.warn('The graph could not be saved; the next change tries again.'); }
@@ -39,13 +38,18 @@ export class GraphStore {
   }
   flush() {
     if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
-    const text = this.pending; this.pending = undefined;
-    if (text === undefined) return;
-    if (Buffer.byteLength(text, 'utf8') > GRAPH_DOCUMENT_MAX_BYTES) {
-      if (!this.oversized) this.warn('The graph is larger than a saved graph may be; changes are not being saved.');
-      this.oversized = true; return;
+    const pending = this.pending; this.pending = undefined;
+    if (pending === undefined) return;
+    // Redacted at write time, like the export, so a key configured since the change never reaches the disk.
+    const text = safeStringify(pending.snapshot);
+    // Never write what the restore would refuse: the last valid file stays, and the operator is told once per reason.
+    try { parseGraphDocument(text); }
+    catch (error) {
+      const reason = error instanceof Error ? error.message : 'Graph file refused.';
+      if (this.refused !== reason) this.warn(`The graph was not saved, and the last valid copy is kept. ${reason}`);
+      this.refused = reason; return;
     }
-    this.oversized = false;
+    this.refused = undefined;
     mkdirSync(this.directory, { recursive: true, mode: 0o700 }); chmodSync(this.directory, 0o700);
     // Written beside the file and renamed over it, so a crash leaves the old graph or the new one, never half of one.
     const partial = `${this.file}.partial`;

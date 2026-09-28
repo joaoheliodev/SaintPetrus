@@ -26,9 +26,11 @@ test('graph mutation reaches its always-on SSE route without polling and is reda
   const reader = response.body!.getReader(); const secret = Buffer.from(randomBytes(32).toString('hex')); const unregister = registerSecret(secret);
   try {
     await readFrame(reader);
-    graph.reset(secret.toString());
+    // The objective was written before the key was configured; the stream redacts it anyway.
+    unregister(); graph.reset(secret.toString()); await readFrame(reader); registerSecret(secret);
+    graph.move('root', { x: 1, y: 1 });
     const wire = await readFrame(reader);
-    assert.match(wire, /graph\.reset/); assert.match(wire, /\[REDACTED\]/); assert.ok(!wire.includes(secret.toString().slice(0, 12)));
+    assert.match(wire, /agent\.moved/); assert.match(wire, /\[REDACTED\]/); assert.ok(!wire.includes(secret.toString().slice(0, 12)));
   } finally { await reader.cancel(); unregister(); secret.fill(0); }
 });
 

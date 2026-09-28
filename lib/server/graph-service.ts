@@ -2,6 +2,7 @@ import { observeArtifact } from '../preview/store';
 import { eventBus } from '../events/bus';
 // Server authority. Node imports prevent accidental use in the browser bundle.
 import { randomUUID } from 'node:crypto';
+import { redactText } from '../security/redact';
 import { createGraph, type Graph, type GraphEvent, type ExecutionBudget, type SpawnRequest, type Agent } from '../orchestrator';
 // Thrown by the graph the custom server builds from its own copy of lib/ and caught by the route bundle's copy, so it
 // is recognized by a Symbol.for brand, like ProviderFailure, never by instanceof.
@@ -9,6 +10,13 @@ const graphErrorBrand = Symbol.for('saintpetrus.GraphError');
 export class GraphError extends Error {
   constructor(message: string) { super(message); Object.defineProperty(this, graphErrorBrand, { value: true }); }
   static is(value: unknown): value is GraphError { return value instanceof Error && Reflect.get(value, graphErrorBrand) === true; }
+}
+// Text the redactor would change cannot be saved as it is, so it is refused at the door, as import refuses it; the
+// redactor is the one definition of credential-shaped. Otherwise a saved graph could fail its own restore.
+function refuseCredentials(fields: Record<string, string | readonly string[]>) {
+  for (const [field, value] of Object.entries(fields)) {
+    if ((typeof value === 'string' ? [value] : value).some(text => redactText(text) !== text)) throw new GraphError(`The ${field} contains text shaped like a credential (an API key or an authorization header). Remove it and try again.`);
+  }
 }
 export class GraphService {
   private graph = createGraph();
@@ -35,6 +43,7 @@ export class GraphService {
   }
   reset(objective = this.graph.agents[0].context.objective) {
     if (!objective.trim() || objective.length > 2000) throw new GraphError('Invalid objective.');
+    refuseCredentials({ objective });
     const revision = this.graph.revision;
     this.graph = createGraph(this.graph.budget, objective);
     this.graph.revision = revision; this.emit('graph.reset', 'Graph reset.');
@@ -70,6 +79,7 @@ export class GraphService {
       request.context.objective.length > 2000 || request.context.summary.length > 2000 ||
       request.context.artifacts.length > 10 || request.context.artifacts.some(a => a.length > 500) ||
       !['Unconfigured', 'Mock'].includes(request.provider)) throw new GraphError('Invalid agent request.');
+    refuseCredentials({ name: request.name, objective: request.context.objective, summary: request.context.summary, artifacts: request.context.artifacts });
     if (parent && parent.depth >= this.graph.budget.maxDepth) throw new GraphError('Depth limit reached.');
     if (this.graph.agents.length >= this.graph.budget.maxNodes) throw new GraphError('Agent limit reached.');
     if (this.graph.costCents >= this.graph.budget.maxCostCents) throw new GraphError('Mock budget exhausted.');
@@ -111,6 +121,7 @@ export class GraphService {
     if (!agent) throw new GraphError('Agent not found.');
     const name = changes.name.trim();
     if (!name || name.length > 70 || !changes.objective.trim() || changes.objective.length > 2000) throw new GraphError('Invalid agent request.');
+    refuseCredentials({ name, objective: changes.objective });
     agent.name = name; agent.context = { ...agent.context, objective: changes.objective };
     this.emit('agent.updated', 'Agent updated.', { agent });
   }
@@ -118,7 +129,8 @@ export class GraphService {
   recordOutput(id: string, text: string): boolean {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) return false;
-    agent.output = text.slice(0, 8000); this.emit('agent.output', 'Answer recorded.', { agent }); return true;
+    // Redacted before the cut, so the saved output is within its limit as the file will hold it.
+    agent.output = redactText(text).slice(0, 8000); this.emit('agent.output', 'Answer recorded.', { agent }); return true;
   }
   connect(source: string, target: string) {
     // Authoritative validation: never trust client feedback or supplied edge IDs.

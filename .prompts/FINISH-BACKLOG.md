@@ -249,7 +249,7 @@ panel, nothing copied or loaded from it.
 | Q-U3 | Mock and answer-event texts | Mock answers "MOCK answer: no model was called and nothing was billed."; `agent.output` says "Answer recorded."; verification unchanged | done |
 | Q-U2 | Graph events say who and when | `agentId` + name (also on `agent.removed`), source/destination ids and names on connections, server `at`; strict client validation; Activity shows name and server time | done |
 | Q-U1 | Run once sends the Objective | System instruction is the agent's Objective; quote and call share `TokenService.plan`; the connection test is unchanged | done |
-| R-01 | Graph round trip | Credential-shaped text refused at create/edit; provider output redacted before the cut; the store never writes a document the parser would refuse | pending |
+| R-01 | Graph round trip | Credential-shaped text refused at create/edit; provider output redacted before the cut; the store never writes a document the parser would refuse | done |
 | R-02 | Persistent accounting | Append-only journal, 0700/0600, fsync per record; rebuild at start; lost in-flight → unverifiable; corrupt journal blocks real calls | pending |
 
 #### Decisions taken
@@ -268,6 +268,16 @@ panel, nothing copied or loaded from it.
   instruction with every Run once"; the summary is no longer shown in the agent panel (it is still in the graph file
   and still used by the connection test). `max_tokens` and budgets untouched. A longer objective now costs more
   input tokens per Run once; the confirmation shows it.
+- R-01: `GraphService` refuses credential-shaped text (whatever the redactor would change) in name, objective,
+  summary and artifacts at creation, in name and objective at edit, and in the Coordinator objective at reset, naming
+  the field. `recordOutput` redacts and then cuts at 8000. `GraphStore` now redacts at write time (not when the change
+  was scheduled) and runs `parseGraphDocument` on the exact text it would write: if the parser refuses, the last valid
+  file stays and the operator is warned once per reason, without the offending text. The restore parser is unchanged.
+  One case the door cannot see remains: a key configured after the text was written. The export and the stream redact
+  it; the store refuses to save until the text is edited, and says so. Tests that relied on key-shaped text entering
+  the graph now use a key registered afterwards. The refusal message avoids the word "Bearer" followed by text, which the
+  response redactor would otherwise have cut. Real restart (SIGINT, same data directory): the refused add answered
+  400 with the full message, the graph with its Run once output came back, nothing was set aside.
 
 #### Questions for João
 

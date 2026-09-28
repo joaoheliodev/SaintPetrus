@@ -34,13 +34,18 @@ test('RS-04 redacts logs, stacks, errors, nested fields, active secrets and summ
 });
 
 test('RS-04 graph response and context export redact before serialization', async () => {
-  const candidate = 'sk-' + randomBytes(24).toString('hex'); runtime().mock.reset();
-  runtime().graph.add({ name: 'Security export test', provider: 'Unconfigured', context: { objective: candidate, summary: candidate, artifacts: [candidate] } });
-  for (const handler of [exportGraph, graphGet]) {
-    const response = await handler(new Request('http://127.0.0.1:3000/api/graph'));
-    const text = await response.text(); assert.ok(!text.includes(candidate)); assert.ok(text.includes('[REDACTED]'));
-  }
   runtime().mock.reset();
+  // Key-shaped text is refused at the door (R-01); a key configured after the text was written is still redacted on the way out.
+  assert.throws(() => runtime().graph.add({ name: 'Security export test', provider: 'Unconfigured', context: { objective: 'sk-' + randomBytes(24).toString('hex'), summary: 'x', artifacts: [] } }), /shaped like a credential/);
+  const candidate = randomBytes(24).toString('hex');
+  runtime().graph.add({ name: 'Security export test', provider: 'Unconfigured', context: { objective: candidate, summary: candidate, artifacts: [candidate] } });
+  const unregister = registerSecret(Buffer.from(candidate));
+  try {
+    for (const handler of [exportGraph, graphGet]) {
+      const response = await handler(new Request('http://127.0.0.1:3000/api/graph'));
+      const text = await response.text(); assert.ok(!text.includes(candidate)); assert.ok(text.includes('[REDACTED]'));
+    }
+  } finally { unregister(); runtime().mock.reset(); }
 });
 
 test('RS-02 default is memory only; disconnect wipes registered storage', async () => {
