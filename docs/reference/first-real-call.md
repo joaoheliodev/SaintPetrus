@@ -26,7 +26,7 @@ made against each provider, not to the first call of a session.
   anyway and does not verify the connection.
 - **Small ceiling.** Lower `costLimitsUsd` so the ceiling contains a mistake, but not below one
   preflight reservation (peak rate, no cache hits, full `max_tokens`), or the call is refused before it
-  is sent. Restart after editing either file; limits edited in Tokens live in memory only.
+  is sent. Restart after editing either file; limits edited in Budgets are journaled and reapplied at start.
 - **Visible events.** Start the server with `SAINTPETRUS_FEED=true` so the events below reach the feed.
 
 ## What to watch
@@ -50,8 +50,10 @@ is a guard, not a proof of the invoice. If the two disagree, stop and find out w
 
 ## Resuming after an unverifiable pause
 
-1. Do not retry and do not restart the server. State is process-local, so a restart erases the record
-   of a call that may have been billed.
+1. Do not retry. A restart no longer erases the record: the accounting journal brings the call back
+   `unverifiable` with its agent paused, holding the same reservation. Avoid restarting anyway, because the
+   session budget, the event feed and the dispatch ledger start empty and are part of the evidence. A
+   restored call's deadline counts from the restart.
 2. Check the provider's billing for the call.
 3. Wait for `reservationTtlMs`. The reservation becomes `⚠ Expired estimate`, charged at the greater of
    the hold and the dearest model in the price table at peak with no cache hits, and stops counting as

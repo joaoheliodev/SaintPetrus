@@ -257,7 +257,7 @@ panel, nothing copied or loaded from it.
 | Q-U2 | Graph events say who and when | `agentId` + name (also on `agent.removed`), source/destination ids and names on connections, server `at`; strict client validation; Activity shows name and server time | done |
 | Q-U1 | Run once sends the Objective | System instruction is the agent's Objective; quote and call share `TokenService.plan`; the connection test is unchanged | done |
 | R-01 | Graph round trip | Credential-shaped text refused at create/edit; provider output redacted before the cut; the store never writes a document the parser would refuse | done |
-| R-02 | Persistent accounting | Append-only journal, 0700/0600, fsync per record; rebuild at start; lost in-flight → unverifiable; corrupt journal blocks real calls | in progress (R-02a journal file, R-02b service rebuild done) |
+| R-02 | Persistent accounting | Append-only journal, 0700/0600, fsync per record; rebuild at start; lost in-flight → unverifiable; corrupt journal blocks real calls | done |
 
 #### Decisions taken
 
@@ -303,6 +303,25 @@ panel, nothing copied or loaded from it.
   still `inflight` returns `unverifiable`, attached to the global, agent and model rows (not the new session), with the
   agent paused and a new deadline of restart time + `reservationTtlMs`; expiry then converts it conservatively, never
   releases it. A new budget period is refused while any reservation (inflight, unverifiable or estimated) is open.
+- R-02c: the server reads the journal once at start (`openAccountingJournal`, after the graph) and pins the records as
+  plain data; the routes' `tokenService()` rebuilds from them on creation, because the server's module copy must not
+  construct `TokenService`. The rebuild therefore happens on the first route that needs accounting (Budgets polls it
+  at once, and every call path goes through it); the server prints what it found. A journal that cannot even be opened
+  (an I/O error, not bad content) does not stop the server: real calls are blocked with `journal_unopenable`, and a
+  new budget period is refused because it could not be journaled, so the way out is fixing access and restarting.
+  `POST /api/tokens` gains `new-period`, which answers 409 with its reason when refused (the other actions keep the
+  generic 400); `GET /api/tokens` gains `accounting`. Budgets shows a warning with **Start a new budget period** when
+  blocked, names calls recovered from a crash, and offers the action in Details when healthy; the summary no longer
+  says "All budgets have room." while real calls are blocked. The sidebar and Global scope texts no longer say
+  accounting is lost on restart. The protocol rule "do not restart with an open reservation" now reads: a restart no
+  longer erases it, but avoid it because the session row, the feed and the dispatch ledger are part of the evidence.
+- R-02 real restart (temporary `SAINTPETRUS_DATA_DIR`, SIGINT, same directory): a mock Run once, an agent token limit,
+  a global USD limit and Pause all came back with the limits, the pause and the kill switch, with mock usage 0 and a
+  new empty session row; directory 0700, file 0600. A journal given an extra state with an in-flight reservation and
+  nothing closing it came back `unverifiable` with a new deadline, 90 tokens held in global and agent rows (not the
+  session), the agent paused, and the server warned. A journal edited by hand was set aside as
+  `accounting-rejected-<time>.jsonl`, real calls blocked, still blocked after a restart, unblocked by `new-period`
+  (200), and recorded after the next restart. Browser check on a fresh instance passed.
 
 #### Questions for João
 

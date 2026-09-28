@@ -103,6 +103,14 @@ redactor like the export. It is read back at startup through the strict parser t
 edited outside the app is untrusted input like any other: unknown fields, credential-shaped text, foreign
 providers, oversize files and impossible graphs are refused, and a refused file is set aside, never overwritten.
 
+The accounting journal, `accounting.jsonl`, sits beside it with the same permissions (0700/0600). Each record is one
+JSON line, synced before the change it records can take effect, and holds only IDs, counts, amounts, price versions,
+verdicts and times: never a key, a prompt, an instruction or an answer. It is read back through a strict record
+format. A record cut short by a stop is dropped; anything else unreadable moves the whole file aside as
+`accounting-rejected-<time>.jsonl`, never overwritten, and real calls stay blocked until the operator starts a new
+budget period, a manual action that is itself journaled. A failed write blocks real calls the same way, and a failure
+before a call releases its hold before any provider I/O.
+
 A legacy `data/` stays ignored by Git and refused by the pre-commit hook and CI's tracked-path
 check, even when forced. The vault directory is kept at 0700 and each file at 0600 where the
 platform supports it. There is no plaintext fallback: an unavailable keyring refuses persistence.

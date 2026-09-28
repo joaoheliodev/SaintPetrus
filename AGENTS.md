@@ -32,7 +32,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 480 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 484 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -112,7 +112,7 @@ When a provider answers with a served model that has no captured price, a reserv
 
 Removing an agent asks first and is refused while the agent has an active, unverifiable or unreconciled reservation. Its `agent` accounting rows stay, marked as a removed agent.
 
-A graph import is untrusted input: strict schema, a size limit, unknown fields and credential-shaped text refused, and every model through the allowlist. The graph format names no model, so a `model` field is refused as unknown; a model field added later must be checked against `policy.models`. The export stays redacted, and accounting stays process-local.
+A graph import is untrusted input: strict schema, a size limit, unknown fields and credential-shaped text refused, and every model through the allowlist. The graph format names no model, so a `model` field is refused as unknown; a model field added later must be checked against `policy.models`. The export stays redacted and carries no accounting.
 
 Run once goes through the same preflight and budgets as any call and asks first, showing the maximum cost it reserves. The quote and the call share `TokenService.plan`, so the quote cannot be cheaper or more permissive than the call; keep them on one code path. Run once stays because no other action sends an agent's own message and records its output.
 
@@ -121,6 +121,8 @@ The mock answers "MOCK answer: no model was called and nothing was billed." to R
 Run once sends the agent's objective, unchanged, as the system instruction, with the user's message; the quote uses the same instruction through `TokenService.plan`. There is no separate instruction field. The connection test keeps `Reply OK.` with the first agent's summary, as `docs/reference/first-real-call.md` describes. `max_tokens` and the budgets in `config/` are the operator's.
 
 Graph events name who they concern, as named at that moment (`agent`, or `source` and `target` for connections, each `{ id, name }`), so `agent.removed` still names the agent that left, and every stream event carries the server's clock `at`. The revision stays the only order; `at` is for display. `isGraphEvent` refuses unknown keys, a missing `at` or a malformed party.
+
+Accounting is journaled (Round 3): `accounting.jsonl` in the user data directory, 0700/0600, one synced record per change, written before the change can take effect, holding only IDs, counts, amounts, price versions, verdicts and times. Start rebuilds the global, agent and model scopes, reservations with their deadlines, `unverifiable` states, pauses and the last 200 receipts; the session scope and the mock's usage stay per process. A reservation in flight when the process stopped returns `unverifiable` with its agent paused, never refunded. An unreadable journal is set aside, never overwritten, and blocks real calls until the operator starts a new budget period, itself journaled; nothing restarts from zero on its own. Never rewrite or truncate a complete journal record.
 
 ## Interface vocabulary
 

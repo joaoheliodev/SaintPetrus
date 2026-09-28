@@ -2,7 +2,7 @@
 // records can have any effect, in the user data directory beside the graph. No complete record is ever rewritten.
 import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, truncateSync, writeSync } from 'node:fs';
 import { join } from 'node:path';
-import { validDurableState, type DurableState } from './accounting-state';
+import { startPeriod, validDurableState, type DurableState } from './accounting-state';
 import type { Receipt } from './receipts';
 
 export type PeriodReason = 'operator' | 'journal_unreadable';
@@ -24,6 +24,19 @@ export function validJournalRecord(value: unknown): value is JournalRecord {
   if (value.kind === 'receipt') return fields === 'at,kind,receipt,v' && validReceipt(value.receipt);
   if (value.kind === 'period') return fields === 'at,kind,reason,v' && (value.reason === 'operator' || value.reason === 'journal_unreadable');
   return false;
+}
+
+// Folds the records in the order they were written. A period the operator started zeroes the counters of the state before
+// it; a journal found unreadable empties it and blocks real calls until the next operator period.
+export function rebuildAccounting(records: readonly JournalRecord[]) {
+  let state: DurableState | undefined; let blocked = false; const receipts: Receipt[] = [];
+  for (const entry of records) {
+    if (entry.kind === 'state') state = entry.state;
+    else if (entry.kind === 'receipt') receipts.push(entry.receipt);
+    else if (entry.reason === 'operator') { blocked = false; if (state) state = startPeriod(state); }
+    else { blocked = true; state = undefined; }
+  }
+  return { state, receipts, blocked };
 }
 
 export class AccountingJournal {

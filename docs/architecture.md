@@ -27,7 +27,7 @@ Each kind of state has exactly one server owner; read
 | Redaction | `lib/security/redact.ts` | Secret-shaped text removed from inputs, outputs, events, exports and JSON responses |
 | Providers | `lib/providers/adapter.ts`, `openai.ts`, `gemini.ts`, `deepseek.ts`, `response-stream.ts`, `model-id.ts`, `thinking-policy.ts` | One adapter per provider: fixed endpoint, no redirects, bounded body, status-to-code mapping, strict usage parsing, the served model id |
 | Proxy | `lib/providers/proxy.ts`, `lib/providers/dispatch-ledger.ts`, `lib/providers/runtime.ts`, `app/api/provider` | One active call, the timeout, the record of every upstream dispatch, the selected provider and its verification state |
-| Budgets | `lib/tokens/config.ts`, `pricing.ts`, `service.ts`, `receipts.ts`, `runtime.ts`, `app/api/tokens`, `app/api/receipts` | The policy, preflight and reconciliation arithmetic, four-scope reservations, expiry, the response cache, pause transitions and receipts |
+| Budgets | `lib/tokens/config.ts`, `pricing.ts`, `service.ts`, `receipts.ts`, `accounting-journal.ts`, `accounting-state.ts`, `runtime.ts`, `app/api/tokens`, `app/api/receipts` | The policy, preflight and reconciliation arithmetic, four-scope reservations, expiry, the response cache, pause transitions, receipts and the accounting journal that rebuilds them at start |
 | Prices | `lib/prices/catalog.ts`, `app/api/prices` | Validity records in `config/prices.json`, captured tariffs and the journal of reconciled intervals |
 | Events | `lib/events/bus.ts`, `lib/events/http.ts` | A bounded, redacted, process-local event sequence and its optional feed |
 | Preview | `lib/preview/store.ts`, `lib/preview/http.ts` | Artifact versions from model output and the isolated preview document |

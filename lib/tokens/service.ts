@@ -6,9 +6,9 @@ import { heuristicTokenCounter, type TokenCounter } from '../core/token-estimate
 import { ProviderFailure, type ProviderAdapter, type ProviderFailureCode, type RequestOptions, type Usage } from '../providers/adapter';
 import type { ProviderProxy } from '../providers/proxy';
 import type { Dispatch } from '../providers/dispatch-ledger';
-import { ReceiptJournal, type JournalInterval, type Receipt, type ReceiptUsage } from './receipts';
-import type { AccountingJournal, JournalRecord } from './accounting-journal';
-import { startPeriod, type DurableRow, type DurableState } from './accounting-state';
+import { ReceiptJournal, type JournalInterval, type ReceiptUsage } from './receipts';
+import { rebuildAccounting, type AccountingJournal, type JournalOpen, type JournalRecord } from './accounting-journal';
+import type { DurableRow, DurableState } from './accounting-state';
 import { redactText } from '../security/redact';
 import { reproducible, validateConfig, validCostLimit, validLimit, type TokenPolicy, type Prices } from './config';
 import { intervalTouchesPeak, preflightCostUsd, reconciledCostUsd, worstCasePeakCostUsd } from './pricing';
@@ -29,13 +29,18 @@ type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => str
 type JournalWriter = { append(entry: JournalRecord): void };
 // memory: nothing is journaled (tests, tools). recorded: every durable change is on disk. blocked: the journal could not be
 // read or written, so real calls wait for the operator to start a new budget period; the mock still runs.
-export type AccountingStatus = { journal: 'memory' | 'recorded' | 'blocked'; reason?: 'journal_unreadable' | 'journal_write_failed'; rejectedAs?: string; recoveredReservations?: number };
+export type AccountingStatus = { journal: 'memory' | 'recorded' | 'blocked'; reason?: 'journal_unreadable' | 'journal_unopenable' | 'journal_write_failed'; rejectedAs?: string; recoveredReservations?: number };
 // disabled, invalid_model_format and model_not_allowlisted are local refusals that bill nothing, yet stay unverifiable: a test
 // proves none can fire with a live reservation, and unbilled would silently free a hold if one ever fired after provider contact.
 const failureVerdicts = {
   unconfigured: 'unbilled', disabled: 'unverifiable', invalid_request: 'unbilled', invalid_model_format: 'unverifiable', model_not_allowlisted: 'unverifiable', unauthorized: 'unbilled', insufficient_balance: 'unbilled', not_found: 'unbilled', rate_limited: 'unbilled', upstream: 'unverifiable', timeout: 'unverifiable', cancelled: 'unverifiable', busy: 'unbilled',
 } satisfies Record<ProviderFailureCode, Exclude<BillingVerdict, 'billed'>>;
 export function failureBillingVerdict(error: unknown): Exclude<BillingVerdict, 'billed'> { return ProviderFailure.is(error) ? failureVerdicts[error.code] : 'unverifiable'; }
+const journalRefusals = {
+  journal_unreadable: 'The accounting journal could not be read and was set aside. Check the provider invoice, then start a new budget period in Budgets; real calls are blocked until then.',
+  journal_unopenable: 'The accounting journal cannot be opened. Real calls are blocked until access to it is fixed and the server restarts.',
+  journal_write_failed: 'The accounting journal could not be written. Real calls are blocked until you start a new budget period in Budgets.',
+} satisfies Record<NonNullable<AccountingStatus['reason']>, string>;
 const zero = (): Totals => ({ prompt: 0, completion: 0, total: 0 });
 const money = (value: number) => Math.round(value * 1_000_000_000_000) / 1_000_000_000_000;
 export class TokenService {
@@ -101,15 +106,9 @@ export class TokenService {
   }
   // Rebuilds what the journal holds and journals from then on. A reservation still in flight when the process stopped may
   // have been served and billed: it returns unverifiable, with its agent paused, and is never released.
-  restore(journal: AccountingJournal) {
-    const opened = journal.open(new Date(this.now()));
-    let state: DurableState | undefined; let blocked = opened.rejectedAs !== undefined; const receipts: Receipt[] = [];
-    for (const entry of opened.records) {
-      if (entry.kind === 'state') state = entry.state;
-      else if (entry.kind === 'receipt') receipts.push(entry.receipt);
-      else if (entry.reason === 'operator') { blocked = false; if (state) state = startPeriod(state); }
-      else { blocked = true; state = undefined; }
-    }
+  restore(journal: AccountingJournal, opened: JournalOpen = journal.open(new Date(this.now()))) {
+    const { state, receipts, blocked: periodBlocked } = rebuildAccounting(opened.records);
+    const blocked = periodBlocked || opened.rejectedAs !== undefined;
     this.accounting = blocked ? { journal: 'blocked', reason: 'journal_unreadable', ...(opened.rejectedAs ? { rejectedAs: basename(opened.rejectedAs) } : {}) } : { journal: 'recorded' };
     if (opened.rejectedAs) try { journal.append({ v: 1, kind: 'period', at: this.now(), reason: 'journal_unreadable' }); } catch { this.writeFailed(); }
     this.receipts.restore(receipts);
@@ -138,10 +137,13 @@ export class TokenService {
     this.journal = journal; this.persist();
     return this.accounting;
   }
+  // The journal could not even be opened: nothing is written, and real calls wait until access is fixed and the server restarts.
+  journalUnopenable() { this.accounting = { journal: 'blocked', reason: 'journal_unopenable' }; }
   accountingStatus() { return { ...this.accounting }; }
   // The operator's manual action after checking the invoice: counters restart, history stays in the journal.
   startBudgetPeriod() {
     this.expireReservations();
+    if (this.accounting.reason === 'journal_unopenable') throw new TokenFailure('The accounting journal cannot be opened. Fix access to it in the user data directory, then restart the server.');
     if (this.reservations.size) throw new TokenFailure('Reconcile or wait for every open reservation before starting a new budget period.');
     if (this.journal) {
       try { this.journal.append({ v: 1, kind: 'period', at: this.now(), reason: 'operator' }); }
@@ -253,7 +255,7 @@ export class TokenService {
     for (const id of Object.keys(this.policy.models)) this.row('model', id, this.policy.perModel, this.policy.costLimitsUsd.perModel);
     const reservations = [...this.reservations.values()].filter(item => item.status !== 'inflight').map(item => ({ id: item.id, agent: item.agent, model: item.model, ...(item.billingModel ? { servedModel: item.billingModel } : {}), priceVersionId: item.priceVersionId, tokens: item.tokens, costUsd: item.costUsd, createdAt: item.createdAt, expiresAt: item.expiresAt, status: item.status }));
     const prices = Object.fromEntries(Object.entries(this.catalog.capture(this.now())).map(([model, version]) => [model, version.price]));
-    return { sessionId: this.sessionId, stopped: this.stopped, paused: [...this.paused], priceDate: this.prices.date, prices, catalog: this.catalog.snapshot(), models: this.policy.models, cacheTtlMs: this.policy.cacheTtlMs, reservationTtlMs: this.policy.reservationTtlMs, reservations, rows: [...this.rows.values()].map(row => ({ ...structuredClone(row), state: this.blocked(row) ? 'stopped' : this.warning(row) ? 'warning' : 'available', ...(row.scope === 'agent' && !ids.includes(row.id) ? { removed: true } : {}) })) };
+    return { sessionId: this.sessionId, accounting: this.accountingStatus(), stopped: this.stopped, paused: [...this.paused], priceDate: this.prices.date, prices, catalog: this.catalog.snapshot(), models: this.policy.models, cacheTtlMs: this.policy.cacheTtlMs, reservationTtlMs: this.policy.reservationTtlMs, reservations, rows: [...this.rows.values()].map(row => ({ ...structuredClone(row), state: this.blocked(row) ? 'stopped' : this.warning(row) ? 'warning' : 'available', ...(row.scope === 'agent' && !ids.includes(row.id) ? { removed: true } : {}) })) };
   }
   private refuse(agent: string, message: string): never {
     eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'budget.refused', severity: 'warning', payload: message });
@@ -267,7 +269,7 @@ export class TokenService {
     const model = Object.hasOwn(this.policy.models, adapter.model) ? this.policy.models[adapter.model] : undefined;
     if (!model || model.provider !== adapter.id) fail('Model not allowlisted. Edit local token policy and prices.', false);
     if (typeof input !== 'string' || !input.trim() || input.length > 2000) fail('Invalid input.', false);
-    if (adapter.id !== 'mock' && this.accounting.journal === 'blocked') fail(this.accounting.reason === 'journal_write_failed' ? 'The accounting journal could not be written. Real calls are blocked until you start a new budget period in Budgets.' : 'The accounting journal could not be read and was set aside. Check the provider invoice, then start a new budget period in Budgets; real calls are blocked until then.', false);
+    if (adapter.id !== 'mock' && this.accounting.journal === 'blocked') fail(journalRefusals[this.accounting.reason ?? 'journal_unreadable'], false);
     if (this.stopped || this.paused.has(agent)) fail('Agent paused.', true);
     const createdAt = this.now();
     const priceVersions = this.catalog.capture(createdAt);
@@ -314,7 +316,7 @@ export class TokenService {
     if (!this.persist() && adapter.id !== 'mock') {
       rows.forEach(row => { row.reserved -= reservedTokens; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); });
       this.reservations.delete(reservation.id);
-      this.refuse(agent, 'The accounting journal could not be written. Real calls are blocked until you start a new budget period in Budgets.');
+      this.refuse(agent, journalRefusals.journal_write_failed);
     }
     if (previewEnabled()) options.onText = text => observeArtifact(agent, this.hooks.role?.(agent) ?? agent, text);
     let verdict: BillingVerdict = 'unverifiable';

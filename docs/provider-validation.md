@@ -34,9 +34,11 @@ Fill this locally. No credential belongs in this document or the results table.
 
 1. Operator: run the build on this branch before validation. Start only on
    `127.0.0.1` with `SAINTPETRUS_MODE=real` (the header must say REAL); disable preview. Enable `SAINTPETRUS_FEED=true` at startup
-   if feed evidence is required. Enabling only its UI is insufficient. Do not
-   restart once a possibly billed call is unresolved: counters and reservations
-   are process-local. Use the policy's configured TTL, not a new timeout policy, and
+   if feed evidence is required. Enabling only its UI is insufficient. A restart
+   no longer erases an unresolved call: the accounting journal brings it back
+   `unverifiable` with its agent paused. Still avoid restarting mid-call: the
+   session row, the event feed and the dispatch ledger start empty, and they are
+   part of the evidence. Use the policy's configured TTL, not a new timeout policy, and
    leave `SAINTPETRUS_VALIDATION_TIMEOUT_MS` unset except for V2.
 2. Operator: put `R` and its provider/output/thinking policy in
    `config/token-policy.json` before startup. Keep `cacheTtlMs: 0`. Gemini currently
@@ -286,7 +288,7 @@ No actual usage is fabricated. The pause remains until explicit resume.
 Use **Apply confirmed usage** only with provider-confirmed prompt, completion and
 cost. Verify it replaces the estimate, does not add another full charge, removes
 the reservation, and updates all four rows. If confirmation is unavailable, retain
-the estimate and stop; do not guess zero, restart to erase it or proceed to V3.
+the estimate and stop; do not guess zero or proceed to V3. A restart does not erase it: the journal restores it.
 Adding tariffs after dispatch does not change the captured expiry candidates.
 
 ### V3: real error, and a naturally occurring 429
@@ -347,7 +349,7 @@ and stop; never send bursts to induce it. Not observed means not verified.
 | G7 | Resolved: the terminal helper accepts `deepseek` under the same rules as the other providers, and a test pins its provider list to the backend credential store | None |
 | G8 | Zero live cached/thinking tokens cannot establish nonzero cases. The names-only diagnostic now covers Gemini usage failures and a missing usage object in both adapters | Obtain numeric provider evidence, or explicitly leave nonzero cases unverified. Do not manufacture billable coverage |
 | G9 | No safe arbitrary-key/fragment comparator for exported artifacts; short fragments not generally identifiable | Approve an ephemeral, nonlogging comparator and an explicit fragment criterion; Gitleaks alone is insufficient |
-| G10 | Counters, holds, receipts and the dispatch ledger vanish on restart; input approximate; price-only reroutes beyond known candidates and unsupported price dimensions can exceed estimates | Preserve process/evidence during the run, select only supported pricing, approve residual exposure; durable receipts/accurate counting need a separate task |
+| G10 | Partly resolved (Round 3, R-02): global, agent and model counters, holds and receipts survive a restart through `accounting.jsonl`; the session row and the dispatch ledger still vanish; input approximate; price-only reroutes beyond known candidates and unsupported price dimensions can exceed estimates | Preserve process/evidence during the run, select only supported pricing, approve residual exposure; durable receipts/accurate counting need a separate task |
 | G11 | Resolved: a probe answered without visible text returns 422 `empty_output`, keeps its billed usage and leaves the connection `incomplete` ("No visible output"), like an output-limit result | Still require visible output during manual validation |
 
 ## Results record

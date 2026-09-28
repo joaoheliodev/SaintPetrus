@@ -204,6 +204,8 @@ button.provider-badge:hover { background: var(--secondary); }
 .context-note svg { flex-shrink: 0; }
 .notice { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 60; max-width: 90vw; display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--card); color: var(--foreground); border: 1px solid var(--destructive); border-radius: 8px; }
 .notice svg { flex-shrink: 0; }
+.journal-warning { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--destructive); border-radius: 8px; color: var(--status-red); }
+.journal-warning p { flex: 1 1 20rem; margin: 0; }
 .confirm-backdrop { position: fixed; inset: 0; z-index: 70; background: rgb(0 0 0 / .45); }
 .confirm-dialog { position: fixed; top: 50%; left: 50%; z-index: 71; transform: translate(-50%, -50%); width: min(30rem, calc(100vw - 32px)); display: grid; gap: 10px; padding: 18px 20px; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 16px 40px rgb(0 0 0 / .45); }
 .confirm-title { font-size: 16px; font-weight: 600; } .confirm-detail { color: var(--muted-foreground); }

@@ -3,6 +3,23 @@
 Notable changes, newest first. Dates are UTC. No release has been tagged; entries are grouped by the branch
 that carried them.
 
+## Unreleased: Round 3 on `night/provider-validation-ready` (2026-09-28)
+
+Operator decisions and server fixes. No request with a real key was made. The test floor rose from 463 to 484.
+
+- The mock's answer and the `agent.output` event claim nothing they did not do (Q-U3).
+- Graph events name the agent, the connection's source and target, and carry the server's clock `at`; the client
+  refuses unknown keys, a missing `at` or a malformed party (Q-U2).
+- Run once sends the agent's objective as its instruction; Details says so (Q-U1).
+- Credential-shaped text is refused at creation and edit, provider output is redacted before its cut, and the graph
+  store never writes a document it would refuse on restore (R-01).
+- Accounting survives a restart: an append-only, synced `accounting.jsonl` in the user data directory rebuilds the
+  global, agent and model budgets, reservations, pauses and the last 200 receipts. A call lost to a crash returns
+  `unverifiable` with its agent paused; an unreadable journal is set aside and blocks real calls until the new
+  `new-period` action on `POST /api/tokens` (**Start a new budget period** in Budgets), which answers 409 with its
+  reason when refused. `GET /api/tokens` gains `accounting` (`journal`, `reason`, `rejectedAs`,
+  `recoveredReservations`) (R-02).
+
 ## Unreleased: `night/provider-validation-ready` (2026-09-27)
 
 Everything that could be finished without a call to a real provider. No request with a real key was made.

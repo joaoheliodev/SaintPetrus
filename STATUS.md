@@ -35,7 +35,7 @@ the branch (40 runs). Two independent reviewer agents audited `0662647..HEAD`; t
   unreconciled reservation; its accounting rows stay, marked as a removed agent.
 - **Q-04** The graph is saved in the user data directory and restored at startup; import is untrusted input (strict
   format, 4 MiB, unknown fields and credential-shaped text refused, no model in the format). The export stays
-  redacted; accounting stays process-local.
+  redacted; accounting stayed process-local until R-02.
 - **Q-05, Q-06** No answer, so the security contact stays a marked placeholder and there is no LICENSE.
 - **Q-07** OpenAI is out of the allowlist and not offered until validated; no snapshot or price was added.
 - **Q-08** Remembered keys moved to the user data directory (0700/0600); a legacy `data/vault` is copied, verified
@@ -53,6 +53,22 @@ server-accounted cost together; Budgets with a summary and the way out of a bloc
 steps bar; in-app confirmations opening on Cancel; the demo and every graph replacement behind the More menu. Open
 questions are in `.prompts/FINISH-BACKLOG.md` (Phase 8, "Questions for João").
 
+## Round 3 (2026-09-28)
+
+- **Q-U3** The mock answers "MOCK answer: no model was called and nothing was billed."; `agent.output` says "Answer
+  recorded.". Verification semantics are unchanged.
+- **Q-U2** Graph events name the agent (also on `agent.removed`), the connection's source and target, and carry the
+  server's `at`; `isGraphEvent` is strict. Activity shows the name and the server time.
+- **Q-U1** Run once sends the agent's objective, unchanged, as the system instruction; quote and call share
+  `TokenService.plan`. The connection test keeps `Reply OK.` with the first agent's summary.
+- **R-01** Credential-shaped text is refused at creation and edit; provider output is redacted before the 8000
+  cut; the graph store never writes a file its own parser would refuse, keeping the last valid one and warning.
+- **R-02** Accounting is journaled (`accounting.jsonl`) and rebuilt at start: global, agent and model consumption
+  and cost, limits changed in Budgets, reservations with deadlines, `unverifiable` states, pauses and the last 200
+  receipts. The session budget and the mock's usage stay per process. A call in flight at a crash returns
+  `unverifiable` with its agent paused. An unreadable journal is set aside and blocks real calls until **Start a new
+  budget period**.
+
 ## Not verified or pending
 
 - No provider has answered a real request. Gemini step 1B and DeepSeek D7 wait for explicit operator approval and follow `docs/reference/first-real-call.md`. `GET /models` is not approved.
@@ -64,7 +80,7 @@ questions are in `.prompts/FINISH-BACKLOG.md` (Phase 8, "Questions for João").
 - Long-context tiers and cache-write pricing are not modeled; see `docs/reference/deferred-price-dimensions.md`.
 - The Responses streaming path and real error, quota and timeout handling are tested only with synthetic transport.
 - The full RF-02 panel is pending. RF-03 and RF-04 are out of scope.
-- Agent removal (Q-03), graph persistence and import (Q-04) are implemented; token accounting stays process-local.
+- Agent removal (Q-03), graph persistence and import (Q-04) are implemented; accounting is journaled since R-02.
 - There is no LICENSE file and the security contact in `SECURITY.md` is a marked placeholder: Q-05 and Q-06 came back empty.
 - Accessibility was checked in Chromium (contrast, control names, visible focus, keyboard paths), not with a screen reader.
 - When usage cannot be parsed, the served model the response named is not carried into receipts or manual reconciliation (F-01). The panel's Forget key reaches only the selected provider; the terminal helper reaches any (F-02).
@@ -72,7 +88,7 @@ questions are in `.prompts/FINISH-BACKLOG.md` (Phase 8, "Questions for João").
 
 ## Open debts and limits
 
-- Counters, budgets, reservations, receipts, events and artifacts are process-local. Restarting clears them; this is not a durable ledger. Only the graph is saved.
+- The graph and the global, agent and model accounting survive a restart. The session budget, the mock's usage, events, artifacts and the dispatch ledger are process-local. The journal is a checkpoint log, not an invoice: the input counter is still approximate.
 - An unresolved reservation converts after `reservationTtlMs` (300000 ms in the shipped policy) at the greater of the hold and the dearest eligible captured model at peak with no cache hits, using P3's provider rule, and stays marked as an expired estimate until manual reconciliation.
 - The input counter is approximate. The monetary ceiling is a guard, not a proof of the invoice.
 - Configured credential fragments of 12 or more characters are redacted; shorter substrings cannot be told apart from ordinary text.

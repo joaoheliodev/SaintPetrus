@@ -94,8 +94,8 @@ meter (the fullest of the global and session budgets; click it to open **Budgets
 
 The server owns the graph: every tab sees the same one. It is saved to `graph.json` in the user data directory
 (the same place as remembered keys, see `SECURITY.md`) and restored at startup, with every agent back at rest.
-Token accounting, reservations, receipts and the event feed are not saved: they are process-local, so a restart
-starts them empty. Settle every reservation in **Budgets** before stopping the server.
+Token accounting is journaled next to it, in `accounting.jsonl` (see **Budgets** below). The event feed and the
+session budget are not saved: a restart starts them empty.
 
 An imported file is untrusted input. It must be at most 4 MiB and match the export format exactly: an unknown
 field at any level, a `model` field included, is refused, as is credential-shaped text, a provider other than
@@ -186,8 +186,16 @@ cache hits. Check the provider's billing, then replace that estimate with **Appl
 
 `GET /api/receipts` keeps the last 200 receipts (settled calls, cache hits, expiries and manual reconciliations share
 them) with their verdict, served model, price versions and dispatch; `GET /api/provider` includes a per-provider count of requests actually dispatched upstream.
-Counters, reservations and receipts are process-local and reset on restart; the price file and its journal
-of reconciled intervals persist. The response cache is off (`cacheTtlMs` is 0) until a real key has been
+Accounting survives a restart. Every change to the global, agent and model budgets (consumption, cost, limits changed
+in Budgets, held and expired reservations with their captured prices, pauses and Pause all) and every receipt is
+appended to `accounting.jsonl` in the user data directory (directory 0700, file 0600, synced per record) before it can
+take effect. The journal holds IDs, counts, amounts, price versions, verdicts and times, never a key, a prompt or an
+answer. At start the server rebuilds from it, with the last 200 receipts. The session budget and the mock's usage start
+empty with each run. A call that was in flight when the server stopped comes back `unverifiable`, with its agent
+paused; it is never refunded. If the journal cannot be read it is set aside as `accounting-rejected-<time>.jsonl`,
+never overwritten, and real calls stay blocked (the mock still runs) until you check the invoice and choose **Start a
+new budget period** in Budgets. That action is journaled, keeps the history and limits, restarts consumption from zero
+and is refused while any reservation is open. The price file and its journal of reconciled intervals persist too. The response cache is off (`cacheTtlMs` is 0) until a real key has been
 validated; turning it on is an operator decision.
 
 ## Optional features
@@ -244,7 +252,8 @@ pauses every agent), so it refuses one that already holds work or has a keyed pr
 - No real provider call has been made. Parsers, accounting and error handling are proven against synthetic
   fixtures only; the first real call against each provider must be checked against its invoice before a second.
 - The input token count is an estimate; the budget is a guard, not a proof of what the invoice will say.
-- Single-user. Only the graph is saved; token accounting is process-local and a restart clears it.
+- Single-user. The graph and the global, agent and model accounting are saved; the session budget, the mock's usage,
+  the event feed and the dispatch ledger are not.
 - Keyring encryption was exercised on Linux only.
 - Accessibility was checked in Chromium (contrast, names, focus, keyboard paths), not with a screen reader.
 - The core health detectors in `lib/core` are integrated as a library; their orchestration is future work.

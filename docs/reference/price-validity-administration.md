@@ -24,8 +24,8 @@ requested and known served model's protected time interval in `reconciled`. An
 append is refused if either its new interval or its predecessor closure intersects
 that history. Synthetic mock usage is never journaled, so the mock cannot rewrite the
 operator's file. This journal begins with this feature; it cannot reconstruct older
-process-local consumption. It survives restart, although counters and inflight
-reservations remain process-local. File writes use an exclusive temporary file,
+process-local consumption. It survives restart; since Round 3 so do the global, agent and model counters and
+held reservations, in the separate `accounting.jsonl` (the session row stays per process). File writes use an exclusive temporary file,
 fsync and atomic rename; failure leaves the previous file and memory unchanged.
 Use the local endpoint for live updates; out-of-band edits are not hot-reloaded.
 

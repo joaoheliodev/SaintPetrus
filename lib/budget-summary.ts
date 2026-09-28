@@ -26,7 +26,7 @@ export function budgetMeter(rows: readonly BudgetRow[]) {
 }
 
 export const scopes: { scope: BudgetRow['scope']; title: string; meaning: string }[] = [
-  { scope: 'global', title: 'Global', meaning: 'Everything this server has spent.' },
+  { scope: 'global', title: 'Global', meaning: 'Everything spent since the budget period began, across restarts.' },
   { scope: 'agent', title: 'Per agent', meaning: 'What each agent has spent.' },
   { scope: 'model', title: 'Per model', meaning: 'What each requested model has spent.' },
   { scope: 'session', title: 'Session', meaning: 'Since this server started.' },
@@ -38,7 +38,7 @@ export const usd = (value: number) => value === 0 ? '$0.00' : Math.abs(value) < 
 
 export type BudgetStatus = { tone: 'green' | 'amber' | 'red'; text: string };
 // One sentence: what is wrong, if anything, and the way out. Names come from the graph; a removed agent keeps its id.
-export function budgetStatus(snapshot: { rows: readonly BudgetRow[]; stopped: boolean; reservations: readonly { status: string }[] }, name: (row: BudgetRow) => string): BudgetStatus {
+export function budgetStatus(snapshot: { rows: readonly BudgetRow[]; stopped: boolean; reservations: readonly { status: string }[]; accounting?: JournalState }, name: (row: BudgetRow) => string): BudgetStatus {
   const label = (row: BudgetRow) => row.scope === 'global' || row.scope === 'session' ? `the ${row.scope} budget` : `the ${row.scope} budget for ${name(row)}`;
   if (snapshot.rows.some(row => row.unverifiable > 0)) return { tone: 'red', text: 'A call lost contact with its provider, so its usage is unverifiable. Its reservation stays held until it expires into an estimate; check the provider billing, then apply the confirmed usage in Details.' };
   const stopped = snapshot.rows.find(row => row.state === 'stopped');
@@ -48,7 +48,18 @@ export function budgetStatus(snapshot: { rows: readonly BudgetRow[]; stopped: bo
   if (estimated) return { tone: 'amber', text: `${estimated} expired ${estimated === 1 ? 'reservation is' : 'reservations are'} counted as an estimate until you apply the provider-confirmed usage in Details.` };
   const warning = snapshot.rows.find(row => row.state === 'warning');
   if (warning) return { tone: 'amber', text: `Warning: ${label(warning)} is above 80%. Calls are refused at 100%.` };
+  // The journal's own warning explains the block; the summary must not call a blocked server fine.
+  if (snapshot.accounting?.journal === 'blocked') return { tone: 'red', text: 'Budgets have room, but real calls are blocked by the accounting journal (see above).' };
   return { tone: 'green', text: 'All budgets have room.' };
+}
+
+export type JournalState = { journal: 'memory' | 'recorded' | 'blocked'; reason?: string; rejectedAs?: string };
+// Why real calls are blocked by the accounting journal, and the way out; undefined while the journal is healthy.
+export function journalWarning(accounting: JournalState) {
+  if (accounting.journal !== 'blocked') return undefined;
+  if (accounting.reason === 'journal_unopenable') return { text: 'Real calls are blocked: the accounting journal cannot be opened. Fix access to it in the user data directory, then restart the server. The mock still runs.', canStartPeriod: false };
+  if (accounting.reason === 'journal_write_failed') return { text: 'Real calls are blocked: the accounting journal could not be written, so the file lags what this screen shows. Check the disk, then start a new budget period. The mock still runs.', canStartPeriod: true };
+  return { text: `Real calls are blocked: the accounting journal could not be read${accounting.rejectedAs ? ` and was set aside as ${accounting.rejectedAs}` : ' and was set aside'}. Nothing restarted from zero on its own. Check the provider invoice, then start a new budget period. The mock still runs.`, canStartPeriod: true };
 }
 
 // Calls in the receipt window the server keeps (GET /api/receipts, bounded). truncated means older ones were dropped.

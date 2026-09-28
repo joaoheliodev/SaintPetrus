@@ -214,7 +214,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         <label>Demo cost limit (cents)<input type="number" min={1} max={10000} value={limits.maxCostCents} disabled={active} onChange={e => setLimits({ ...limits, maxCostCents: Number(e.target.value) })} /></label>
         <Button disabled={active || pending} variant="outline" onClick={applyLimits}>Apply demo cost limit</Button>
       </details>}
-      <p className="helper">The graph is saved on this machine; token accounting is not. Only Run once and connection tests call a provider, and only when you click them. Run once is an agent&apos;s Run tab.</p>
+      <p className="helper">The graph and the token accounting are saved on this machine; the session budget is not. Only Run once and connection tests call a provider, and only when you click them. Run once is an agent&apos;s Run tab.</p>
       </div>
     </aside>
     <div className="main-column">
