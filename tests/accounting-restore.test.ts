@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ProviderProxy } from '../lib/providers/proxy';
+import { DEFAULT_PROVIDER_TIMEOUT_MS, ProviderProxy } from '../lib/providers/proxy';
 import type { ProviderAdapter } from '../lib/providers/adapter';
 import { TokenService } from '../lib/tokens/service';
 import { AccountingJournal, type JournalRecord } from '../lib/tokens/accounting-journal';
@@ -65,6 +65,40 @@ test('R-02 consumption, cost, limits and receipts survive a restart; the session
   assert.ok(!/Question|System|Answer/.test(text), 'no prompt, instruction or answer is journaled');
 }));
 
+// A process that dies while the provider holds the request: nothing closes the reservation it journaled.
+async function crash(directory: string, now = 1000) {
+  const tokens = service({ now }).tokens;
+  tokens.restore(new AccountingJournal(directory));
+  void tokens.execute(new ProviderProxy(), keyed(async (_input, _signal, _options, onDispatch) => { onDispatch?.(); return new Promise(() => {}); }), 'Question', signal(), 'a', 'System');
+  await new Promise(resolve => setImmediate(resolve));
+  const last = new AccountingJournal(directory).open().records.at(-1);
+  assert.ok(last?.kind === 'state' && last.state.reservations[0]?.status === 'inflight');
+  return last.state.reservations[0];
+}
+
+test('R3-1 a lost call\'s deadline counts from when it was sent: restarts never move it, and one after it converts at once', async () => {
+  await withDirectory(async directory => {
+    const held = await crash(directory);
+    const deadline = held.createdAt + DEFAULT_PROVIDER_TIMEOUT_MS + policy.reservationTtlMs;
+    const deadlines = [];
+    for (const now of [5000, 12_000]) {
+      const restarted = service({ now }).tokens; restarted.restore(new AccountingJournal(directory));
+      deadlines.push(restarted.snapshot().reservations[0].expiresAt);
+    }
+    assert.deepEqual(deadlines, [deadline, deadline], 'the restart time never enters the deadline');
+  });
+  await withDirectory(async directory => {
+    const held = await crash(directory);
+    const late = service({ now: held.createdAt + DEFAULT_PROVIDER_TIMEOUT_MS + policy.reservationTtlMs });
+    late.tokens.restore(new AccountingJournal(directory));
+    assert.equal(late.tokens.accountingStatus().recoveredReservations, 1);
+    assert.deepEqual(late.tokens.receiptSnapshot().receipts.map(receipt => [receipt.kind, receipt.kind === 'expiry' ? receipt.costUsd >= held.costUsd : null]), [['expiry', true]], 'converted conservatively, at once');
+    assert.equal(late.tokens.snapshot().reservations[0].status, 'estimated', 'never released');
+    assert.deepEqual([row(late.tokens, 'global').used, row(late.tokens, 'global').reserved, row(late.tokens, 'global').unverifiable], [held.tokens, 0, 0]);
+    assert.ok(late.paused.has('a'), 'the agent stays paused');
+  });
+});
+
 test('R-02 a crash with a call in flight rebuilds it as unverifiable with the agent paused, and never refunds it', () => withDirectory(async directory => {
   const first = service();
   first.tokens.restore(new AccountingJournal(directory));
@@ -82,17 +116,18 @@ test('R-02 a crash with a call in flight rebuilds it as unverifiable with the ag
   const status = second.tokens.restore(new AccountingJournal(directory));
   assert.deepEqual(status, { journal: 'recorded', recoveredReservations: 1 });
   const [reservation] = second.tokens.snapshot().reservations;
-  assert.deepEqual([reservation.id, reservation.status, reservation.tokens, reservation.costUsd, reservation.expiresAt], [held.id, 'unverifiable', held.tokens, held.costUsd, 7000 + policy.reservationTtlMs]);
+  const deadline = held.createdAt + DEFAULT_PROVIDER_TIMEOUT_MS + policy.reservationTtlMs;
+  assert.deepEqual([reservation.id, reservation.status, reservation.tokens, reservation.costUsd, reservation.expiresAt], [held.id, 'unverifiable', held.tokens, held.costUsd, deadline]);
   assert.ok(second.paused.has('a') && second.tokens.snapshot().paused.includes('a'), 'the agent is paused');
   assert.throws(() => second.tokens.resume('a'), /Usage unverifiable/);
   for (const scope of ['global', 'agent', 'model']) assert.deepEqual([row(second.tokens, scope, scope === 'agent' ? 'a' : undefined).reserved, row(second.tokens, scope, scope === 'agent' ? 'a' : undefined).unverifiable], [held.tokens, 1], scope);
   assert.equal(row(second.tokens, 'session').reserved, 0);
   await assert.rejects(second.tokens.execute(new ProviderProxy(), keyed(), 'Question', signal(), 'a', 'System'), /paused/);
-  second.clock.now = 7000 + policy.reservationTtlMs;
+  second.clock.now = deadline;
   assert.equal(row(second.tokens, 'global').used, held.tokens, 'expiry converts it to conservative usage');
   assert.ok(row(second.tokens, 'global').costAccountedUsd >= held.costUsd);
 
-  const third = service({ now: 9000 });
+  const third = service({ now: deadline + 1 });
   third.tokens.restore(new AccountingJournal(directory));
   assert.equal(third.tokens.snapshot().reservations[0].status, 'estimated', 'the conversion was journaled');
   assert.equal(row(third.tokens, 'global').used, held.tokens); assert.equal(row(third.tokens, 'global').unverifiable, 0);

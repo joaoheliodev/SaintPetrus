@@ -14,6 +14,12 @@ for the accepted loss of coincidental headroom from unrelated providers. Do not 
 this to ordinary release: only a failure that proves no generation occurred is `unbilled`, and later
 reconciliation must replace the same converted amount rather than charge it twice.
 
+A reservation still in flight when the process stopped comes back from the accounting journal as
+`unverifiable`. Its deadline is the latest it could have had had the process lived: `createdAt` plus the
+provider timeout (`DEFAULT_PROVIDER_TIMEOUT_MS`) plus `reservationTtlMs`. It is computed from journaled data
+only, never from the restart time, so restarting again cannot postpone the conversion; a deadline already past
+converts on the first read. The conversion is the same conservative one, and nothing is released.
+
 Candidates are the tariff values captured with the reservation, not the current
 catalog. Closing or appending a validity after dispatch must not change this floor;
 see [price administration](price-validity-administration.md).

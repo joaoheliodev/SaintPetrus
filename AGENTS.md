@@ -32,7 +32,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 484 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 485 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -122,7 +122,7 @@ Run once sends the agent's objective, unchanged, as the system instruction, with
 
 Graph events name who they concern, as named at that moment (`agent`, or `source` and `target` for connections, each `{ id, name }`), so `agent.removed` still names the agent that left, and every stream event carries the server's clock `at`. The revision stays the only order; `at` is for display. `isGraphEvent` refuses unknown keys, a missing `at` or a malformed party.
 
-Accounting is journaled (Round 3): `accounting.jsonl` in the user data directory, 0700/0600, one synced record per change, written before the change can take effect, holding only IDs, counts, amounts, price versions, verdicts and times. Start rebuilds the global, agent and model scopes, reservations with their deadlines, `unverifiable` states, pauses and the last 200 receipts; the session scope and the mock's usage stay per process. A reservation in flight when the process stopped returns `unverifiable` with its agent paused, never refunded. An unreadable journal is set aside, never overwritten, and blocks real calls until the operator starts a new budget period, itself journaled; nothing restarts from zero on its own. Never rewrite or truncate a complete journal record.
+Accounting is journaled (Round 3): `accounting.jsonl` in the user data directory, 0700/0600, one synced record per change, written before the change can take effect, holding only IDs, counts, amounts, price versions, verdicts and times. Start rebuilds the global, agent and model scopes, reservations with their deadlines, `unverifiable` states, pauses and the last 200 receipts; the session scope and the mock's usage stay per process. A reservation in flight when the process stopped returns `unverifiable` with its agent paused, never refunded; its deadline is the latest it could have had without the crash, `createdAt` + `DEFAULT_PROVIDER_TIMEOUT_MS` + `reservationTtlMs`, taken from the journal alone so restarts never move it, and a deadline already past converts on the first read like any other. An unreadable journal is set aside, never overwritten, and blocks real calls until the operator starts a new budget period, itself journaled; nothing restarts from zero on its own. Never rewrite or truncate a complete journal record.
 
 ## Interface vocabulary
 

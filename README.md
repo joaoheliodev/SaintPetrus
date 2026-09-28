@@ -192,7 +192,8 @@ appended to `accounting.jsonl` in the user data directory (directory 0700, file 
 take effect. The journal holds IDs, counts, amounts, price versions, verdicts and times, never a key, a prompt or an
 answer. At start the server rebuilds from it, with the last 200 receipts. The session budget and the mock's usage start
 empty with each run. A call that was in flight when the server stopped comes back `unverifiable`, with its agent
-paused; it is never refunded. If the journal cannot be read it is set aside as `accounting-rejected-<time>.jsonl`,
+paused, and keeps the deadline it would have had (request time + provider timeout + `reservationTtlMs`); it is never
+refunded. If the journal cannot be read it is set aside as `accounting-rejected-<time>.jsonl`,
 never overwritten, and real calls stay blocked (the mock still runs) until you check the invoice and choose **Start a
 new budget period** in Budgets. That action is journaled, keeps the history and limits, restarts consumption from zero
 and is refused while any reservation is open. The price file and its journal of reconciled intervals persist too. The response cache is off (`cacheTtlMs` is 0) until a real key has been

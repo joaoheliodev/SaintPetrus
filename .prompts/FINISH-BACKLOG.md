@@ -230,10 +230,10 @@ panel, nothing copied or loaded from it.
 
 #### Questions for João
 
-- R-02: a call lost to a crash gets its unverifiable deadline from the restart time (restart + `reservationTtlMs`),
+- Answered (R3-1): count from the send time, `createdAt` + provider timeout + TTL. Was: a call lost to a crash gets its unverifiable deadline from the restart time (restart + `reservationTtlMs`),
   not from when it was sent. Expiry converts it at the conservative price either way, so this only decides how long
   the agent waits before the estimate appears. Keep it, or count from the original request time?
-- R-02: "Start a new budget period" zeroes consumption in the global, agent and model scopes and keeps limits,
+- Answered (R3-2): keep it; pauses are not released, and the screen points to Resume eligible agents. Was: "Start a new budget period" zeroes consumption in the global, agent and model scopes and keeps limits,
   pauses and the kill switch; it is refused while any reservation is open. Is that the period you want, or should it
   also clear pauses?
 
@@ -258,6 +258,8 @@ panel, nothing copied or loaded from it.
 | Q-U1 | Run once sends the Objective | System instruction is the agent's Objective; quote and call share `TokenService.plan`; the connection test is unchanged | done |
 | R-01 | Graph round trip | Credential-shaped text refused at create/edit; provider output redacted before the cut; the store never writes a document the parser would refuse | done |
 | R-02 | Persistent accounting | Append-only journal, 0700/0600, fsync per record; rebuild at start; lost in-flight → unverifiable; corrupt journal blocks real calls | done |
+| R3-1 | Lost call's deadline from its send time | A reservation restored from a crash expires at `createdAt` + `DEFAULT_PROVIDER_TIMEOUT_MS` + `reservationTtlMs`; restarts never move it; a past deadline converts on the first read | done |
+| R3-2 | New budget period unchanged | Zeroes consumption, keeps limits, pauses and Pause all, refused with an open reservation; the screen says paused agents stay paused and points to **Resume eligible agents** | pending |
 
 #### Decisions taken
 
@@ -322,6 +324,12 @@ panel, nothing copied or loaded from it.
   session), the agent paused, and the server warned. A journal edited by hand was set aside as
   `accounting-rejected-<time>.jsonl`, real calls blocked, still blocked after a restart, unblocked by `new-period`
   (200), and recorded after the next restart. Browser check on a fresh instance passed.
+- R3-1: the restored deadline is `createdAt + DEFAULT_PROVIDER_TIMEOUT_MS + reservationTtlMs`, computed in
+  `TokenService.restore` from the journaled reservation alone. The normal timeout, not a validation timeout pinned
+  for one run, because it is the latest the call could have lasted; the journal does not record which timeout was
+  pinned. Conversion stays lazy (the first snapshot or receipts read), as for every other reservation. Tests: two
+  restarts give the same deadline; a restart at the deadline converts at once, conservatively, never released, agent
+  still paused. Mutations (restart time in place of `createdAt`, timeout dropped, TTL dropped) all killed.
 
 #### Questions for João
 

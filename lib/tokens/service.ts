@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { basename } from 'node:path';
 import { heuristicTokenCounter, type TokenCounter } from '../core/token-estimate';
 import { ProviderFailure, type ProviderAdapter, type ProviderFailureCode, type RequestOptions, type Usage } from '../providers/adapter';
-import type { ProviderProxy } from '../providers/proxy';
+import { DEFAULT_PROVIDER_TIMEOUT_MS, type ProviderProxy } from '../providers/proxy';
 import type { Dispatch } from '../providers/dispatch-ledger';
 import { ReceiptJournal, type JournalInterval, type ReceiptUsage } from './receipts';
 import { rebuildAccounting, type AccountingJournal, type JournalOpen, type JournalRecord } from './accounting-journal';
@@ -127,7 +127,8 @@ export class TokenService {
     for (const item of state.reservations) {
       const rows = [this.budgetRow('global', 'all'), this.budgetRow('agent', item.agent), this.budgetRow('model', item.model)];
       const reservation: Reservation = { ...structuredClone(item), rows };
-      if (reservation.status === 'inflight') { reservation.status = 'unverifiable'; reservation.expiresAt = this.now() + this.policy.reservationTtlMs; lost.push(item.agent); }
+      // The latest deadline it could have had without the crash, from journal data only, so repeated restarts never move it.
+      if (reservation.status === 'inflight') { reservation.status = 'unverifiable'; reservation.expiresAt = reservation.createdAt + DEFAULT_PROVIDER_TIMEOUT_MS + this.policy.reservationTtlMs; lost.push(item.agent); }
       if (reservation.status === 'unverifiable') rows.forEach(row => { row.reserved += reservation.tokens; row.costReservedUsd = money(row.costReservedUsd + reservation.costUsd); row.unverifiable++; });
       this.reservations.set(reservation.id, reservation);
     }

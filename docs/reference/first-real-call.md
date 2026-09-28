@@ -53,7 +53,8 @@ is a guard, not a proof of the invoice. If the two disagree, stop and find out w
 1. Do not retry. A restart no longer erases the record: the accounting journal brings the call back
    `unverifiable` with its agent paused, holding the same reservation. Avoid restarting anyway, because the
    session budget, the event feed and the dispatch ledger start empty and are part of the evidence. A
-   restored call's deadline counts from the restart.
+   restored call keeps the deadline it would have had without the stop: request time + provider
+   timeout + `reservationTtlMs`, however often the server restarts.
 2. Check the provider's billing for the call.
 3. Wait for `reservationTtlMs`. The reservation becomes `⚠ Expired estimate`, charged at the greater of
    the hold and the dearest model in the price table at peak with no cache hits, and stops counting as
