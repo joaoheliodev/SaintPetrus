@@ -257,7 +257,10 @@ test('F2 running one agent records the answer as that agent output; a connection
     assert.equal(response.status, 200);
     const body = await response.json();
     const outputs = new Map(graph.snapshot().agents.map(agent => [agent.id, agent.output]));
-    assert.equal(outputs.get(child), body.text); assert.match(body.text, /^MOCK:/);
+    assert.equal(outputs.get(child), body.text); assert.equal(body.text, 'MOCK answer: no model was called and nothing was billed.', 'the mock never claims a verified connection');
+    const events: string[] = []; const stop = graph.subscribe(event => { if (event.type === 'agent.output') events.push(event.message); });
+    await POST(request({ action: 'complete', input: 'Again.', agentId: child })); stop();
+    assert.deepEqual(events, ['Answer recorded.'], 'the event names no provider, which the mock is not');
     assert.equal(outputs.get('root'), '', 'only the agent that ran gets the answer');
     assert.equal((await POST(request({ action: 'complete', input: 'x'.repeat(2001), agentId: child }))).status, 409, 'input bounds still apply');
   } finally {

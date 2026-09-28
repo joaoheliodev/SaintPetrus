@@ -115,7 +115,7 @@ export class GraphService {
   recordOutput(id: string, text: string): boolean {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) return false;
-    agent.output = text.slice(0, 8000); this.emit('agent.output', 'Provider output recorded.'); return true;
+    agent.output = text.slice(0, 8000); this.emit('agent.output', 'Answer recorded.'); return true;
   }
   connect(source: string, target: string) {
     // Authoritative validation: never trust client feedback or supplied edge IDs.

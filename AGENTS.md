@@ -116,6 +116,8 @@ A graph import is untrusted input: strict schema, a size limit, unknown fields a
 
 Run once goes through the same preflight and budgets as any call and asks first, showing the maximum cost it reserves. The quote and the call share `TokenService.plan`, so the quote cannot be cheaper or more permissive than the call; keep them on one code path. Run once stays because no other action sends an agent's own message and records its output.
 
+The mock answers "MOCK answer: no model was called and nothing was billed." to Run once and to the connection test, and the `agent.output` event says "Answer recorded.": neither may claim a verified connection or a provider. Verification semantics are unchanged (`docs/reference/connection-state.md`).
+
 ## Interface vocabulary
 
 The panel, the README and the tests use these words and no synonyms:

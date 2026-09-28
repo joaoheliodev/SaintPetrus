@@ -76,6 +76,6 @@ export class MockLLMAdapter {
   readonly model = 'mock-v1';
   async complete(_input: string, signal: AbortSignal) {
     signal.throwIfAborted();
-    return { text: 'MOCK: connection verified. No external API was called.' };
+    return { text: 'MOCK answer: no model was called and nothing was billed.' };
   }
 }

@@ -242,6 +242,24 @@ panel, nothing copied or loaded from it.
   reviewer read that as a contradiction. Both are server strings: reword them (for example "MOCK answer: no provider
   was called.")?
 
+### Phase 9 — Round 3: operator decisions and server fixes (2026-09-28)
+
+| ID | Item | Acceptance criterion | Status |
+| --- | --- | --- | --- |
+| Q-U3 | Mock and answer-event texts | Mock answers "MOCK answer: no model was called and nothing was billed."; `agent.output` says "Answer recorded."; verification unchanged | done |
+| Q-U2 | Graph events say who and when | `agentId` + name (also on `agent.removed`), source/destination ids and names on connections, server `at`; strict client validation; Activity shows name and server time | pending |
+| Q-U1 | Run once sends the Objective | System instruction is the agent's Objective; quote and call share `TokenService.plan`; the connection test is unchanged | pending |
+| R-01 | Graph round trip | Credential-shaped text refused at create/edit; provider output redacted before the cut; the store never writes a document the parser would refuse | pending |
+| R-02 | Persistent accounting | Append-only journal, 0700/0600, fsync per record; rebuild at start; lost in-flight → unverifiable; corrupt journal blocks real calls | pending |
+
+#### Decisions taken
+
+- Q-U3: the demo's own scripted text ("MOCK: This fixed demonstration…") is unchanged; only the Run once / connection
+  test answer and the `agent.output` event message changed. The connection test still passes because the answer is
+  not empty.
+
+#### Questions for João
+
 ## V0 review of Part 2 (`1445177`)
 
 Checked every section of `docs/provider-validation.md` and the `STATUS.md` change against the code.

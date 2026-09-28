@@ -128,9 +128,9 @@ try {
     assert.match(answer, /^Mock answer/);
     // The message, the answer, its tokens, latency and cost sit together under the Send button.
     const exchange = await until(() => evaluate(`(() => { const box = document.querySelector('section[aria-label="Last exchange"]'); const facts = box?.querySelector('.exchange-facts')?.textContent ?? ''; return box && /\\$\\d/.test(facts) ? { message: box.querySelector('.exchange-message')?.textContent, answer: box.querySelector('.exchange-answer')?.textContent, facts } : null; })()`), 'last exchange with its cost');
-    assert.equal(exchange.message, 'Say something short.'); assert.match(exchange.answer, /^MOCK:/); assert.match(exchange.facts, /\d+ tokens.* · \d+ ms · /);
+    assert.equal(exchange.message, 'Say something short.'); assert.match(exchange.answer, /^MOCK answer:/); assert.match(exchange.facts, /\d+ tokens.* · \d+ ms · /);
     const recorded = await evaluate(`fetch('/api/graph', { cache: 'no-store' }).then(r => r.json()).then(g => g.agents.find(a => a.name === 'Renamed smoke agent')?.output ?? '')`);
-    assert.match(recorded, /^MOCK:/, 'the server recorded the answer as the agent output');
+    assert.match(recorded, /^MOCK answer:/, 'the server recorded the answer as the agent output');
     console.log(`PASS: agent ran once through the mock; the Run tab shows message, answer and "${exchange.facts}"`);
   } else {
     assert.match(answer, /No provider is connected/);
