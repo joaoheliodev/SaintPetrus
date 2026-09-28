@@ -33,8 +33,11 @@ export function relativeTime(at: number, now: number) {
 }
 
 export type ActivityLine = { key: string; title: string; detail: string; time: string; agent?: string };
-export function graphLine(event: { id: number; type: string; message: string; at?: number }, now: number): ActivityLine {
-  return { key: `graph-${event.id}`, title: graphTitle(event.type), detail: event.message, time: event.at === undefined ? '' : relativeTime(event.at, now) };
+type Party = { id: string; name: string };
+// Names and times come from the server event: who it concerned when it happened, and the server's clock.
+export function graphLine(event: { id: number; type: string; message: string; at?: number; agent?: Party; source?: Party; target?: Party }, now: number): ActivityLine {
+  const route = event.source && event.target ? `${event.source.name} → ${event.target.name} · ` : '';
+  return { key: `graph-${event.id}`, title: graphTitle(event.type), ...(event.agent ? { agent: event.agent.name } : {}), detail: `${route}${event.message}`, time: event.at === undefined ? '' : relativeTime(event.at, now) };
 }
 export function busLine(event: { id: number; type: string; role: string; payload: string; timestamp: string; source?: string; destination?: string }, now: number): ActivityLine {
   const at = Date.parse(event.timestamp);

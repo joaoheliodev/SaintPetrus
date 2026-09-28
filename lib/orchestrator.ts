@@ -7,7 +7,11 @@ export type Agent = { id: string; parentId: string | null; name: string; provide
 export type RootAgent = Agent & { id: 'root'; parentId: null; depth: 0 };
 export type Edge = { id: string; source: string; target: string; kind: 'delegation' | 'context' };
 export type Graph = { revision: number; agents: readonly [RootAgent, ...Agent[]]; edges: Edge[]; budget: ExecutionBudget; costCents: number; status: 'idle' | 'running' | 'paused' | 'completed' | 'blocked' };
-export type GraphEvent = { id: number; type: string; message: string; snapshot: Graph };
+// Who an event concerns, named as they were when it happened: a removed agent is no longer in the snapshot.
+export type EventParty = { id: string; name: string };
+// at is the server's clock, for display only; id (the revision) is the order. Stream events always carry at;
+// the client's own placeholders for a command response do not.
+export type GraphEvent = { id: number; type: string; message: string; snapshot: Graph; at?: number; agent?: EventParty; source?: EventParty; target?: EventParty };
 export type SpawnRequest = { name: string; provider: Provider; context: ContextEnvelope };
 export const DEFAULT_OBJECTIVE = 'Design a local agent orchestration workspace.';
 export const DEFAULT_BUDGET: ExecutionBudget = { maxDepth: 5, maxNodes: 12, maxCostCents: 100 };
@@ -26,8 +30,12 @@ export function isGraph(value: unknown): value is Graph {
   if (!record(value) || !integer(value.revision) || value.revision < 0 || !Array.isArray(value.agents) || value.agents.length === 0 || !isRoot(value.agents[0]) || !value.agents.every(isAgent)) return false;
   return Array.isArray(value.edges) && value.edges.every(isEdge) && isBudget(value.budget) && integer(value.costCents) && value.costCents >= 0 && ['idle', 'running', 'paused', 'completed', 'blocked'].some(status => status === value.status);
 }
+const eventKeys = ['id', 'type', 'message', 'snapshot', 'at', 'agent', 'source', 'target'];
+const isParty = (value: unknown) => value === undefined || (record(value) && Object.keys(value).every(key => key === 'id' || key === 'name') && typeof value.id === 'string' && value.id.length <= 100 && typeof value.name === 'string' && value.name.length <= 200);
+// A server stream event: every field known, the server time present, parties well formed.
 export function isGraphEvent(value: unknown): value is GraphEvent {
-  return record(value) && integer(value.id) && value.id >= 0 && typeof value.type === 'string' && typeof value.message === 'string' && isGraph(value.snapshot) && value.snapshot.revision === value.id;
+  return record(value) && Object.keys(value).every(key => eventKeys.includes(key)) && integer(value.id) && value.id >= 0 && typeof value.type === 'string' && typeof value.message === 'string'
+    && integer(value.at) && value.at >= 0 && isParty(value.agent) && isParty(value.source) && isParty(value.target) && isGraph(value.snapshot) && value.snapshot.revision === value.id;
 }
 // UX feedback only. The server independently validates every graph mutation.
 export function connectionFeedback(graph: Graph, source: string, target: string): string | null {

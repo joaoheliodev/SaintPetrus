@@ -64,13 +64,13 @@ test('graph stream is primary; stream failure polls and the revision guard rejec
   });
   try {
     source.open(); await delay(5); assert.equal(polls, 0);
-    source.emit({ id: 1, type: 'graph.updated', message: 'stream', snapshot: graphAt(1, 'stream') });
+    source.emit({ id: 1, type: 'graph.updated', message: 'stream', at: 0, snapshot: graphAt(1, 'stream') });
     assert.equal(useProjection.getState().graph.agents[0].context.objective, 'stream');
     source.fail();
     for (let i = 0; i < 20 && polls === 0; i++) await delay(1);
     assert.ok(polls > 0); assert.equal(useProjection.getState().graph.agents[0].context.objective, 'fallback');
-    source.emit({ id: 2, type: 'graph.updated', message: 'delayed', snapshot: graphAt(2, 'delayed') });
-    source.emit({ id: 3, type: 'graph.updated', message: 'equal', snapshot: graphAt(3, 'equal') });
+    source.emit({ id: 2, type: 'graph.updated', message: 'delayed', at: 0, snapshot: graphAt(2, 'delayed') });
+    source.emit({ id: 3, type: 'graph.updated', message: 'equal', at: 0, snapshot: graphAt(3, 'equal') });
     assert.equal(useProjection.getState().graph.agents[0].context.objective, 'fallback');
     source.open(); await delay(3); const afterOpen = polls; await delay(5);
     assert.equal(polls, afterOpen); assert.equal(unavailable, false);

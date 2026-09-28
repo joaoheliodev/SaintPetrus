@@ -31,7 +31,7 @@ export function graphStream(request: Request, graph: GraphService) {
       if (request.signal.aborted) abort();
       else {
         const snapshot = graph.snapshot();
-        send({ id: snapshot.revision, type: 'graph.snapshot', message: 'Current server state.', snapshot });
+        send({ id: snapshot.revision, type: 'graph.snapshot', message: 'Current server state.', snapshot, at: Date.now() });
       }
     },
     cancel() { cleanup(); },

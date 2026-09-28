@@ -33,6 +33,15 @@ Each kind of state has exactly one server owner; read
 | Preview | `lib/preview/store.ts`, `lib/preview/http.ts` | Artifact versions from model output and the isolated preview document |
 | Core | `lib/core/*` | Dependency-free token estimate, health detectors and handoff; typechecked on its own |
 
+## Graph events
+
+`GraphService` publishes one event per change on `GET /api/graph/stream`: `{ id, type, message, snapshot, at, agent?,
+source?, target? }`. `id` is the revision and the only order; `at` is the server's clock, for display only.
+`agent`, `source` and `target` are `{ id, name }` as they were when the event happened, so a removal or rename later
+does not rewrite history. The stream passes through the redactor. `isGraphEvent` in `lib/orchestrator.ts` accepts only
+these keys and requires `at`. A command response is logged as a placeholder under its revision until the stream's
+event for that revision replaces the log line; the graph itself is taken only by the revision guard.
+
 ## One call, end to end
 
 This is **Run once** in the inspector. **Connect and verify** takes the same path with a fixed probe message,

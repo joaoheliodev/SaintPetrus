@@ -21,9 +21,12 @@ export class GraphService {
   subscribe(listener: (event: GraphEvent) => void) {
     this.listeners.add(listener); return () => { this.listeners.delete(listener); };
   }
-  private emit(type: string, message: string) {
+  // parties name who the event concerns as they are now, so the name survives a later removal or rename.
+  private emit(type: string, message: string, parties: { agent?: Agent; source?: Agent; target?: Agent } = {}) {
     this.graph.revision++;
-    const event: GraphEvent = { id: this.graph.revision, type, message, snapshot: this.snapshot() };
+    const party = (agent: Agent | undefined) => agent ? { id: agent.id, name: agent.name } : undefined;
+    const event: GraphEvent = { id: this.graph.revision, type, message, snapshot: this.snapshot(), at: Date.now(),
+      ...(parties.agent ? { agent: party(parties.agent) } : {}), ...(parties.source ? { source: party(parties.source) } : {}), ...(parties.target ? { target: party(parties.target) } : {}) };
     // A transport consumer cannot mutate another consumer's event or turn a committed mutation
     // into an apparent command failure by throwing from its listener.
     for (const listener of this.listeners) {
@@ -80,7 +83,7 @@ export class GraphService {
     if (parent) this.graph.edges.push({ id: randomUUID(), source: parent.id, target: id, kind: 'delegation' });
     this.record('agent.created', id, 'Agent created.');
     if (parent) this.record('connection.created', parent.id, 'Delegation connection created.', { source: parent.id, destination: id });
-    this.emit('agent.created', 'Agent created.'); return id;
+    this.emit('agent.created', 'Agent created.', { agent, ...(parent ? { source: parent, target: agent } : {}) }); return id;
   }
   // Accounting refusals (a reservation not yet settled) are decided by the token service before this runs.
   remove(id: string) {
@@ -93,7 +96,7 @@ export class GraphService {
     const [root, ...rest] = this.graph.agents;
     this.graph.agents = [root, ...rest.filter(a => a.id !== id)];
     this.graph.edges = this.graph.edges.filter(e => e.source !== id && e.target !== id);
-    this.emit('agent.removed', 'Agent removed.');
+    this.emit('agent.removed', 'Agent removed.', { agent });
   }
   // Takes a graph already rebuilt by parseGraphDocument. Accounting refusals are decided before this runs, as for remove.
   replace(graph: Graph, reason: 'imported' | 'restored') {
@@ -109,13 +112,13 @@ export class GraphService {
     const name = changes.name.trim();
     if (!name || name.length > 70 || !changes.objective.trim() || changes.objective.length > 2000) throw new GraphError('Invalid agent request.');
     agent.name = name; agent.context = { ...agent.context, objective: changes.objective };
-    this.emit('agent.updated', 'Agent updated.');
+    this.emit('agent.updated', 'Agent updated.', { agent });
   }
   // A provider answer replaces the agent's output, bounded; a reset may already have removed the agent that asked.
   recordOutput(id: string, text: string): boolean {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) return false;
-    agent.output = text.slice(0, 8000); this.emit('agent.output', 'Answer recorded.'); return true;
+    agent.output = text.slice(0, 8000); this.emit('agent.output', 'Answer recorded.', { agent }); return true;
   }
   connect(source: string, target: string) {
     // Authoritative validation: never trust client feedback or supplied edge IDs.
@@ -131,19 +134,19 @@ export class GraphService {
     if (reaches(target)) throw new GraphError('Connection would create a cycle.');
     this.graph.edges.push({ id: randomUUID(), source, target, kind: 'context' });
     this.record('connection.created', source, 'Connection created.', { source, destination: target });
-    this.emit('edge.created', 'Connection created.');
+    this.emit('edge.created', 'Connection created.', { source: this.graph.agents.find(a => a.id === source), target: this.graph.agents.find(a => a.id === target) });
   }
   disconnect(id: string) {
     const edge = this.graph.edges.find(e => e.id === id);
     if (!edge) throw new GraphError('Connection not found.');
     this.graph.edges = this.graph.edges.filter(e => e.id !== id);
     this.record('connection.removed', edge.source, 'Connection removed.', { source: edge.source, destination: edge.target });
-    this.emit('edge.removed', 'Connection removed.');
+    this.emit('edge.removed', 'Connection removed.', { source: this.graph.agents.find(a => a.id === edge.source), target: this.graph.agents.find(a => a.id === edge.target) });
   }
   move(id: string, position: { x: number; y: number }) {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent || !Number.isFinite(position.x) || !Number.isFinite(position.y) || Math.abs(position.x) > 100000 || Math.abs(position.y) > 100000) throw new GraphError('Invalid position.');
-    agent.position = { ...position }; this.emit('agent.moved', 'Agent moved.');
+    agent.position = { ...position }; this.emit('agent.moved', 'Agent moved.', { agent });
   }
   pauseAll() { this.graph.agents.forEach(agent => this.setAgentStatus(agent.id, 'paused')); this.graph.status = 'paused'; this.emit('agents.paused', 'All agents paused by kill switch.'); }
   setRunStatus(status: Graph['status']) { this.graph.status = status; this.emit('run.updated', `Run ${status}.`); }
@@ -152,7 +155,7 @@ export class GraphService {
     if (!agent) throw new GraphError('Agent not found.');
     const from = agent.status; agent.status = status;
     if (from !== status) this.record(status === 'paused' ? 'agent.paused' : 'agent.status_changed', id, 'Agent status changed.', { status: { from, to: status } });
-    this.emit('agent.updated', 'Agent status updated.');
+    this.emit('agent.updated', 'Agent status updated.', { agent });
   }
   compareAndSetAgentStatus(id: string, expected: Agent['status'], status: Agent['status']) {
     const agent = this.graph.agents.find(a => a.id === id);
@@ -166,9 +169,9 @@ export class GraphService {
     if (!agent) throw new GraphError('Agent not found.');
     if (charge && this.graph.costCents + 1 > this.graph.budget.maxCostCents) {
       agent.status = 'blocked'; this.graph.status = 'blocked';
-      this.emit('budget.exhausted', 'Mock budget exhausted.'); return false;
+      this.emit('budget.exhausted', 'Mock budget exhausted.', { agent }); return false;
     }
     if (charge) this.graph.costCents++;
-    agent.output += character; observeArtifact(id, agent.name, agent.output); this.record('agent.message', id, agent.output); this.emit('mock.delta', 'Mock output updated.'); return true;
+    agent.output += character; observeArtifact(id, agent.name, agent.output); this.record('agent.message', id, agent.output); this.emit('mock.delta', 'Mock output updated.', { agent }); return true;
   }
 }

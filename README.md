@@ -105,7 +105,11 @@ are chosen only through the policy allowlist. Import is refused during a mock ru
 holds a reservation. A saved `graph.json` that fails the same checks at startup is renamed to
 `graph-rejected-<time>.json` and the server starts with a new graph.
 
-Snapshots arrive over a server-sent event stream, with 300 ms polling only while the stream is down.
+Snapshots arrive over a server-sent event stream (`GET /api/graph/stream`), with 300 ms polling only while the stream
+is down. Each event carries its revision (`id`, the only order), the new snapshot, the server's clock (`at`, shown in
+Activity) and who it concerns: `agent` (`id` and the name it had at that moment, so `agent.removed` still names the
+agent that left) and, for connections, `source` and `target`. The stream is redacted like every other response, names
+included, and the client refuses an event with an unknown field, no `at` or a malformed party.
 
 ## Connecting a provider
 

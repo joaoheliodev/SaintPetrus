@@ -247,7 +247,7 @@ panel, nothing copied or loaded from it.
 | ID | Item | Acceptance criterion | Status |
 | --- | --- | --- | --- |
 | Q-U3 | Mock and answer-event texts | Mock answers "MOCK answer: no model was called and nothing was billed."; `agent.output` says "Answer recorded."; verification unchanged | done |
-| Q-U2 | Graph events say who and when | `agentId` + name (also on `agent.removed`), source/destination ids and names on connections, server `at`; strict client validation; Activity shows name and server time | pending |
+| Q-U2 | Graph events say who and when | `agentId` + name (also on `agent.removed`), source/destination ids and names on connections, server `at`; strict client validation; Activity shows name and server time | done |
 | Q-U1 | Run once sends the Objective | System instruction is the agent's Objective; quote and call share `TokenService.plan`; the connection test is unchanged | pending |
 | R-01 | Graph round trip | Credential-shaped text refused at create/edit; provider output redacted before the cut; the store never writes a document the parser would refuse | pending |
 | R-02 | Persistent accounting | Append-only journal, 0700/0600, fsync per record; rebuild at start; lost in-flight → unverifiable; corrupt journal blocks real calls | pending |
@@ -257,6 +257,12 @@ panel, nothing copied or loaded from it.
 - Q-U3: the demo's own scripted text ("MOCK: This fixed demonstration…") is unchanged; only the Run once / connection
   test answer and the `agent.output` event message changed. The connection test still passes because the answer is
   not empty.
+- Q-U2: parties are `{ id, name }` objects (`agent`, `source`, `target`) rather than flat `agentId`/`agentName` fields,
+  built from the live agent at emit time. A subagent's `agent.created` carries its parent as `source`. `at` is
+  optional in the type because the client's own command placeholders have no server time, but `isGraphEvent`
+  requires it on every stream event. When the stream's event for a revision arrives after the command response,
+  it replaces the placeholder's log line (so your own changes are named too); the graph is still taken only by the
+  revision guard, and older events are still ignored. Activity time is now the server's clock, not the receive time.
 
 #### Questions for João
 

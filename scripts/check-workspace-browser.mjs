@@ -159,6 +159,8 @@ try {
   // Activity names each action for a person; the arrow-key and drag moves above are hidden until asked for.
   await until(() => click('Activity'), 'Activity view');
   await until(() => evaluate(`document.querySelector('.activity-view .activity-lines')?.textContent.includes('Agent created')`), 'activity lines');
+  // Server events name the agent, even for your own changes, and carry the server's time.
+  await until(() => evaluate(`(t => t.includes('Renamed smoke agent · Agent updated') && t.includes('Smoke agent · Agent created'))(document.querySelector('.activity-view .activity-lines').textContent)`), 'activity names the agent');
   assert.equal(await evaluate(`document.querySelector('.activity-view .activity-lines').textContent.includes('Card moved')`), false, 'card moves hidden by default');
   await evaluate(`document.querySelector('.activity-view .activity-bar input').click()`);
   await until(() => evaluate(`document.querySelector('.activity-view .activity-lines').textContent.includes('Card moved')`), 'card moves shown on request');
