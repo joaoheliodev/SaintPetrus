@@ -230,6 +230,13 @@ panel, nothing copied or loaded from it.
 
 #### Questions for João
 
+- R-02: a call lost to a crash gets its unverifiable deadline from the restart time (restart + `reservationTtlMs`),
+  not from when it was sent. Expiry converts it at the conservative price either way, so this only decides how long
+  the agent waits before the estimate appears. Keep it, or count from the original request time?
+- R-02: "Start a new budget period" zeroes consumption in the global, agent and model scopes and keeps limits,
+  pauses and the kill switch; it is refused while any reservation is open. Is that the period you want, or should it
+  also clear pauses?
+
 - **Q-U1** Run once sends the agent's "Instruction" (`context.summary`), a fixed text such as "Manually configured
   agent. No provider connected." It says "No provider connected" even when one is. Changing it changes what is
   sent to the provider, so it is out of this round: the Details tab now shows it verbatim under "Instruction sent
@@ -250,7 +257,7 @@ panel, nothing copied or loaded from it.
 | Q-U2 | Graph events say who and when | `agentId` + name (also on `agent.removed`), source/destination ids and names on connections, server `at`; strict client validation; Activity shows name and server time | done |
 | Q-U1 | Run once sends the Objective | System instruction is the agent's Objective; quote and call share `TokenService.plan`; the connection test is unchanged | done |
 | R-01 | Graph round trip | Credential-shaped text refused at create/edit; provider output redacted before the cut; the store never writes a document the parser would refuse | done |
-| R-02 | Persistent accounting | Append-only journal, 0700/0600, fsync per record; rebuild at start; lost in-flight → unverifiable; corrupt journal blocks real calls | pending |
+| R-02 | Persistent accounting | Append-only journal, 0700/0600, fsync per record; rebuild at start; lost in-flight → unverifiable; corrupt journal blocks real calls | in progress (R-02a journal file, R-02b service rebuild done) |
 
 #### Decisions taken
 
@@ -278,6 +285,24 @@ panel, nothing copied or loaded from it.
   the graph now use a key registered afterwards. The refusal message avoids the word "Bearer" followed by text, which the
   response redactor would otherwise have cut. Real restart (SIGINT, same data directory): the refused add answered
   400 with the full message, the graph with its Run once output came back, nothing was set aside.
+- R-02a: `lib/tokens/accounting-journal.ts` appends one JSON line per record (`state`, `receipt`, `period`) with an
+  fsync, 0700/0600, in the user data directory (`accounting.jsonl`). `lib/tokens/accounting-state.ts` defines the durable
+  state strictly (exact key sets; IDs, counts, amounts, price versions, verdicts and times only). A final line without
+  its newline was being written when the process stopped; nothing acts before a record is synced, so it is cut, and only
+  those bytes. Any other unreadable content moves the whole file aside as `accounting-rejected-<time>.jsonl`. The fsync
+  itself has no killing test (a missing fsync is invisible without a power cut).
+- R-02b: `TokenService` checkpoints its durable state (global, agent and model rows; reservations with captured price
+  versions; pauses; kill switch; agent models; reservation sequence) after every change, skipping identical
+  checkpoints, and journals every non-mock receipt. A keyed call's reservation is on disk before any provider I/O; if
+  that write fails the hold is released, the call refused before I/O, and real calls blocked. The mock's usage and cost
+  are kept apart (the mock has its own counters; its cost in a private map) and never reach the journal; its receipts
+  are not journaled either, so receipt numbering after a restart continues from the last journaled receipt. The session
+  row is never journaled. Only limits changed in Budgets are journaled (untouched ones keep following the policy file).
+  Rebuild folds the records in order: `state` replaces, `period/operator` zeroes counters (limits, pauses and kill
+  switch carry over), `period/journal_unreadable` empties and blocks until the next `operator` period. A reservation
+  still `inflight` returns `unverifiable`, attached to the global, agent and model rows (not the new session), with the
+  agent paused and a new deadline of restart time + `reservationTtlMs`; expiry then converts it conservatively, never
+  releases it. A new budget period is refused while any reservation (inflight, unverifiable or estimated) is open.
 
 #### Questions for João
 

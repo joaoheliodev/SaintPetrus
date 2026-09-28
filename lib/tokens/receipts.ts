@@ -25,6 +25,11 @@ export class ReceiptJournal {
     this.entries = [receipt, ...this.entries].slice(0, this.capacity);
     return structuredClone(receipt);
   }
+  // Rebuilds from journaled receipts in the order they were written; numbering continues after the highest one kept.
+  restore(receipts: readonly Receipt[]) {
+    this.entries = structuredClone(receipts.slice(-this.capacity)).reverse();
+    this.sequence = Math.max(this.sequence, ...receipts.map(receipt => receipt.id));
+  }
   snapshot() {
     return { capacity: this.capacity, total: this.sequence, evicted: this.sequence - this.entries.length, receipts: structuredClone(this.entries) };
   }

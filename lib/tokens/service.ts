@@ -1,11 +1,14 @@
 import { observeArtifact, previewEnabled } from '../preview/store';
 import { eventBus } from '../events/bus';
 import { createHash, randomUUID } from 'node:crypto';
+import { basename } from 'node:path';
 import { heuristicTokenCounter, type TokenCounter } from '../core/token-estimate';
 import { ProviderFailure, type ProviderAdapter, type ProviderFailureCode, type RequestOptions, type Usage } from '../providers/adapter';
 import type { ProviderProxy } from '../providers/proxy';
 import type { Dispatch } from '../providers/dispatch-ledger';
-import { ReceiptJournal, type JournalInterval, type ReceiptUsage } from './receipts';
+import { ReceiptJournal, type JournalInterval, type Receipt, type ReceiptUsage } from './receipts';
+import type { AccountingJournal, JournalRecord } from './accounting-journal';
+import { startPeriod, type DurableRow, type DurableState } from './accounting-state';
 import { redactText } from '../security/redact';
 import { reproducible, validateConfig, validCostLimit, validLimit, type TokenPolicy, type Prices } from './config';
 import { intervalTouchesPeak, preflightCostUsd, reconciledCostUsd, worstCasePeakCostUsd } from './pricing';
@@ -23,6 +26,10 @@ export type BillingVerdict = 'unbilled' | 'billed' | 'unverifiable';
 type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costAccountedUsd: number; costUnmeasuredUsd: number; saved: number; unverifiable: number };
 type Reservation = { id: string; agent: string; model: string; provider: ProviderAdapter['id']; priceVersionId: string; priceVersions: ReturnType<PriceCatalog['capture']>; billingModel?: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[]; reported?: { prompt: number; completion: number; reasoning?: number } };
 type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => string[]; role?: (id: string) => string };
+type JournalWriter = { append(entry: JournalRecord): void };
+// memory: nothing is journaled (tests, tools). recorded: every durable change is on disk. blocked: the journal could not be
+// read or written, so real calls wait for the operator to start a new budget period; the mock still runs.
+export type AccountingStatus = { journal: 'memory' | 'recorded' | 'blocked'; reason?: 'journal_unreadable' | 'journal_write_failed'; rejectedAs?: string; recoveredReservations?: number };
 // disabled, invalid_model_format and model_not_allowlisted are local refusals that bill nothing, yet stay unverifiable: a test
 // proves none can fire with a live reservation, and unbilled would silently free a hold if one ever fired after provider contact.
 const failureVerdicts = {
@@ -42,6 +49,14 @@ export class TokenService {
   private reservations = new Map<string, Reservation>();
   private reservationSequence = 0;
   private receipts = new ReceiptJournal();
+  private journal?: JournalWriter;
+  private written = '';
+  private accounting: AccountingStatus = { journal: 'memory' };
+  // Only limits changed in Budgets are journaled; the others keep following the policy file.
+  private limitOverrides = new Set<string>();
+  private costLimitOverrides = new Set<string>();
+  // The mock's price is fictitious and its usage lives only as long as the process: kept apart so it never reaches the journal.
+  private mockCost = new WeakMap<Row, number>();
   constructor(readonly policy: TokenPolicy, readonly prices: Prices, private readonly hooks: Hooks, private readonly counter: TokenCounter = heuristicTokenCounter, private readonly now = Date.now, catalog?: PriceCatalog) {
     validateConfig(policy, prices); this.catalog = catalog ?? new PriceCatalog(prices, undefined, now);
   }
@@ -50,13 +65,98 @@ export class TokenService {
     if (!row) { row = { scope, id, limit, used: 0, reserved: 0, estimated: 0, conservativeCachedInput: 0, actual: zero(), mock: zero(), costLimitUsd, costReservedUsd: 0, costAccountedUsd: 0, costUnmeasuredUsd: 0, saved: 0, unverifiable: 0 }; this.rows.set(key, row); }
     return row;
   }
-  private scopes(agent: string, model: string) { return [this.row('global', 'all', this.policy.global, this.policy.costLimitsUsd.global), this.row('agent', agent, this.policy.perAgent, this.policy.costLimitsUsd.perAgent), this.row('model', model, this.policy.perModel, this.policy.costLimitsUsd.perModel), this.row('session', this.sessionId, this.policy.perSession, this.policy.costLimitsUsd.perSession)]; }
+  private budgetRow(scope: Scope, id: string) {
+    const defaults = { global: [this.policy.global, this.policy.costLimitsUsd.global], agent: [this.policy.perAgent, this.policy.costLimitsUsd.perAgent], model: [this.policy.perModel, this.policy.costLimitsUsd.perModel], session: [this.policy.perSession, this.policy.costLimitsUsd.perSession] } satisfies Record<Scope, [number, number]>;
+    return this.row(scope, id, ...defaults[scope]);
+  }
+  private scopes(agent: string, model: string) { return [this.budgetRow('global', 'all'), this.budgetRow('agent', agent), this.budgetRow('model', model), this.budgetRow('session', this.sessionId)]; }
   private blocked(row: Row) { return row.used + row.reserved >= row.limit || row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd; }
   private warning(row: Row) { return row.used + row.reserved >= row.limit * .8 || row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd * .8; }
   // A reset can drop the agent from the graph mid-call; a failing projection hook must not undo settled accounting.
-  private pause(id: string) { this.paused.add(id); try { this.hooks.pause(id); } catch { /* The recorded pause still applies. */ } }
+  private pause(id: string) { this.paused.add(id); try { this.hooks.pause(id); } catch { /* The recorded pause still applies. */ } this.persist(); }
+  private durableState(): DurableState {
+    const rows: DurableRow[] = [];
+    for (const [key, row] of this.rows) {
+      if (row.scope === 'session') continue;
+      rows.push({ scope: row.scope, id: row.id, ...(this.limitOverrides.has(key) ? { limit: row.limit } : {}), ...(this.costLimitOverrides.has(key) ? { costLimitUsd: row.costLimitUsd } : {}),
+        used: row.used - row.mock.total, estimated: row.estimated, conservativeCachedInput: row.conservativeCachedInput, actual: { ...row.actual }, costAccountedUsd: money(row.costAccountedUsd - (this.mockCost.get(row) ?? 0)), costUnmeasuredUsd: row.costUnmeasuredUsd });
+    }
+    const reservations = [...this.reservations.values()].filter(item => item.provider !== 'mock').map(item => ({ id: item.id, agent: item.agent, model: item.model, provider: item.provider, priceVersionId: item.priceVersionId, priceVersions: structuredClone(item.priceVersions),
+      ...(item.billingModel ? { billingModel: item.billingModel } : {}), tokens: item.tokens, costUsd: item.costUsd, inputTokens: item.inputTokens, maxOutputTokens: item.maxOutputTokens, createdAt: item.createdAt, expiresAt: item.expiresAt, status: item.status, ...(item.reported ? { reported: { ...item.reported } } : {}) }));
+    return { rows, reservations, paused: [...this.paused], stopped: this.stopped, agentModels: Object.fromEntries([...this.agentModels].map(([agent, models]) => [agent, [...models]])), reservationSequence: this.reservationSequence };
+  }
+  private writeFailed() { this.accounting = { ...this.accounting, journal: 'blocked', reason: 'journal_write_failed' }; }
+  // Appends a checkpoint when the durable state changed. A failed write blocks real calls: from then on the file lags memory.
+  private persist() {
+    if (!this.journal) return true;
+    const state = this.durableState(); const text = JSON.stringify(state);
+    if (text === this.written) return true;
+    try { this.journal.append({ v: 1, kind: 'state', at: this.now(), state }); this.written = text; return true; }
+    catch { this.writeFailed(); return false; }
+  }
+  private receipt(draft: Parameters<ReceiptJournal['append']>[0]) {
+    const receipt = this.receipts.append(draft);
+    if (!this.journal || receipt.provider === 'mock') return;
+    try { this.journal.append({ v: 1, kind: 'receipt', at: this.now(), receipt }); } catch { this.writeFailed(); }
+  }
+  // Rebuilds what the journal holds and journals from then on. A reservation still in flight when the process stopped may
+  // have been served and billed: it returns unverifiable, with its agent paused, and is never released.
+  restore(journal: AccountingJournal) {
+    const opened = journal.open(new Date(this.now()));
+    let state: DurableState | undefined; let blocked = opened.rejectedAs !== undefined; const receipts: Receipt[] = [];
+    for (const entry of opened.records) {
+      if (entry.kind === 'state') state = entry.state;
+      else if (entry.kind === 'receipt') receipts.push(entry.receipt);
+      else if (entry.reason === 'operator') { blocked = false; if (state) state = startPeriod(state); }
+      else { blocked = true; state = undefined; }
+    }
+    this.accounting = blocked ? { journal: 'blocked', reason: 'journal_unreadable', ...(opened.rejectedAs ? { rejectedAs: basename(opened.rejectedAs) } : {}) } : { journal: 'recorded' };
+    if (opened.rejectedAs) try { journal.append({ v: 1, kind: 'period', at: this.now(), reason: 'journal_unreadable' }); } catch { this.writeFailed(); }
+    this.receipts.restore(receipts);
+    // Attached only once rebuilt, so no partial state is ever checkpointed on the way.
+    if (!state) { this.journal = journal; return this.accounting; }
+    for (const item of state.rows) {
+      const row = this.budgetRow(item.scope, item.id); const key = JSON.stringify([item.scope, item.id]);
+      if (item.limit !== undefined) { row.limit = item.limit; this.limitOverrides.add(key); }
+      if (item.costLimitUsd !== undefined) { row.costLimitUsd = item.costLimitUsd; this.costLimitOverrides.add(key); }
+      Object.assign(row, { used: item.used, estimated: item.estimated, conservativeCachedInput: item.conservativeCachedInput, actual: { ...item.actual }, costAccountedUsd: item.costAccountedUsd, costUnmeasuredUsd: item.costUnmeasuredUsd });
+    }
+    this.stopped = state.stopped; this.reservationSequence = state.reservationSequence;
+    for (const [agent, models] of Object.entries(state.agentModels)) this.agentModels.set(agent, new Set(models));
+    for (const id of state.paused) this.pause(id);
+    const lost: string[] = [];
+    for (const item of state.reservations) {
+      const rows = [this.budgetRow('global', 'all'), this.budgetRow('agent', item.agent), this.budgetRow('model', item.model)];
+      const reservation: Reservation = { ...structuredClone(item), rows };
+      if (reservation.status === 'inflight') { reservation.status = 'unverifiable'; reservation.expiresAt = this.now() + this.policy.reservationTtlMs; lost.push(item.agent); }
+      if (reservation.status === 'unverifiable') rows.forEach(row => { row.reserved += reservation.tokens; row.costReservedUsd = money(row.costReservedUsd + reservation.costUsd); row.unverifiable++; });
+      this.reservations.set(reservation.id, reservation);
+    }
+    this.written = JSON.stringify(state);
+    if (lost.length) this.accounting = { ...this.accounting, recoveredReservations: lost.length };
+    lost.forEach(agent => this.pause(agent));
+    this.journal = journal; this.persist();
+    return this.accounting;
+  }
+  accountingStatus() { return { ...this.accounting }; }
+  // The operator's manual action after checking the invoice: counters restart, history stays in the journal.
+  startBudgetPeriod() {
+    this.expireReservations();
+    if (this.reservations.size) throw new TokenFailure('Reconcile or wait for every open reservation before starting a new budget period.');
+    if (this.journal) {
+      try { this.journal.append({ v: 1, kind: 'period', at: this.now(), reason: 'operator' }); }
+      catch { this.writeFailed(); throw new TokenFailure('The accounting journal could not be written; the budget period was not changed.'); }
+    }
+    for (const row of this.rows.values()) {
+      if (row.scope === 'session') continue;
+      Object.assign(row, { used: row.mock.total, estimated: 0, conservativeCachedInput: 0, actual: { prompt: 0, completion: 0, total: 0 }, costAccountedUsd: this.mockCost.get(row) ?? 0, costUnmeasuredUsd: 0 });
+    }
+    this.accounting = { journal: this.journal ? 'recorded' : 'memory' };
+    this.written = ''; this.persist();
+    return this.accountingStatus();
+  }
   private expireReservations() {
-    const now = this.now();
+    const now = this.now(); let converted = false;
     for (const reservation of this.reservations.values()) {
       if (reservation.status !== 'unverifiable' || reservation.expiresAt === null || reservation.expiresAt > now) continue;
       // Convert at the dearer of what was held and what the dearest eligible model would have cost:
@@ -80,14 +180,15 @@ export class TokenService {
         row.costUnmeasuredUsd = money(row.costUnmeasuredUsd + conservative);
         row.unverifiable--;
       }
-      this.receipts.append({ kind: 'expiry', at: now, agent: reservation.agent, provider: reservation.provider, requestedModel: reservation.model, servedModel: reservation.billingModel ?? null, reservationId: reservation.id, tokens, heldCostUsd: reservation.costUsd, costUsd: conservative });
+      this.receipt({ kind: 'expiry', at: now, agent: reservation.agent, provider: reservation.provider, requestedModel: reservation.model, servedModel: reservation.billingModel ?? null, reservationId: reservation.id, tokens, heldCostUsd: reservation.costUsd, costUsd: conservative });
       // The converted figure replaces the held one so a later manual reconciliation subtracts what
       // was actually charged to the budget, not the understated reservation.
       reservation.costUsd = conservative; reservation.tokens = tokens;
-      reservation.status = 'estimated';
+      reservation.status = 'estimated'; converted = true;
     }
+    if (converted) this.persist();
   }
-  kill() { this.stopped = true; this.hooks.ids().forEach(id => this.paused.add(id)); this.hooks.pauseAll(); }
+  kill() { this.stopped = true; this.hooks.ids().forEach(id => this.paused.add(id)); this.hooks.pauseAll(); this.persist(); }
   isStopped() { return this.stopped; }
   // A call in flight, unverifiable usage or an estimate awaiting reconciliation still belongs to this agent.
   holdsReservation(agent: string) { this.expireReservations(); return [...this.reservations.values()].some(item => item.agent === agent); }
@@ -103,6 +204,7 @@ export class TokenService {
       const blocked = [...this.rows.values()].some(row => (row.scope === 'global' || row.scope === 'session' || (row.scope === 'agent' && row.id === id) || (row.scope === 'model' && this.agentModels.get(id)?.has(row.id))) && this.blocked(row));
       if (!blocked && this.paused.delete(id)) resumed.push(id);
     }
+    this.persist();
     return resumed;
   }
   reconcileReservation(id: string, prompt: unknown, completion: unknown, costUsd: unknown) {
@@ -122,7 +224,8 @@ export class TokenService {
       row.actual.prompt += prompt; row.actual.completion += completion; row.actual.total += total;
     }
     this.reservations.delete(id);
-    this.receipts.append({ kind: 'manual', at: this.now(), agent: reservation.agent, provider: reservation.provider, requestedModel: reservation.model, servedModel: reservation.billingModel ?? null, reservationId: id, usage: { prompt, completion, total }, replacedCostUsd: reservation.costUsd, costUsd, journal });
+    this.persist();
+    this.receipt({ kind: 'manual', at: this.now(), agent: reservation.agent, provider: reservation.provider, requestedModel: reservation.model, servedModel: reservation.billingModel ?? null, reservationId: id, usage: { prompt, completion, total }, replacedCostUsd: reservation.costUsd, costUsd, journal });
     if (reservation.rows.some(row => this.blocked(row))) this.pause(reservation.agent);
   }
   receiptSnapshot() { this.expireReservations(); return this.receipts.snapshot(); }
@@ -133,12 +236,14 @@ export class TokenService {
     if (!this.validScopeId(scope, id)) throw new TokenFailure('Unknown budget scope.');
     const defaults = { global: this.policy.costLimitsUsd.global, agent: this.policy.costLimitsUsd.perAgent, model: this.policy.costLimitsUsd.perModel, session: this.policy.costLimitsUsd.perSession };
     this.row(scope, id, limit, defaults[scope]).limit = limit;
+    if (scope !== 'session') { this.limitOverrides.add(JSON.stringify([scope, id])); this.persist(); }
   }
   setCostLimit(scope: string, id: string, limit: unknown) {
     if (!validCostLimit(limit) || !this.validScope(scope)) throw new TokenFailure('Invalid cost limit.');
     if (!this.validScopeId(scope, id)) throw new TokenFailure('Unknown budget scope.');
     const defaults = { global: this.policy.global, agent: this.policy.perAgent, model: this.policy.perModel, session: this.policy.perSession };
     this.row(scope, id, defaults[scope], limit).costLimitUsd = limit;
+    if (scope !== 'session') { this.costLimitOverrides.add(JSON.stringify([scope, id])); this.persist(); }
   }
   snapshot() {
     this.expireReservations();
@@ -162,6 +267,7 @@ export class TokenService {
     const model = Object.hasOwn(this.policy.models, adapter.model) ? this.policy.models[adapter.model] : undefined;
     if (!model || model.provider !== adapter.id) fail('Model not allowlisted. Edit local token policy and prices.', false);
     if (typeof input !== 'string' || !input.trim() || input.length > 2000) fail('Invalid input.', false);
+    if (adapter.id !== 'mock' && this.accounting.journal === 'blocked') fail(this.accounting.reason === 'journal_write_failed' ? 'The accounting journal could not be written. Real calls are blocked until you start a new budget period in Budgets.' : 'The accounting journal could not be read and was set aside. Check the provider invoice, then start a new budget period in Budgets; real calls are blocked until then.', false);
     if (this.stopped || this.paused.has(agent)) fail('Agent paused.', true);
     const createdAt = this.now();
     const priceVersions = this.catalog.capture(createdAt);
@@ -197,13 +303,19 @@ export class TokenService {
     const { options, hash, inputEstimate, reservedCostUsd, reservedTokens, reusable, cached, rows, createdAt, priceVersions, selectedPrice } = this.plan(adapter, input, agent, systemPrompt, messages, verification, (message, pause) => { if (pause) this.pause(agent); return this.refuse(agent, message); }, true);
     if (cached) {
       rows.forEach(row => { row.saved += cached.usage.total; });
-      this.receipts.append({ kind: 'cache', at: this.now(), agent, provider: adapter.id, requestedModel: adapter.model, servedModel: cached.billingModel, savedTokens: cached.usage.total });
+      this.receipt({ kind: 'cache', at: this.now(), agent, provider: adapter.id, requestedModel: adapter.model, servedModel: cached.billingModel, savedTokens: cached.usage.total });
       return { provider: adapter.id, model: adapter.model, billingModel: cached.billingModel, mocked: adapter.id === 'mock', text: redactText(cached.text), latencyMs: 0, cached: true, usage: cached.usage, approximate: cached.approximate };
     }
     // Synchronous reservation across all four scopes happens before any provider I/O.
     rows.forEach(row => { row.reserved += reservedTokens; row.costReservedUsd = money(row.costReservedUsd + reservedCostUsd); });
     const reservation: Reservation = { id: `reservation-${++this.reservationSequence}`, agent, model: adapter.model, provider: adapter.id, priceVersionId: selectedPrice.id, priceVersions, tokens: reservedTokens, costUsd: reservedCostUsd, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, createdAt, expiresAt: null, status: 'inflight', rows };
     this.reservations.set(reservation.id, reservation);
+    // On disk before any provider I/O: a crash from here on rebuilds this reservation as unverifiable.
+    if (!this.persist() && adapter.id !== 'mock') {
+      rows.forEach(row => { row.reserved -= reservedTokens; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); });
+      this.reservations.delete(reservation.id);
+      this.refuse(agent, 'The accounting journal could not be written. Real calls are blocked until you start a new budget period in Budgets.');
+    }
     if (previewEnabled()) options.onText = text => observeArtifact(agent, this.hooks.role?.(agent) ?? agent, text);
     let verdict: BillingVerdict = 'unverifiable';
     let outcome = 'completed'; let dispatch: Dispatch | undefined; let reportedUsage: ReceiptUsage | undefined;
@@ -240,6 +352,7 @@ export class TokenService {
       for (const row of rows) {
         row.reserved -= reservedTokens; row.used += usage.total; row.costReservedUsd = money(row.costReservedUsd - reservedCostUsd); row.costAccountedUsd = money(row.costAccountedUsd + actualCostUsd);
         const totals = approximate ? row.mock : row.actual;
+        if (approximate) this.mockCost.set(row, money((this.mockCost.get(row) ?? 0) + actualCostUsd));
         totals.prompt += usage.prompt; totals.completion += usage.completion; totals.total += usage.total;
         row.conservativeCachedInput += usage.cachedPromptFullRate ?? 0;
       }
@@ -278,7 +391,8 @@ export class TokenService {
           this.pause(agent);
         }
       }
-      this.receipts.append({ kind: 'call', at: this.now(), agent, provider: adapter.id, requestedModel: adapter.model, servedModel: reservation.billingModel ?? null, reservationId: reservation.id, verdict, outcome, mocked: adapter.id === 'mock',
+      this.persist();
+      this.receipt({ kind: 'call', at: this.now(), agent, provider: adapter.id, requestedModel: adapter.model, servedModel: reservation.billingModel ?? null, reservationId: reservation.id, verdict, outcome, mocked: adapter.id === 'mock',
         requestedAt: createdAt, priceVersionId: selectedPrice.id, servedPriceVersionId: priced?.servedPriceVersionId ?? null, dispatch: dispatch ? { sequence: dispatch.sequence, at: dispatch.at } : null,
         reserved: { tokens: reservedTokens, inputTokens: inputEstimate, maxOutputTokens: options.maxTokens, costUsd: reservedCostUsd }, reportedUsage: reportedUsage ?? null, band: priced?.band ?? null, costUsd: priced?.costUsd ?? null, journal: priced?.journal ?? null });
     }

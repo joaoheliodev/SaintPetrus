@@ -44,3 +44,8 @@ export function validDurableState(value: unknown): value is DurableState {
     && record(value.agentModels) && Object.entries(value.agentModels).every(([agent, models]) => id(agent) && Array.isArray(models) && models.every(id))
     && time(value.reservationSequence);
 }
+// A new budget period starts every durable counter from zero. Limits the operator set, pauses and the kill switch carry over;
+// the journal keeps everything written before, and the caller refuses the change while any reservation is unresolved.
+export function startPeriod(state: DurableState): DurableState {
+  return { ...structuredClone(state), rows: state.rows.map(row => ({ scope: row.scope, id: row.id, ...(row.limit === undefined ? {} : { limit: row.limit }), ...(row.costLimitUsd === undefined ? {} : { costLimitUsd: row.costLimitUsd }), used: 0, estimated: 0, conservativeCachedInput: 0, actual: { prompt: 0, completion: 0, total: 0 }, costAccountedUsd: 0, costUnmeasuredUsd: 0 })) };
+}
