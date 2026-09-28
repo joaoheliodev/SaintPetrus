@@ -26,10 +26,13 @@ export async function POST(request: Request) {
     const agent = input.agentId === undefined ? graph.agents[0] : graph.agents.find(a => a.id === input.agentId);
     if (!agent) throw new ProviderFailure('invalid_request');
     // What Run once would reserve, from the same checks as the call itself; nothing is reserved and nothing leaves.
-    if (input.action === 'quote') return safeJson({ quote: tokenService().quote(configuredAdapter(), input.input, agent.id, agent.context.summary) });
+    // Run once sends the agent's objective as its instruction (operator decision Q-U1); the connection test keeps the
+    // first agent's summary, as docs/reference/first-real-call.md describes. The quote uses what the call will send.
+    const instruction = input.action === 'test' ? agent.context.summary : agent.context.objective;
+    if (input.action === 'quote') return safeJson({ quote: tokenService().quote(configuredAdapter(), input.input, agent.id, instruction) });
     // The verdict belongs to the key and pair this call uses; a change while it runs makes it stale.
     generation = verificationGeneration();
-    const result = await tokenService().execute(providerProxy(), configuredAdapter(), input.action === 'test' ? 'Reply OK.' : input.input, request.signal, agent.id, agent.context.summary, undefined, input.action === 'test');
+    const result = await tokenService().execute(providerProxy(), configuredAdapter(), input.action === 'test' ? 'Reply OK.' : input.input, request.signal, agent.id, instruction, undefined, input.action === 'test');
     if ('outcome' in result && result.outcome === 'output_limit') {
       if (input.action === 'test') recordVerification(false, 'output_limit', generation);
       return safeJson({ ...result, error: 'output_limit', status: providerStatus() }, 422);

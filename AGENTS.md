@@ -32,7 +32,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 467 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 468 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -117,6 +117,8 @@ A graph import is untrusted input: strict schema, a size limit, unknown fields a
 Run once goes through the same preflight and budgets as any call and asks first, showing the maximum cost it reserves. The quote and the call share `TokenService.plan`, so the quote cannot be cheaper or more permissive than the call; keep them on one code path. Run once stays because no other action sends an agent's own message and records its output.
 
 The mock answers "MOCK answer: no model was called and nothing was billed." to Run once and to the connection test, and the `agent.output` event says "Answer recorded.": neither may claim a verified connection or a provider. Verification semantics are unchanged (`docs/reference/connection-state.md`).
+
+Run once sends the agent's objective, unchanged, as the system instruction, with the user's message; the quote uses the same instruction through `TokenService.plan`. There is no separate instruction field. The connection test keeps `Reply OK.` with the first agent's summary, as `docs/reference/first-real-call.md` describes. `max_tokens` and the budgets in `config/` are the operator's.
 
 Graph events name who they concern, as named at that moment (`agent`, or `source` and `target` for connections, each `{ id, name }`), so `agent.removed` still names the agent that left, and every stream event carries the server's clock `at`. The revision stays the only order; `at` is for display. `isGraphEvent` refuses unknown keys, a missing `at` or a malformed party.
 

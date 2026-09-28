@@ -53,7 +53,9 @@ reasoning turned off where the provider allows it, and no response cache.
    answers exactly as the call would. The inspector shows that maximum in a confirmation, and only after it is
    accepted posts `{ action: 'complete', input, agentId }`. Neither body ever carries a key, a model or a URL.
 2. **Local boundary.** The route checks Host, the exact page Origin and the JSON content type, reads a
-   bounded body and refuses unknown fields. The agent must exist in the graph.
+   bounded body and refuses unknown fields. The agent must exist in the graph. The instruction (system prompt) is
+   the agent's objective, unchanged, for both the quote and the call; the connection test instead sends `Reply OK.`
+   with the first agent's summary.
 3. **Admission.** `TokenService.execute` expires overdue reservations, then refuses before any I/O when the
    selected model is not allowlisted for its provider, the input is empty or too long, the agent or the whole
    service is paused, or no effective price exists.

@@ -79,8 +79,8 @@ meter (the fullest of the global and session budgets; click it to open **Budgets
    call would reserve, through the same preflight and budgets as the call itself, and the confirmation shows that
    maximum in tokens and dollars; nothing is reserved or sent until you accept. Your message, the answer, its
    tokens, latency and the cost the server accounted appear right under the button. With the mock it is free.
-6. **Details** (second tab): edit the name and objective (the objective is shown on the card and is **not** sent
-   to the model), read the exact instruction Run once sends, connect to another agent, and **Remove agent** in the
+6. **Details** (second tab): edit the name and objective (the objective is sent, unchanged, as the instruction with
+   every Run once, together with your message), connect to another agent, and **Remove agent** in the
    Danger zone. Removal is refused for the Coordinator, for an agent with subagents, while the demo runs, and while
    the agent has a call in flight or usage that is unverifiable or awaiting reconciliation. Its accounting rows
    stay in **Budgets**, marked as a removed agent.

@@ -98,7 +98,8 @@ explicit `A`, use the supported `agentId` field on the same local route.
 For call `i`, let `I_i` be the core heuristic count of the **sanitized serialized**
 `{systemPrompt, messages}` constructed by `TokenService.execute`, and `O_i` the
 policy maximum output. For a probe, messages contains one user `Reply OK.` and
-systemPrompt is the chosen agent's context summary. Use
+systemPrompt is the first agent's context summary. For Run once, messages contains the user's message and
+systemPrompt is that agent's objective, unchanged, so a longer objective raises `I_i`. Use
 `heuristicTokenCounter.count(JSON.stringify({systemPrompt, messages}))` from
 `lib/core/token-estimate.ts` offline on non-secret context to reproduce the hold.
 The response's `preflight.tokens` counts only the input string and is **not** `I_i`.

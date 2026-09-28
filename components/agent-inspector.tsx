@@ -89,7 +89,7 @@ export function AgentInspector({ agent, agents, pending, command, connect, conne
             <p className="exchange-facts">{facts.join(' · ')}</p>
           </section> : agent.output ? <section className="exchange" aria-label="Recorded output"><p className="exchange-label">Last recorded output</p><pre className="exchange-answer">{agent.output}</pre></section>
             : <p className="helper">No message sent from this panel yet. The answer, its tokens, latency and cost appear here.</p>}
-          <p className="helper">Run once sends your message with this agent&apos;s instruction (see Details). It asks first, showing the most the call can reserve. The mock is free; a real provider can charge for it.</p>
+          <p className="helper">Run once sends your message with this agent&apos;s objective as the instruction (see Details). It asks first, showing the most the call can reserve. The mock is free; a real provider can charge for it.</p>
         </section>
       </TabsContent>
       <TabsContent value="details" keepMounted>
@@ -97,9 +97,8 @@ export function AgentInspector({ agent, agents, pending, command, connect, conne
           <label>Name<input value={name} maxLength={70} required onChange={event => setName(event.target.value)} /></label>
           <label>Objective<textarea value={objective} maxLength={2000} required onChange={event => setObjective(event.target.value)} /></label>
           <div className="project-actions"><Button type="submit" disabled={pending || !name.trim() || !objective.trim()}>Save</Button><Button type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</Button></div>
-        </form> : <><h3>Objective</h3><p>{agent.context.objective}</p><p className="helper">Shown on the card, not sent to the model.</p><Button variant="outline" disabled={pending} onClick={edit}><Pencil />Edit name and objective</Button></>}
-        <h3>Instruction sent with Run once</h3><pre className="instruction">{agent.context.summary}</pre>
-        <div className="context-note"><ShieldCheck aria-hidden="true" /><span>Run once sends this instruction and your message, nothing else. Parent transcripts are not inherited.</span></div>
+        </form> : <><h3>Objective</h3><p>{agent.context.objective}</p><p className="helper">Sent as the instruction with every Run once.</p><Button variant="outline" disabled={pending} onClick={edit}><Pencil />Edit name and objective</Button></>}
+        <div className="context-note"><ShieldCheck aria-hidden="true" /><span>Run once sends the objective as its instruction and your message, nothing else. Parent transcripts are not inherited.</span></div>
         <section className="inspector-connect" aria-label="Connect this agent"><h3>Connect</h3>
           <p className="helper">Same as dragging from this card&apos;s right dot to another card&apos;s left dot.</p>
           <label>Connect to<select value={target} disabled={pending || !others.length} onChange={event => setTarget(event.target.value)}><option value="">Choose an agent</option>{others.map(other => <option key={other.id} value={other.id}>{other.name}</option>)}</select></label>

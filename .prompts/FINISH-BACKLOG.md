@@ -248,7 +248,7 @@ panel, nothing copied or loaded from it.
 | --- | --- | --- | --- |
 | Q-U3 | Mock and answer-event texts | Mock answers "MOCK answer: no model was called and nothing was billed."; `agent.output` says "Answer recorded."; verification unchanged | done |
 | Q-U2 | Graph events say who and when | `agentId` + name (also on `agent.removed`), source/destination ids and names on connections, server `at`; strict client validation; Activity shows name and server time | done |
-| Q-U1 | Run once sends the Objective | System instruction is the agent's Objective; quote and call share `TokenService.plan`; the connection test is unchanged | pending |
+| Q-U1 | Run once sends the Objective | System instruction is the agent's Objective; quote and call share `TokenService.plan`; the connection test is unchanged | done |
 | R-01 | Graph round trip | Credential-shaped text refused at create/edit; provider output redacted before the cut; the store never writes a document the parser would refuse | pending |
 | R-02 | Persistent accounting | Append-only journal, 0700/0600, fsync per record; rebuild at start; lost in-flight → unverifiable; corrupt journal blocks real calls | pending |
 
@@ -263,6 +263,11 @@ panel, nothing copied or loaded from it.
   requires it on every stream event. When the stream's event for a revision arrives after the command response,
   it replaces the placeholder's log line (so your own changes are named too); the graph is still taken only by the
   revision guard, and older events are still ignored. Activity time is now the server's clock, not the receive time.
+- Q-U1: the route picks one `instruction` for both `quote` and `complete` (the agent's objective, unchanged) and the
+  summary only for `test`, so the quote prices exactly what the call sends. Details labels the objective "Sent as the
+  instruction with every Run once"; the summary is no longer shown in the agent panel (it is still in the graph file
+  and still used by the connection test). `max_tokens` and budgets untouched. A longer objective now costs more
+  input tokens per Run once; the confirmation shows it.
 
 #### Questions for João
 

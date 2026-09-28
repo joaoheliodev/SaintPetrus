@@ -50,13 +50,13 @@ test('U3 Run is the default tab: message, send and the last exchange together; D
   const exchange = { ...exchangeFromResponse('What <i>now</i>?', { text: 'Answer <script>x</script>', billingModel: 'mock-v1', mocked: true, latencyMs: 0, usage: { total: 52 } }), costUsd: 0 };
   const markup = renderToStaticMarkup(React.createElement(AgentInspector, { agent, agents: [agent], pending: false, command: async () => null, connect: async () => {}, connection: mock, exchange }));
   assert.match(markup, /mock-v1 · MOCK/); assert.match(markup, /Coordinator · level 0/); assert.match(markup, />Ready<\/span>/);
-  const run = markup.slice(markup.indexOf('aria-label="Run this agent"'), markup.indexOf('Instruction sent with Run once'));
+  const run = markup.slice(markup.indexOf('aria-label="Run this agent"'), markup.indexOf('Edit name and objective'));
   assert.ok(run.indexOf('Send (1 call)') < run.indexOf('aria-label="Last exchange"'), 'the answer sits right under the send button');
   assert.ok(run.includes('What &lt;i&gt;now&lt;/i&gt;?') && run.includes('Answer &lt;script&gt;x&lt;/script&gt;'), 'message and answer are plain text');
   assert.match(run, /52 tokens \(estimated\) · 0 ms · \$0\.00 \(mock\)/);
   assert.match(run, /Last exchange · kept on this page only/);
-  assert.match(markup, /<h3>Instruction sent with Run once<\/h3><pre class="instruction">Manually configured agent\.<\/pre>/);
-  assert.match(markup, /Plan &lt;b&gt;it&lt;\/b&gt;<\/p><p class="helper">Shown on the card, not sent to the model\.<\/p>/);
+  assert.match(markup, /Plan &lt;b&gt;it&lt;\/b&gt;<\/p><p class="helper">Sent as the instruction with every Run once\.<\/p>/, 'Q-U1: the objective is what is sent');
+  assert.doesNotMatch(markup, /Manually configured agent/, 'the summary is not shown in the agent panel');
   assert.match(markup, /role="tab"[^>]*aria-selected="true"[^>]*>Run</, 'Run opens first');
   const source = await readFile('components/agent-inspector.tsx', 'utf8');
   assert.doesNotMatch(source, /PerMillion|preflightCost|tokens\/pricing/, 'no cost is computed in the browser');
