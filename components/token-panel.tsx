@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { PricePanel } from './price-panel';
 import { useConfirm } from './confirm-dialog';
 import { Gauge } from 'lucide-react';
-import { budgetMeter, budgetStatus, callCount, idle, journalWarning, percent, rowUsage, scopes, usd, type BudgetRow } from '../lib/budget-summary';
+import { budgetMeter, budgetStatus, callCount, idle, journalWarning, percent, periodNotice, rowUsage, scopes, usd, type BudgetRow } from '../lib/budget-summary';
 import { cn } from '../lib/utils';
 // The one GET reader for accounting evidence: the token snapshot and the receipts behind it.
 export function readAccounting(path: '/api/tokens', signal?: AbortSignal): Promise<TokenSnapshot>;
@@ -92,15 +92,18 @@ function ScopeRow({ row, name }: { row: BudgetRow; name: string }) {
     <UsageBar label="Dollars" value={usd(row.costAccountedUsd + row.costReservedUsd)} limit={usd(row.costLimitUsd)} share={usage.dollars} unit="" />
   </div>;
 }
+// Resolves true only when the server started the period.
 export async function askToStartBudgetPeriod(command: TokenSource['command'], confirm: ReturnType<typeof useConfirm>) {
-  if (await confirm({ message: 'Start a new budget period? Consumption in the global, agent and model budgets starts again from zero. The journal keeps everything recorded before, and limits and pauses stay as they are. Do this only after checking the provider invoice.', confirmLabel: 'Start a new budget period', destructive: true })) void command({ action: 'new-period' });
+  if (!await confirm({ message: 'Start a new budget period? Consumption in the global, agent and model budgets starts again from zero. The journal keeps everything recorded before, and limits and pauses stay as they are. Do this only after checking the provider invoice.', confirmLabel: 'Start a new budget period', destructive: true })) return false;
+  return command({ action: 'new-period' });
 }
 export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agents?: readonly { id: string; name: string }[] }) {
   const { data, error, pending, command } = tokens;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
   const [reconciliation, setReconciliation] = useState<Record<string, { prompt: string; completion: string; costUsd: string }>>({});
-  const confirm = useConfirm(); const [allScopes, setAllScopes] = useState(false); const [calls, setCalls] = useState<ReturnType<typeof callCount>>();
+  const confirm = useConfirm(); const [allScopes, setAllScopes] = useState(false); const [periodStarted, setPeriodStarted] = useState(false);
+  const startPeriod = () => { void askToStartBudgetPeriod(command, confirm).then(started => { if (started) setPeriodStarted(true); }); }; const [calls, setCalls] = useState<ReturnType<typeof callCount>>();
   const total = data?.rows.find(row => row.scope === 'global');
   const name = (row: BudgetRow) => row.scope === 'agent' ? agents.find(agent => agent.id === row.id)?.name ?? row.id : row.scope === 'global' ? 'All calls' : row.scope === 'session' ? 'This server run' : row.id;
   // Receipts are read again only when the global counters move, i.e. after a call settles.
@@ -114,8 +117,9 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
         <p className="helper">Every call reserves its worst case before it leaves: peak price, no cache hits, full output. The mock&apos;s estimated tokens count against the token limits too, so the mock can reach a limit; its dollars are $0.</p>
         {!data ? <p role="status">Loading server token state… {error}</p> : <>
           <section className="budget-summary" aria-label="Budget summary">
-            {journal && <div role="alert" className="journal-warning"><p>{journal.text}</p>{journal.canStartPeriod && <Button disabled={pending} variant="outline" onClick={() => askToStartBudgetPeriod(command, confirm)}>Start a new budget period</Button>}</div>}
+            {journal && <div role="alert" className="journal-warning"><p>{journal.text}</p>{journal.canStartPeriod && <Button disabled={pending} variant="outline" onClick={startPeriod}>Start a new budget period</Button>}</div>}
             {!!data.accounting.recoveredReservations && data.reservations.some(item => item.status === 'unverifiable') && <p className="helper tone-red">{data.accounting.recoveredReservations} provider {data.accounting.recoveredReservations === 1 ? 'call was' : 'calls were'} in flight when the server stopped. {data.accounting.recoveredReservations === 1 ? 'It came' : 'They came'} back unverifiable and {data.accounting.recoveredReservations === 1 ? 'its agent is' : 'their agents are'} paused.</p>}
+            {periodStarted && <p role="status" className="helper">{periodNotice(data)}</p>}
             <p role="status" className={`budget-status tone-${status?.tone}`}>{status?.text} {error}</p>
             {total && <><UsageBar label="Tokens" value={(total.used + total.reserved).toLocaleString('en-US')} limit={total.limit.toLocaleString('en-US')} share={rowUsage(total).tokens} unit="tokens" />
               <UsageBar label="Dollars" value={usd(total.costAccountedUsd + total.costReservedUsd)} limit={usd(total.costLimitUsd)} share={rowUsage(total).dollars} unit="" /></>}
@@ -134,7 +138,7 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
         <p>Actual provider tokens: {total?.actual.total ?? 0} · Mock estimated tokens: {total?.mock.total ?? 0} · Saved tokens: {total?.saved ?? 0}</p>
         <p>Accounted cost (USD): {(total?.costAccountedUsd ?? 0).toFixed(9)} · Reserved worst-case cost: {(total?.costReservedUsd ?? 0).toFixed(9)} · Local price table date: {data?.priceDate ?? 'Unavailable'}</p>
         <p>Global, agent and model consumption, limits changed here, pauses and held reservations are journaled in the user data directory and survive a restart. The session budget and the mock&apos;s usage start empty with each server run. A call in flight when the server stops comes back unverifiable, with its agent paused.</p>
-        {data?.accounting.journal === 'recorded' && <p><Button disabled={pending} variant="outline" onClick={() => askToStartBudgetPeriod(command, confirm)}>Start a new budget period</Button> <span className="helper">Consumption starts again from zero; the journal keeps the history. Refused while a reservation is open.</span></p>}
+        {data?.accounting.journal === 'recorded' && <p><Button disabled={pending} variant="outline" onClick={startPeriod}>Start a new budget period</Button> <span className="helper">Consumption starts again from zero; the journal keeps the history. Refused while a reservation is open.</span></p>}
         <p>Rows overlap: global, agent, model and session describe the same calls. Do not add rows together. Either dimension warns at 80% and pauses at 100%. Increase a limit, then resume explicitly.</p>
         <div className="token-table"><table><caption>Budgets and consumption</caption><thead><tr><th>Scope / ID</th><th>Token limit</th><th>USD limit</th><th>Actual input / output / total</th><th>Mock estimated input / output / total</th><th>Reserved / unverifiable / expired estimate</th><th>USD used / reserved / expired estimate</th><th>Budget status</th></tr></thead><tbody>
           {data?.rows.map(row => { const key = `${row.scope}:${row.id}`; return <tr key={key}>

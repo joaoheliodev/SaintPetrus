@@ -62,6 +62,14 @@ export function journalWarning(accounting: JournalState) {
   return { text: `Real calls are blocked: the accounting journal could not be read${accounting.rejectedAs ? ` and was set aside as ${accounting.rejectedAs}` : ' and was set aside'}. Nothing restarted from zero on its own. Check the provider invoice, then start a new budget period. The mock still runs.`, canStartPeriod: true };
 }
 
+// After a new budget period starts: a period never resumes anyone, so say who is still paused and the way out.
+export function periodNotice(snapshot: { paused: readonly string[]; stopped: boolean }) {
+  if (snapshot.stopped) return 'A new budget period has started. Pause all agents is still on, so every agent stays paused: use Resume eligible agents when you want them to run.';
+  const count = snapshot.paused.length;
+  if (count) return `A new budget period has started. ${count} ${count === 1 ? 'agent is' : 'agents are'} still paused: a new period resumes no one. Use Resume eligible agents.`;
+  return 'A new budget period has started.';
+}
+
 // Calls in the receipt window the server keeps (GET /api/receipts, bounded). truncated means older ones were dropped.
 export function callCount(receipts: unknown) {
   const body = receipts !== null && typeof receipts === 'object' ? receipts : {};

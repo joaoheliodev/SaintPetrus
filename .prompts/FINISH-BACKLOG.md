@@ -259,7 +259,7 @@ panel, nothing copied or loaded from it.
 | R-01 | Graph round trip | Credential-shaped text refused at create/edit; provider output redacted before the cut; the store never writes a document the parser would refuse | done |
 | R-02 | Persistent accounting | Append-only journal, 0700/0600, fsync per record; rebuild at start; lost in-flight → unverifiable; corrupt journal blocks real calls | done |
 | R3-1 | Lost call's deadline from its send time | A reservation restored from a crash expires at `createdAt` + `DEFAULT_PROVIDER_TIMEOUT_MS` + `reservationTtlMs`; restarts never move it; a past deadline converts on the first read | done |
-| R3-2 | New budget period unchanged | Zeroes consumption, keeps limits, pauses and Pause all, refused with an open reservation; the screen says paused agents stay paused and points to **Resume eligible agents** | pending |
+| R3-2 | New budget period unchanged | Zeroes consumption, keeps limits, pauses and Pause all, refused with an open reservation; the screen says paused agents stay paused and points to **Resume eligible agents** | done |
 
 #### Decisions taken
 
@@ -330,6 +330,10 @@ panel, nothing copied or loaded from it.
   pinned. Conversion stays lazy (the first snapshot or receipts read), as for every other reservation. Tests: two
   restarts give the same deadline; a restart at the deadline converts at once, conservatively, never released, agent
   still paused. Mutations (restart time in place of `createdAt`, timeout dropped, TTL dropped) all killed.
+- R3-2: behaviour unchanged. `askToStartBudgetPeriod` now resolves with whether the server started the period, and
+  only then Budgets shows `periodNotice` (transient presentation state in the view): "A new budget period has
+  started.", plus how many agents are still paused (or that Pause all is still on) and "Use Resume eligible agents".
+  A cancelled or refused period shows nothing new. Recorded in AGENTS.md.
 
 #### Questions for João
 

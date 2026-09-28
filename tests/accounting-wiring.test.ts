@@ -11,8 +11,8 @@ import type { ProviderAdapter } from '../lib/providers/adapter';
 import { TokenService } from '../lib/tokens/service';
 import { AccountingJournal } from '../lib/tokens/accounting-journal';
 import { openAccountingJournal, tokenService } from '../lib/tokens/runtime';
-import { journalWarning } from '../lib/budget-summary';
-import { BudgetsView } from '../components/token-panel';
+import { journalWarning, periodNotice } from '../lib/budget-summary';
+import { askToStartBudgetPeriod, BudgetsView } from '../components/token-panel';
 import type { Prices, TokenPolicy } from '../lib/tokens/config';
 
 // Fictitious policy and tariff for this test only.
@@ -95,3 +95,20 @@ test('R-02 a journaled service offers a new period in Details, and a recovered c
   assert.match(markup.slice(markup.indexOf('<details')), />Start a new budget period</);
   assert.doesNotMatch(markup, /role="alert"/);
 }));
+
+test('R3-2 after a new budget period, paused agents are said to stay paused, with the way out', () => {
+  assert.equal(periodNotice({ paused: [], stopped: false }), 'A new budget period has started.');
+  assert.equal(periodNotice({ paused: ['a'], stopped: false }), 'A new budget period has started. 1 agent is still paused: a new period resumes no one. Use Resume eligible agents.');
+  assert.match(periodNotice({ paused: ['a', 'b'], stopped: false }), /2 agents are still paused.*Resume eligible agents/);
+  assert.match(periodNotice({ paused: ['a'], stopped: true }), /Pause all agents is still on.*Resume eligible agents/);
+});
+
+test('R3-2 the notice waits for the server: a cancelled or refused period reports nothing started', async () => {
+  const sent: object[] = [];
+  const command = async (body: object) => { sent.push(body); return sent.length > 1; };
+  assert.equal(await askToStartBudgetPeriod(command, async () => false), false, 'cancelled');
+  assert.deepEqual(sent, [], 'nothing sent when cancelled');
+  assert.equal(await askToStartBudgetPeriod(command, async () => true), false, 'refused by the server');
+  assert.equal(await askToStartBudgetPeriod(command, async () => true), true, 'started');
+  assert.deepEqual(sent, [{ action: 'new-period' }, { action: 'new-period' }]);
+});
