@@ -47,7 +47,7 @@ The build fetches no fonts and makes no provider request.
 Every start runs in **MOCK** mode unless you opt in: `npm run dev` and `npm start` both start with the keyless mock,
 and no keyed provider can be selected, no key is stored and no request can reach a provider. Real providers need
 `SAINTPETRUS_MODE=real` at startup (for example `SAINTPETRUS_MODE=real npm start`); the value is read once and
-cannot change while the server runs, and in REAL mode the mock is off. A badge next to the name in the header always
+cannot change while the server runs, and in REAL mode the mock is off. A badge next to the name in the sidebar always
 says **MOCK** or **REAL**. The former `SAINTPETRUS_MOCK` variables are gone, and the server refuses to start if one
 is still set. The mock answers every call with synthetic `MOCK:` text, uses no network, costs nothing and never
 writes to the price file.
@@ -58,29 +58,39 @@ fictitious budget: one cent per 30 characters, reserved before output is deliver
 
 ## Main flow
 
-1. **Add agent** opens a form for a name and an objective; **Create agent** places it on the canvas.
-   Double-clicking empty canvas does the same at the pointer.
-2. **Subagents.** The **+** beside an agent in the left list, or a drag from a card's right dot to empty canvas,
-   creates an agent one level deeper, already joined by a delegation edge.
+**The screen.** The sidebar holds the name, the **MOCK** or **REAL** badge (always visible), the views
+(**Workspace**, **Activity**, **Budgets**, **Prices**, **Connection**) and the list of agents with their status.
+The top bar shows the connection Run once uses (`● Connected · mock-v1`; click it to open **Connection**), a budget
+meter (the fullest of the global and session budgets; click it to open **Budgets**), **Commands** (Ctrl+K) and
+**Pause all agents**. The agent panel on the right has a **Run** and a **Details** tab. While the graph is new, a
+**First steps** bar above the canvas lists the next thing to do.
+
+1. **Add agent** (canvas toolbar) opens a form for a name and an objective; **Create agent** places it on the
+   canvas. Double-clicking empty canvas does the same at the pointer.
+2. **Subagents.** **Add subagent**, the **+** beside an agent in the sidebar, or a drag from a card's right dot to
+   empty canvas creates an agent one level deeper, already joined by a delegation connection. Cards say their role
+   and level in words ("Subagent · level 1") and their status with an icon and a word.
 3. **Connect** two existing agents by dragging from one card's right dot to another card's left dot, or from the
-   keyboard with **Connect to** and **Connect** in the inspector. The server refuses duplicates,
-   self-connections and cycles.
+   keyboard with **Details → Connect to** and **Connect**. The server refuses duplicates, self-connections and
+   cycles.
 4. **Move** cards with the mouse, or focus a card, press Enter to select it and use the arrow keys. The server
    saves every settled position.
-5. **Edit** an agent's name and objective from the inspector.
-6. **Run once** sends one message for the selected agent through the connected provider; the answer appears
-   under **Output**. It first asks the server what the call would reserve, through the same preflight and budgets
-   as the call itself, and shows that maximum (tokens and dollars) in a confirmation. Nothing is reserved or sent
-   until you accept. With the mock it is free. With a real provider it is an ordinary budgeted call.
-7. **Watch** the server events panel, the connection badge in the header, and **Budgets** for budgets,
-   reservations and receipts. An optional live feed is described below.
-8. **Export graph** downloads the current graph as redacted JSON. **Import graph** reads such a file back and
-   replaces the canvas after a confirmation.
-9. **Delete a connection**: select it and press Delete or Backspace, then confirm. **Remove** in the inspector
-   deletes an agent and its connections after a confirmation. It is refused for the coordinator, for an agent
-   with subagents, during a mock run, and while the agent has a call in flight or usage that is unverifiable or
-   awaiting reconciliation. Its accounting rows stay in **Budgets**, marked as a removed agent.
-10. **Reset graph** and **Pause all agents** ask before acting.
+5. **Run** (agent panel, first tab): type a message and press **Send (1 call)**. The server first quotes what the
+   call would reserve, through the same preflight and budgets as the call itself, and the confirmation shows that
+   maximum in tokens and dollars; nothing is reserved or sent until you accept. Your message, the answer, its
+   tokens, latency and the cost the server accounted appear right under the button. With the mock it is free.
+6. **Details** (second tab): edit the name and objective (the objective is shown on the card and is **not** sent
+   to the model), read the exact instruction Run once sends, connect to another agent, and **Remove agent** in the
+   Danger zone. Removal is refused for the Coordinator, for an agent with subagents, while the demo runs, and while
+   the agent has a call in flight or usage that is unverifiable or awaiting reconciliation. Its accounting rows
+   stay in **Budgets**, marked as a removed agent.
+7. **Watch** the Activity drawer under the canvas (card moves and demo output are hidden until you ask for them),
+   or the full **Activity** view, and **Budgets** for how much is left and what to do when something is blocked.
+8. **More** (canvas toolbar) holds **Import graph…**, **Export graph** (redacted JSON), **Reset graph…** (with the
+   objective the Coordinator receives on reset) and, in MOCK mode, **Load demo…**. Every action that replaces the
+   canvas asks first.
+9. **Delete a connection**: select it and press Delete or Backspace, then confirm.
+10. Every confirmation opens inside the app with the focus on **Cancel**.
 
 The server owns the graph: every tab sees the same one. It is saved to `graph.json` in the user data directory
 (the same place as remembered keys, see `SECURITY.md`) and restored at startup, with every agent back at rest.
@@ -94,6 +104,7 @@ connections, limits out of range). The graph format names no model, so nothing i
 are chosen only through the policy allowlist. Import is refused during a mock run and while any current agent
 holds a reservation. A saved `graph.json` that fails the same checks at startup is renamed to
 `graph-rejected-<time>.json` and the server starts with a new graph.
+
 Snapshots arrive over a server-sent event stream, with 300 ms polling only while the stream is down.
 
 ## Connecting a provider
@@ -155,7 +166,9 @@ key as an argument.
 
 **Budgets** shows global, agent, model and session limits in tokens and in USD. Either dimension warns at 80%;
 a call whose reservation would pass any limit is refused before provider I/O and pauses its agent, and at 100%
-further calls are blocked. Raising a limit does not restart work: use **Resume eligible agents**.
+further calls are blocked. Raising a limit does not restart work: use **Resume eligible agents**. The view opens
+with a summary and one sentence saying what is blocked and how to unblock it; the full table is under **Details**.
+The mock's estimated tokens count against the token limits too, so the mock alone can reach a limit.
 **Pause all agents** cancels the active provider request and pauses the mock too.
 
 Costs are estimates from the dated local price table, not invoices. Preflight counts input approximately and

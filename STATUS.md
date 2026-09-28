@@ -5,7 +5,7 @@ Branch: `night/provider-validation-ready`, continuing `night/provider-validation
 ## Verification checkpoint (2026-09-27)
 
 Run in a cloud session without any API key: lint, both typechecks, the full suite at the floor stated in
-`AGENTS.md` (427 tests in 29 suites at the end) with zero failures or skips, and `npm run build` passed before
+`AGENTS.md` (462 tests at the end of the UI round) with zero failures or skips, and `npm run build` passed before
 every commit of the finishing session. After a fresh `npm ci`, `npm audit` reported 0 vulnerabilities and the
 keyless `npm run dev` main flow passed the browser check. `npm run test:e2e` passed in development and in
 production and `npm run test:browser` passed. Gitleaks found nothing in the staged diff of any commit, in the
@@ -43,6 +43,15 @@ the branch (40 runs). Two independent reviewer agents audited `0662647..HEAD`; t
 - **Q-09** Run once stays and asks first with the server's quote of the most it reserves, from the same checks.
 - **Q-10** An unpriced served model's expiry converts at the greater of estimate and reported usage per dimension,
   at least at the requested model's peak, cache-miss rate; the agent waits for manual reconciliation.
+
+## UI round (2026-09-27)
+
+Presentation only (no route, contract, file format, accounting, payload, configuration, mode, header or CSP
+change): a sidebar of views, a top bar with the connection chip, budget meter, Ctrl+K palette and Pause all; one
+interface vocabulary (`AGENTS.md`); an agent panel whose Run tab shows message, answer, tokens, latency and the
+server-accounted cost together; Budgets with a summary and the way out of a block; a readable Activity log; a First
+steps bar; in-app confirmations opening on Cancel; the demo and every graph replacement behind the More menu. Open
+questions are in `.prompts/FINISH-BACKLOG.md` (Phase 8, "Questions for João").
 
 ## Not verified or pending
 

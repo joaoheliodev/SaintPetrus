@@ -13,8 +13,8 @@ const { call, close } = await launchChromium({ timeoutMs: 45000, onEvent: (messa
     send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, childSession).catch(() => {});
   }
   if (message.method === 'Page.frameNavigated') navigations.push(message.params.frame.url);
-  // Running the preview mock replaces the graph, so the panel asks first; this disposable instance accepts.
-  if (message.method === 'Page.javascriptDialogOpening') { dialogs.push(message.params.message); send('Page.handleJavaScriptDialog', { accept: true }, message.sessionId).catch(() => {}); }
+  // Confirmations are in-app dialogs; a native one would mean a window.confirm came back.
+  if (message.method === 'Page.javascriptDialogOpening') { logs.push(`Native dialog: ${message.params.message}`); send('Page.handleJavaScriptDialog', { accept: false }, message.sessionId).catch(() => {}); }
 } });
 try {
   const { targetId } = await call('Target.createTarget', { url: 'about:blank' });
@@ -27,11 +27,21 @@ try {
     return result.result.value;
   };
   const until = async fn => { for (let i = 0; i < 80; i++) { const value = await fn(); if (value) return value; await new Promise(resolve => setTimeout(resolve, 100)); } throw new Error('Browser assertion timed out.'); };
+  // Loading the preview demo replaces the graph: it sits in the More menu and asks first; this disposable instance accepts.
+  const loadPreviewDemo = async () => {
+    await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='More').click()`);
+    await until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('[role=menuitem]')).find(i=>i.textContent.trim()==='Load preview demo…'); item?.click(); return !!item; })()`));
+    dialogs.push(await until(() => evaluate(`document.querySelector('[data-confirm] .confirm-title')?.textContent`)));
+    await evaluate(`document.querySelectorAll('[data-confirm] .confirm-actions button')[1].click()`);
+    await until(() => evaluate(`!document.querySelector('[data-confirm]')`));
+  };
   await call('Page.navigate', { url: `http://127.0.0.1:${port}` }, sessionId);
-  await until(() => evaluate(`Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Run preview mock')`));
-  await until(() => evaluate(`document.querySelector('header [role=status]')?.textContent.includes('Configured')`));
+  await until(() => evaluate(`Array.from(document.querySelectorAll('button')).some(b=>b.textContent.trim()==='More')`));
+  await until(() => evaluate(`document.querySelector('.provider-badge [role=status]')?.textContent.includes('Configured')`));
+  // The preview is a tab of the drawer under the canvas.
+  await evaluate(`Array.from(document.querySelectorAll('[role=tab]')).find(t=>t.textContent.trim()==='Preview').click()`);
   const baseline = await evaluate(`Number(document.querySelector('[aria-label="Artifact preview"]').textContent.match(/Version: (\\d+)/)?.[1] ?? 0)`);
-  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Run preview mock').click()`);
+  await loadPreviewDemo();
   await until(() => evaluate(`Number(document.querySelector('[aria-label="Artifact preview"]')?.textContent.match(/Version: (\\d+)/)?.[1] ?? 0) >= ${baseline + 3}`));
   await new Promise(resolve => setTimeout(resolve, 500));
   const context = await until(async () => {
@@ -59,10 +69,11 @@ try {
   assert.ok(await evaluate(`document.querySelector('[aria-label="Artifact preview"]').textContent.includes('Version: ${baseline + 2}')`));
   await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Show source').click()`);
   assert.ok(await evaluate(`document.querySelector('.artifact-preview pre').textContent.includes('Stage two')`));
-  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Run preview mock').click()`);
+  await loadPreviewDemo();
   await until(() => evaluate(`Array.from(document.querySelectorAll('[aria-label="Artifact preview"] select option')).some(o=>Number(o.value)>=${baseline + 6})`));
   assert.ok(await evaluate(`document.querySelector('[aria-label="Artifact preview"]').textContent.includes('Version: ${baseline + 2}')`), 'Paused view stays on historical version despite new events');
   assert.equal(await evaluate(`document.querySelector('iframe').getAttribute('sandbox')`), 'allow-scripts');
-  assert.ok(dialogs.length >= 2 && dialogs.every(text => text.startsWith('Run the preview mock?')), 'each run asked before replacing the graph');
+  assert.ok(dialogs.length >= 2 && dialogs.every(text => text === 'Load the preview demo?'), 'each run asked before replacing the graph');
+  assert.ok(!logs.some(text => text.startsWith('Native dialog')), 'no native dialog');
   console.log('PASS: live updates, JS rendering, prior version/source, fetch blocked by CSP, navigation blocked by parent CSP, storage/parent inaccessible, allow-scripts only.');
 } finally { await close(); }

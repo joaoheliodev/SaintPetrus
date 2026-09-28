@@ -6,7 +6,40 @@ that carried them.
 ## Unreleased: `night/provider-validation-ready` (2026-09-27)
 
 Everything that could be finished without a call to a real provider. No request with a real key was made.
-The test floor rose from 338 to 427.
+The test floor rose from 338 to 462.
+
+### Interface
+
+The panel was reorganised so that someone who has never seen it can find their way without the documentation.
+Presentation only: no route, API contract, graph file format, accounting, provider payload, configuration value,
+run mode, security header or content security policy changed.
+
+- A fixed sidebar with the **MOCK**/**REAL** badge, the views (Workspace, Activity, Budgets, Prices, Connection) and
+  the agents with their status; a top bar with the connection chip, a budget meter, **Commands** (Ctrl+K) and
+  **Pause all agents**. Budgets, Prices and Connection are views instead of dialogs.
+- One vocabulary everywhere (now a section of `AGENTS.md`): cards drop the file's "Unconfigured" label and show the
+  role and level in words and each status with its own icon, colour and text.
+- The agent panel opens on **Run**: message, Send, and right below the answer with its tokens, latency and the
+  cost the server accounted. **Details** shows the instruction Run once really sends and marks the objective as not
+  sent.
+- The demo, import, export and reset moved to a **More** menu; **Load demo** warns that it replaces the canvas.
+  "Mock limits" became **Graph limits** and **Demo cost**.
+- **Budgets** opens with a summary and one sentence on what is blocked and how to unblock it; the full table is under
+  Details. **Activity** reads as one line per action with its detail indented, and hides card moves until asked.
+- A **First steps** bar, in-app confirmations that open on Cancel, and the Next.js development badge turned off.
+
+| Before | Now |
+| --- | --- |
+| Run mock / Run preview mock | Load demo… / Load preview demo… (More menu) |
+| Mock limits | Graph limits and Demo cost |
+| Project objective | Coordinator objective (in Reset graph…) |
+| Export context | Export graph |
+| Tokens (dialog) | Budgets and Prices (views) |
+| Connect AI (dialog) | Connection (view; the top-bar chip opens it) |
+| Server events · revision N | Activity (drawer and view) |
+| Output tab, Executive summary | Run tab with the last exchange; Details → Instruction sent with Run once |
+| L0, "Unconfigured" on cards | Coordinator · level 0, Agent · level 0, Subagent · level 1 |
+| Browser `confirm()` pop-ups | In-app confirmations |
 
 ### Provider validation
 

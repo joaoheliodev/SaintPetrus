@@ -143,7 +143,7 @@ panel, nothing copied or loaded from it.
 | U7 | First steps | Checklist derived from server state, dismissible in memory | done |
 | U8 | In-app confirmations (P3) | Dialog instead of `window.confirm`, same texts, refuse-then-confirm in the browser check | done |
 | U9 | Command palette (P3, optional) | Ctrl+K filterable list of existing actions | done |
-| U10 | Finish | Dev indicator, README, CHANGELOG, STATUS, floor | pending |
+| U10 | Finish | Dev indicator, README, CHANGELOG, STATUS, floor | done; usability review next |
 
 #### Decisions taken
 
@@ -202,6 +202,12 @@ panel, nothing copied or loaded from it.
   agents and every agent by name. Every word typed must appear (`lib/command-search.ts`); the order never changes and
   disabled actions are left out. Each entry calls the same handler as its button, confirmations included; Pause all
   moved into `askToPauseAll` so the button and the palette share it. The top bar shows "Commands Ctrl K".
+- U10: `devIndicators: false` in `next.config.ts`, as the installed Next.js 16 guide documents; compile and runtime
+  errors still surface. README (Main flow rewritten for the new screen), CHANGELOG (Interface section with the
+  names table), STATUS, architecture and the floor updated. The preview browser check (`npm run test:browser`) had
+  been broken since U1/U2 renamed "Run preview mock" and moved it into More, and it answered native dialogs; it was
+  not run between those items. It now opens the Preview tab, goes through the More menu, answers the in-app
+  confirmation and fails on a native dialog. It passes.
 
 #### Questions for João
 

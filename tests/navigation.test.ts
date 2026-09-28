@@ -42,3 +42,7 @@ test('U4 Budgets and Prices render from the shared snapshot and say when it is l
   assert.match(renderToStaticMarkup(React.createElement(BudgetsView, { tokens })), /Loading server token state…/);
   assert.match(renderToStaticMarkup(React.createElement(PricesView, { tokens })), /Loading server prices…/);
 });
+
+test('U10 the Next.js development badge is off, so it no longer covers panel text', async () => {
+  assert.match(await readFile('next.config.ts', 'utf8'), /devIndicators: false/);
+});
