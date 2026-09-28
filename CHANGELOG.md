@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: `night/provider-validation-ready` (2026-09-27)
 
 Everything that could be finished without a call to a real provider. No request with a real key was made.
-The test floor rose from 338 to 462.
+The test floor rose from 338 to 463.
 
 ### Interface
 

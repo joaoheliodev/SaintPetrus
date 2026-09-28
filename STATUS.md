@@ -5,7 +5,7 @@ Branch: `night/provider-validation-ready`, continuing `night/provider-validation
 ## Verification checkpoint (2026-09-27)
 
 Run in a cloud session without any API key: lint, both typechecks, the full suite at the floor stated in
-`AGENTS.md` (462 tests at the end of the UI round) with zero failures or skips, and `npm run build` passed before
+`AGENTS.md` (463 tests at the end of the UI round) with zero failures or skips, and `npm run build` passed before
 every commit of the finishing session. After a fresh `npm ci`, `npm audit` reported 0 vulnerabilities and the
 keyless `npm run dev` main flow passed the browser check. `npm run test:e2e` passed in development and in
 production and `npm run test:browser` passed. Gitleaks found nothing in the staged diff of any commit, in the
