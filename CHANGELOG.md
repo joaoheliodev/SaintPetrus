@@ -27,6 +27,9 @@ run mode, security header or content security policy changed.
 - **Budgets** opens with a summary and one sentence on what is blocked and how to unblock it; the full table is under
   Details. **Activity** reads as one line per action with its detail indented, and hides card moves until asked.
 - A **First steps** bar, in-app confirmations that open on Cancel, and the Next.js development badge turned off.
+- A reviewer who had not built it tried the six goals from screenshots alone; the confirmed findings were fixed: Send
+  no longer says "Running…" while its question is open, the budget meter says "used", an empty Activity log no longer
+  claims the graph is empty, dollars read the same everywhere, and Connection explains MOCK and its buttons.
 
 | Before | Now |
 | --- | --- |

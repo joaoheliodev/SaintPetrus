@@ -30,7 +30,7 @@ test('U6 card moves and demo output are hidden until asked for, and nothing is r
   assert.doesNotMatch(markup, /Card moved/); assert.match(markup, /\(2 hidden\)/);
   assert.match(markup, /<span class="activity-title">Connection created<\/span><span class="activity-detail">⎿ Connection &lt;b&gt;created&lt;\/b&gt;\.<\/span>/);
   assert.match(markup, /<small>revision 3<\/small>/, 'the revision is there, but small');
-  assert.match(renderToStaticMarkup(React.createElement(GraphActivity, { events: [], revision: 0 })), /Nothing yet\./);
+  assert.match(renderToStaticMarkup(React.createElement(GraphActivity, { events: [], revision: 0 })), /No changes since this page opened\. Earlier work is on the canvas/, 'an empty log never claims the graph is empty');
 });
 
 test('U6 the drawer under the canvas collapses, and the Activity view has the whole log', async () => {

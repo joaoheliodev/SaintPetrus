@@ -41,11 +41,11 @@ function AgentNode({ data, selected }: NodeProps<AgentNodeType>) {
   const a = data.agent;
   const connection = useContext(ConnectionContext);
   return <article className={cn('agent-card', selected && 'is-selected')}>
-    <Handle id="input" type="target" position={Position.Left} aria-label={`Connect to ${a.name}`} />
+    <Handle id="input" type="target" position={Position.Left} aria-label={`Connect to ${a.name}`} title="Drop a connection from another card here" />
     <div className="agent-card-head"><Bot size={20} aria-hidden="true" /><div><h3>{a.name}</h3><small>{agentPlacement(a)}</small></div></div>
     <div className="agent-card-body"><p>{a.context.objective}</p>{a.output && <p className="node-output">{a.output.slice(-120)}</p>}</div>
     <div className="agent-card-foot"><AgentStatusBadge status={a.status} /><small title="The connection Run once uses">{connection && connection.state !== 'disconnected' ? connectionTarget(connection) : 'No connection'}</small></div>
-    <Handle id="output" type="source" position={Position.Right} aria-label={`Drag from ${a.name} to empty canvas to create a subagent`} />
+    <Handle id="output" type="source" position={Position.Right} aria-label={`Drag from ${a.name} to empty canvas to create a subagent`} title="Drag to another card's left dot to connect, or to empty canvas to create a subagent" />
   </article>;
 }
 const nodeTypes = { agent: AgentNode };
@@ -201,7 +201,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       <nav aria-label="Views" className="sidebar-nav">{views.map(item => <button key={item.id} type="button" aria-current={view === item.id ? 'page' : undefined} onClick={() => setView(item.id)}><item.icon size={16} aria-hidden="true" />{item.label}</button>)}</nav>
       <div className="sidebar-label"><GitBranch size={14} aria-hidden="true" />Agents <span>{graph.agents.length}</span></div>
       <div className="agent-list">{graph.agents.map(a => <div key={a.id} className={cn('agent-list-item', selectedId === a.id && 'active')}>
-        <button className="agent-list-open" onClick={() => openAgent(a)}><AgentStatusBadge status={a.status} compact /><span>{a.name}</span>{a.id === 'root' && <Crown className="role-mark" size={14} aria-label="Coordinator" />}</button>
+        <button className="agent-list-open" onClick={() => openAgent(a)}><AgentStatusBadge status={a.status} compact /><span className="agent-list-name">{a.name}</span>{a.id === 'root' && <span className="role-mark" title="Coordinator: the root agent every graph starts with"><Crown size={14} aria-hidden="true" /><span className="sr-only">Coordinator</span></span>}</button>
         <button className="agent-list-add" aria-label={`Add subagent under ${a.name}`} title={`Add subagent under ${a.name}`} disabled={pending} onClick={() => { setView('workspace'); openDraft({ parentId: a.id }); }}><Plus size={15} /></button>
       </div>)}</div>
       <div className="sidebar-footer">
@@ -210,11 +210,11 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         <label>Max agents<input type="number" min={1} max={50} value={limits.maxNodes} disabled={active} onChange={e => setLimits({ ...limits, maxNodes: Number(e.target.value) })} /></label>
         <Button disabled={active || pending} variant="outline" onClick={applyLimits}>Apply graph limits</Button>
       </details>
-      {mockEnabled && <details className="budget-card" aria-label="Demo cost"><summary>Demo cost <small>${(graph.costCents / 100).toFixed(2)} of ${(graph.budget.maxCostCents / 100).toFixed(2)}</small></summary><p className="helper">Fictitious spend of the demo only. Budgets holds real accounting.</p><p>${(graph.costCents / 100).toFixed(2)} of ${(graph.budget.maxCostCents / 100).toFixed(2)}</p><Progress aria-label="Demo cost used" value={graph.costCents / graph.budget.maxCostCents * 100} />
+      {mockEnabled && <details className="budget-card" aria-label="Demo cost"><summary>Demo cost <small>fictitious · ${(graph.costCents / 100).toFixed(2)} of ${(graph.budget.maxCostCents / 100).toFixed(2)}</small></summary><p className="helper">Fictitious spend of the demo, the fixed walkthrough you can load from More. MOCK means no provider is reachable; Budgets holds the real accounting.</p><p>${(graph.costCents / 100).toFixed(2)} of ${(graph.budget.maxCostCents / 100).toFixed(2)}</p><Progress aria-label="Demo cost used" value={graph.costCents / graph.budget.maxCostCents * 100} />
         <label>Demo cost limit (cents)<input type="number" min={1} max={10000} value={limits.maxCostCents} disabled={active} onChange={e => setLimits({ ...limits, maxCostCents: Number(e.target.value) })} /></label>
         <Button disabled={active || pending} variant="outline" onClick={applyLimits}>Apply demo cost limit</Button>
       </details>}
-      <p className="helper">The graph is saved on this machine; token accounting is not. Only Run once and connection tests call a provider, and only when you click them.</p>
+      <p className="helper">The graph is saved on this machine; token accounting is not. Only Run once and connection tests call a provider, and only when you click them. Run once is an agent&apos;s Run tab.</p>
       </div>
     </aside>
     <div className="main-column">
@@ -253,7 +253,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         <TabsContent value="activity" keepMounted><GraphActivity events={events} revision={graph.revision} /></TabsContent>
         {previewPort && <TabsContent value="preview" keepMounted><ArtifactPreview port={previewPort} /></TabsContent>}
       </Tabs>
-      </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={exchange => setExchanges(current => ({ ...current, [selected.id]: exchange }))} /></div>
+      </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={exchange => setExchanges(current => ({ ...current, [selected.id]: exchange }))} openConnection={() => setView('connection')} /></div>
       {view === 'activity' && <section className="view activity-view" aria-labelledby="activity-title"><h1 id="activity-title">Activity</h1>
         <p className="helper">What changed on the canvas, newest first, as the server published it. Card moves and demo output are hidden unless you ask for them.</p>
         <GraphActivity events={events} revision={graph.revision} />

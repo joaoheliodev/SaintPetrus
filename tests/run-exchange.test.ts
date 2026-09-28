@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { accountedCost, exchangeFacts, exchangeFromResponse } from '../lib/run-exchange';
-import { AgentInspector, runsWith } from '../components/agent-inspector';
+import { AgentInspector, runLabels, runsWith } from '../components/agent-inspector';
 import { createGraph } from '../lib/orchestrator';
 import type { ProviderStatusSnapshot } from '../lib/providers/runtime';
 
@@ -31,7 +31,7 @@ test('U3 the cost is the newest call receipt of that agent, as the server accoun
   assert.equal(accountedCost(null, 'a'), undefined);
   const base = exchangeFromResponse('m', { text: 't', model: 'x', latencyMs: 12, usage: { total: 40 } });
   assert.deepEqual(exchangeFacts({ ...base, costUsd: 0.000123 }), ['40 tokens', '12 ms', '$0.000123']);
-  assert.deepEqual(exchangeFacts({ ...base, mocked: true, costUsd: 0 }), ['40 tokens (estimated)', '12 ms', '$0.000000 (mock)']);
+  assert.deepEqual(exchangeFacts({ ...base, mocked: true, costUsd: 0 }), ['40 tokens (estimated)', '12 ms', '$0.00 (mock)'], 'dollars read the same as in Budgets');
   assert.equal(exchangeFacts({ ...base, costUsd: null })[2], 'cost not accounted yet');
   assert.equal(exchangeFacts({ ...base, costPending: true, costUsd: 1 })[2], 'reading cost…');
   assert.equal(exchangeFacts(base)[2], 'cost not reported');
@@ -53,10 +53,18 @@ test('U3 Run is the default tab: message, send and the last exchange together; D
   const run = markup.slice(markup.indexOf('aria-label="Run this agent"'), markup.indexOf('Instruction sent with Run once'));
   assert.ok(run.indexOf('Send (1 call)') < run.indexOf('aria-label="Last exchange"'), 'the answer sits right under the send button');
   assert.ok(run.includes('What &lt;i&gt;now&lt;/i&gt;?') && run.includes('Answer &lt;script&gt;x&lt;/script&gt;'), 'message and answer are plain text');
-  assert.match(run, /52 tokens \(estimated\) · 0 ms · \$0\.000000 \(mock\)/);
+  assert.match(run, /52 tokens \(estimated\) · 0 ms · \$0\.00 \(mock\)/);
+  assert.match(run, /Last exchange · kept on this page only/);
   assert.match(markup, /<h3>Instruction sent with Run once<\/h3><pre class="instruction">Manually configured agent\.<\/pre>/);
   assert.match(markup, /Plan &lt;b&gt;it&lt;\/b&gt;<\/p><p class="helper">Shown on the card, not sent to the model\.<\/p>/);
   assert.match(markup, /role="tab"[^>]*aria-selected="true"[^>]*>Run</, 'Run opens first');
   const source = await readFile('components/agent-inspector.tsx', 'utf8');
   assert.doesNotMatch(source, /PerMillion|preflightCost|tokens\/pricing/, 'no cost is computed in the browser');
+});
+
+test('U-review the Send button never says Running while the question is still open', async () => {
+  assert.deepEqual(runLabels, { idle: 'Send (1 call)', quoting: 'Checking the cost…', asking: 'Waiting for your answer…', sending: 'Running…' });
+  const source = await readFile('components/agent-inspector.tsx', 'utf8');
+  const ask = source.indexOf("setPhase('asking')"), confirmAt = source.indexOf('await confirm({ message: runQuestion('), send = source.indexOf("setPhase('sending')"), complete = source.indexOf("action: 'complete'");
+  assert.ok(ask > 0 && ask < confirmAt && confirmAt < send && send < complete, 'asking while the dialog is open, sending only after yes');
 });

@@ -1,5 +1,7 @@
 // The last Run once of an agent as the Run tab shows it: what was sent, what came back and what it cost.
 // Everything here comes from server responses; nothing is priced or estimated in the browser.
+import { usd } from './budget-summary';
+
 export type RunExchange = { message: string; text: string; model: string; mocked: boolean; tokens: number; latencyMs: number; costUsd?: number | null; costPending?: boolean };
 
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -29,6 +31,6 @@ export function accountedCost(receipts: unknown, agent: string): number | null |
 }
 
 export function exchangeFacts(exchange: RunExchange): string[] {
-  const cost = exchange.costPending ? 'reading cost…' : exchange.costUsd === undefined ? 'cost not reported' : exchange.costUsd === null ? 'cost not accounted yet' : exchange.mocked ? `$${exchange.costUsd.toFixed(6)} (mock)` : `$${exchange.costUsd.toFixed(6)}`;
+  const cost = exchange.costPending ? 'reading cost…' : exchange.costUsd === undefined ? 'cost not reported' : exchange.costUsd === null ? 'cost not accounted yet' : `${usd(exchange.costUsd)}${exchange.mocked ? ' (mock)' : ''}`;
   return [`${exchange.tokens} tokens${exchange.mocked ? ' (estimated)' : ''}`, `${exchange.latencyMs} ms`, cost];
 }

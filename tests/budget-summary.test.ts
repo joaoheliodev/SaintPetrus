@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { budgetMeter, budgetStatus, callCount, idle, percent, rowUsage, scopes, usd, type BudgetRow } from '../lib/budget-summary';
 import { BudgetMeter, BudgetsView } from '../components/token-panel';
 import { TokenService } from '../lib/tokens/service';
+import { PricePanel } from '../components/price-panel';
 import type { Prices, TokenPolicy } from '../lib/tokens/config';
 
 const zero = { prompt: 0, completion: 0, total: 0 };
@@ -28,7 +29,7 @@ test('U4 the top meter shows the fullest of global and session, never an agent o
 test('U4 the meter says its number and state in text, and leads to Budgets', () => {
   const snapshot = { rows: [row('global', 'all', { used: 850, state: 'warning' }), row('session', 's')], stopped: false };
   const markup = renderToStaticMarkup(React.createElement(BudgetMeter, { snapshot, open: () => {} }));
-  assert.match(markup, /class="budget-meter is-warning"/); assert.match(markup, /<span>Budget 85% · warning<\/span>/); assert.match(markup, /width:85%/);
+  assert.match(markup, /class="budget-meter is-warning"/); assert.match(markup, /<span>Budget 85% used · warning<\/span>/); assert.match(markup, /width:85%/);
   assert.match(renderToStaticMarkup(React.createElement(BudgetMeter, { snapshot: { ...snapshot, stopped: true }, open: () => {} })), /Budget · all paused/);
   assert.match(renderToStaticMarkup(React.createElement(BudgetMeter, { snapshot: undefined, open: () => {} })), /Budget …/);
 });
@@ -66,6 +67,13 @@ test('U5 Budgets opens with the summary and the used scopes, and keeps every fie
   assert.match(summary, /All budgets have room\./); assert.match(summary, /0 of 1,000 tokens/); assert.match(summary, /0 held or expired reservations/);
   assert.match(markup, /The mock&#x27;s estimated tokens count against the token limits too/);
   assert.equal(markup.match(/>Resume eligible agents</g)?.length, 1, 'one Resume, in the summary');
+  assert.match(summary, /<button[^>]*disabled=""[^>]*>Resume eligible agents<\/button><span class="helper">Nothing is paused\.<\/span>/, 'nothing to resume, and it says so');
+  service.kill();
+  const paused = renderToStaticMarkup(React.createElement(BudgetsView, { tokens: { data: service.snapshot(), error: '', pending: false, priceError: '', command: async () => true }, agents: [] }));
+  assert.doesNotMatch(paused, /Nothing is paused/); assert.match(paused, /Every agent is paused by Pause all agents/);
+  const priceMarkup = renderToStaticMarkup(React.createElement(PricePanel, { catalog: service.snapshot().catalog, allowlisted: ['test-model'], pending: false, error: '', onAppend: async () => true }));
+  assert.equal(priceMarkup.match(/Not in the model allowlist/g)?.length, 1, 'only the priced model outside the allowlist is marked');
+  assert.ok(priceMarkup.indexOf('Not in the model allowlist') > priceMarkup.indexOf('<h3>other-model</h3>'));
   assert.ok(!summary.includes('other-model') && !summary.includes('Critic'), 'unused scopes wait behind Show all scopes');
   assert.match(markup, />Show all scopes</);
   const details = markup.slice(markup.indexOf('<details'));

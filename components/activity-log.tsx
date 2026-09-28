@@ -22,6 +22,6 @@ export function GraphActivity({ events, revision }: { events: readonly ReceivedE
   const hidden = events.length - shown.length;
   return <section className="activity" aria-label="Graph events">
     <div className="activity-bar"><label className="checkbox-row"><input type="checkbox" checked={noise} onChange={event => setNoise(event.target.checked)} />Show card moves and demo output{hidden ? ` (${hidden} hidden)` : ''}</label><small>revision {revision}</small></div>
-    {shown.length ? <ActivityLines lines={shown.map(event => graphLine(event, now))} /> : <p className="helper">{events.length ? 'Only card moves and demo output so far.' : 'Nothing yet. Add an agent, connect two, or run one.'}</p>}
+    {shown.length ? <ActivityLines lines={shown.map(event => graphLine(event, now))} /> : <p className="helper">{events.length ? 'Only card moves and demo output since this page opened.' : 'No changes since this page opened. Earlier work is on the canvas; the log starts when the page loads.'}</p>}
   </section>;
 }

@@ -8,6 +8,8 @@ import { useConfirm } from './confirm-dialog';
 
 type Props = {
   catalog: TokenSnapshot['catalog'] | undefined;
+  // The policy allowlist; a priced model outside it is kept but cannot be selected.
+  allowlisted?: readonly string[];
   pending: boolean;
   error: string;
   onAppend: (body: object) => Promise<boolean>;
@@ -33,7 +35,7 @@ function PriceDetails({ price }: { price: ModelPrice }) {
   </div>;
 }
 
-export function PricePanel({ catalog, pending, error, onAppend }: Props) {
+export function PricePanel({ catalog, allowlisted, pending, error, onAppend }: Props) {
   const [windows, setWindows] = useState<number[]>([]);
   const [saved, setSaved] = useState(false);
   const nextWindow = useRef(0); const confirm = useConfirm();
@@ -63,6 +65,7 @@ export function PricePanel({ catalog, pending, error, onAppend }: Props) {
     {catalog?.models.length === 0 && <p className="price-warning">No prices configured — execution refused.</p>}
     {catalog?.models.map(row => <section key={row.model} aria-label={`Prices for ${row.model}`}>
       <h3>{row.model}</h3>
+      {allowlisted && !allowlisted.includes(row.model) && <p className="price-note">Not in the model allowlist: its prices are kept, but this model cannot be selected.</p>}
       {row.current ? <div data-current-price={row.current.id}><h4>Current validity</h4><PriceDetails price={row.current.price} /></div>
         : <p className="price-warning">No current price — execution refused.</p>}
       <details><summary>View history</summary>

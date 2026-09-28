@@ -20,13 +20,16 @@ export function runQuestion(quote: unknown): string {
   const price = provider === 'mock' ? 'the mock is free' : `at most $${cost.toFixed(6)} before sending`;
   return `Send one call to ${model}? It reserves ${tokens} tokens, ${price}. What the provider does not use is released when its usage is confirmed.`;
 }
+// The Send button says where a run is: the server's quote, your answer to it, then the call itself.
+type RunPhase = 'idle' | 'quoting' | 'asking' | 'sending';
+export const runLabels: Record<RunPhase, string> = { idle: 'Send (1 call)', quoting: 'Checking the cost…', asking: 'Waiting for your answer…', sending: 'Running…' };
 type Props = { agent: Agent; agents: readonly Pick<Agent, 'id' | 'name'>[]; pending: boolean; command: (input: Record<string, unknown>) => Promise<Graph | null>; connect: (source: string, target: string) => Promise<void>;
   // The global connection Run once uses, and this agent's last exchange, kept in the workspace's memory only.
-  connection?: ProviderStatusSnapshot; exchange?: RunExchange; onExchange?: (exchange: RunExchange) => void };
+  connection?: ProviderStatusSnapshot; exchange?: RunExchange; onExchange?: (exchange: RunExchange) => void; openConnection?: () => void };
 // What Run once will use, in the words of the connection chip and the mode badge.
 export const runsWith = (connection: ProviderStatusSnapshot | undefined) => !connection ? 'Connection loading' : `${connection.state === 'disconnected' ? 'No connection' : connectionTarget(connection)} · ${connection.mode === 'real' ? 'REAL' : 'MOCK'}`;
 // Mount with `key={agent.id}` so drafts never carry over from another agent.
-export function AgentInspector({ agent, agents, pending, command, connect, connection, exchange, onExchange }: Props) {
+export function AgentInspector({ agent, agents, pending, command, connect, connection, exchange, onExchange, openConnection }: Props) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(agent.name);
   const [objective, setObjective] = useState(agent.context.objective);
@@ -40,17 +43,19 @@ export function AgentInspector({ agent, agents, pending, command, connect, conne
   }
   // The keyboard path to what a drag between two cards does; the canvas validates and the server decides.
   const [target, setTarget] = useState(''); const others = agents.filter(other => other.id !== agent.id);
-  const [message, setMessage] = useState(''); const [running, setRunning] = useState(false); const [result, setResult] = useState('');
+  const [message, setMessage] = useState(''); const [phase, setPhase] = useState<RunPhase>('idle'); const [result, setResult] = useState('');
   // A 409 carries either a known code or the server's own fixed refusal sentence; both are safe to show.
   const refusal = (status: number, error: unknown) => status === 409 && typeof error === 'string' && !/^[a-z_]+$/.test(error) ? `Stopped by the server: ${error}` : verificationMessage(status, typeof error === 'string' ? error : undefined);
   // One budgeted call through the connected provider; the server records the answer as this agent's output.
   // It asks first with the server's own quote of the most the call can reserve (operator decision Q-09).
   async function run() {
-    setRunning(true); setResult('');
+    setPhase('quoting'); setResult('');
     try {
       const quoted = await postProviderAction(JSON.stringify({ action: 'quote', input: message, agentId: agent.id }));
       if (!quoted.ok) { setResult(refusal(quoted.status, quoted.data?.error)); return; }
+      setPhase('asking');
       if (!await confirm({ message: runQuestion(quoted.data?.quote), confirmLabel: 'Send (1 call)' })) { setResult('Not sent.'); return; }
+      setPhase('sending');
       const sent = message;
       const { ok, status, data } = await postProviderAction(JSON.stringify({ action: 'complete', input: sent, agentId: agent.id }));
       if (!ok) { setResult(refusal(status, data?.error)); return; }
@@ -62,28 +67,29 @@ export function AgentInspector({ agent, agents, pending, command, connect, conne
       try { costUsd = accountedCost(await readAccounting('/api/receipts'), agent.id); } catch { /* The answer stands without its cost line. */ }
       onExchange?.({ ...answered, costUsd });
     } catch { setResult('Local server unavailable. The call was not confirmed.'); }
-    finally { setRunning(false); }
+    finally { setPhase('idle'); }
   }
   const facts = exchange ? exchangeFacts(exchange) : [];
   return <aside className="inspector" aria-label="Agent inspector">
     <header className="inspector-head">
       <div className="inspector-profile"><Bot aria-hidden="true" /><h2>{agent.name}</h2><AgentStatusBadge status={agent.status} /></div>
-      <p className="inspector-meta"><span title="The connection Run once uses; change it in Connection">{runsWith(connection)}</span><span>{agentPlacement(agent)}</span></p>
+      <p className="inspector-meta">{openConnection ? <button type="button" className="runs-with" title="The connection Run once uses. Open Connection to change it." onClick={openConnection}>{runsWith(connection)}</button> : <span>{runsWith(connection)}</span>}<span>{agentPlacement(agent)}</span></p>
     </header>
     {/* Both panels stay mounted, so an unsaved edit or message survives a tab switch. */}
     <Tabs defaultValue="run"><TabsList aria-label="Agent panel"><TabsTrigger value="run">Run</TabsTrigger><TabsTrigger value="details">Details</TabsTrigger></TabsList>
       <TabsContent value="run" keepMounted>
         <section className="inspector-run" aria-label="Run this agent">
           <label>Message<textarea value={message} maxLength={2000} placeholder="What should this agent answer?" onChange={event => setMessage(event.target.value)} /></label>
-          <Button disabled={running || !message.trim()} onClick={run}><Send />{running ? 'Running…' : 'Send (1 call)'}</Button>
+          <Button disabled={phase !== 'idle' || !message.trim()} onClick={run}><Send />{runLabels[phase]}</Button>
           <p role="status">{result}</p>
           {exchange ? <section className="exchange" aria-label="Last exchange">
+            <p className="exchange-caption">Last exchange · kept on this page only</p>
             <p className="exchange-label">You</p><pre className="exchange-message">{exchange.message}</pre>
             <p className="exchange-label">{exchange.mocked ? `Mock · ${exchange.model}` : exchange.model}</p><pre className="exchange-answer">{exchange.text || 'No visible text.'}</pre>
             <p className="exchange-facts">{facts.join(' · ')}</p>
           </section> : agent.output ? <section className="exchange" aria-label="Recorded output"><p className="exchange-label">Last recorded output</p><pre className="exchange-answer">{agent.output}</pre></section>
             : <p className="helper">No message sent from this panel yet. The answer, its tokens, latency and cost appear here.</p>}
-          <p className="helper">Sends your message with this agent&apos;s instruction (see Details). It asks first, showing the most the call can reserve. The mock is free; a real provider can charge for it.</p>
+          <p className="helper">Run once sends your message with this agent&apos;s instruction (see Details). It asks first, showing the most the call can reserve. The mock is free; a real provider can charge for it.</p>
         </section>
       </TabsContent>
       <TabsContent value="details" keepMounted>

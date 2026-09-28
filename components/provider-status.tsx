@@ -95,12 +95,20 @@ export function useProviderStatus() {
   return { status, unavailable, refresh };
 }
 export type ProviderStatusSource = ReturnType<typeof useProviderStatus>;
+// What each state means, for the chip's tooltip: configured is not verified (docs/reference/connection-state.md).
+export const connectionHints: Record<ConnectionState, string> = {
+  verified: 'Verified: a connection test with this provider and model succeeded.',
+  configured: 'Configured: Run once can use this provider and model, but no connection test has succeeded yet. Connect and verify in Connection proves it.',
+  incomplete: 'The last connection test came back without visible text, so the connection is not verified.',
+  rejected: 'The provider rejected the key or the model in the last connection test.',
+  disconnected: 'No provider is connected, so Run once cannot run.',
+};
 export const statusText = (source: ProviderStatusSource) => source.status ? `${connectionLabel(source.status)}${source.unavailable ? ' · server unreachable' : ''}` : source.unavailable ? '○ Local server unavailable' : '◌ Loading connection state';
 // The top-bar chip: the connection in one line, and the way to the Connection view.
 export function ConnectionChip({ source, open }: { source: ProviderStatusSource; open: () => void }) {
   const { status } = source;
   return <>
-    <button type="button" className={`provider-badge ${status ? `is-${status.state}` : 'is-loading'}`} title="Open Connection" onClick={open}><span role="status">{statusText(source)}</span></button>
+    <button type="button" className={`provider-badge ${status ? `is-${status.state}` : 'is-loading'}`} title={`${status ? `${connectionHints[status.state]} ` : ''}Click to open Connection.`} onClick={open}><span role="status">{statusText(source)}</span></button>
     {status?.validationTimeoutMs !== undefined && <span className="provider-badge is-incomplete" title="Set at server startup with SAINTPETRUS_VALIDATION_TIMEOUT_MS">⏱ Validation timeout · {status.validationTimeoutMs} ms</span>}
   </>;
 }
@@ -156,13 +164,13 @@ export function ConnectionView({ source, children }: { source: ProviderStatusSou
   }
   return <section className="view provider-panel" aria-labelledby="connection-title">
         <h1 id="connection-title">Connection</h1>
-        <p className="helper">Keys go only to this local backend. Connecting makes one minimal call to prove the key works, and can incur provider charges. Memory only by default.</p>
+        <p className="helper">Keys go only to this local backend and stay in its memory unless you tick Remember. Connecting makes one minimal call to prove the key works, and can incur provider charges.</p>
         <p className="connection-now">Now: <strong>{statusText(source)}</strong></p>
         <label>Provider<select value={provider} disabled={pending} onChange={event => { setProvider(event.target.value); setModel(''); setCustom(''); if (keyField.current) keyField.current.value = ''; setShow(false); }}>
           {status?.mockAvailable && <option value="mock">Mock — synthetic, no network</option>}
           <option value="openai" disabled>OpenAI (not supported until validated)</option><option value="gemini" disabled={!realMode}>Google Gemini{realMode ? '' : ' (REAL mode only)'}</option><option value="deepseek" disabled={!realMode}>DeepSeek{realMode ? '' : ' (REAL mode only)'}</option>
         </select></label>
-        <p>{realMode ? 'REAL mode: a connected provider is called for real and can charge you.' : 'MOCK mode: real providers are off and no key is stored. Restart with SAINTPETRUS_MODE=real to use one.'}</p>
+        <p>{realMode ? 'REAL mode: a connected provider is called for real and can charge you.' : 'MOCK mode: only the free mock is available and no key is stored. Connect and verify checks the mock without any network call. Real providers need a server restart with SAINTPETRUS_MODE=real.'}</p>
         <label>Default model<select value={provider === 'mock' ? 'mock-v1' : model} disabled={pending || provider === 'mock'} onChange={event => setModel(event.target.value)}>
           {provider === 'mock' ? <option value="mock-v1">mock-v1</option> : <><option value="">Enter model ID…</option>{status?.provider === provider && status.model && <option value={status.model}>{status.model}</option>}</>}
         </select></label>
@@ -175,7 +183,7 @@ export function ConnectionView({ source, children }: { source: ProviderStatusSou
         </>}
         <div className="project-actions">
           <Button disabled={pending} onClick={() => run('connect')}>{pending ? 'Verifying…' : 'Connect and verify (1 call)'}</Button>
-          <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('test')}>Test again</Button>
+          <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('test')}>Test connection (1 call)</Button>
           <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('disconnect')}>Disconnect</Button>
           <Button variant="outline" disabled={pending || !status || !keyedProviders.includes(status.provider)} onClick={() => run('forget')}>Forget key</Button>
         </div>

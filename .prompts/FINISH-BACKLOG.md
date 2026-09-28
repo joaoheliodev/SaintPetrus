@@ -143,7 +143,8 @@ panel, nothing copied or loaded from it.
 | U7 | First steps | Checklist derived from server state, dismissible in memory | done |
 | U8 | In-app confirmations (P3) | Dialog instead of `window.confirm`, same texts, refuse-then-confirm in the browser check | done |
 | U9 | Command palette (P3, optional) | Ctrl+K filterable list of existing actions | done |
-| U10 | Finish | Dev indicator, README, CHANGELOG, STATUS, floor | done; usability review next |
+| U10 | Finish | Dev indicator, README, CHANGELOG, STATUS, floor | done |
+| UR | Usability review | A reviewer who did not build it tries the six goals from screenshots only | done: confirmed findings fixed, the rest recorded below |
 
 #### Decisions taken
 
@@ -208,6 +209,24 @@ panel, nothing copied or loaded from it.
   been broken since U1/U2 renamed "Run preview mock" and moved it into More, and it answered native dialogs; it was
   not run between those items. It now opens the Preview tab, goes through the More menu, answers the in-app
   confirmation and fails on a native dialog. It passes.
+- Usability review (a subagent that saw only 13 screenshots and the six goals). Fixed:
+  1. Send said "Running…" while the quote confirmation was still open; it now reads Checking the cost… → Waiting for
+     your answer… → Running… (only after yes).
+  2. An empty Activity log said "Nothing yet. Add an agent…" next to existing agents (the log covers this page only);
+     it now says so.
+  3. "Budget 6%" did not say used or left: "Budget 6% used".
+  4. Dollars read $0.00 in one place and $0.000000 in another: one formatter. The sidebar's Demo cost is now marked
+     fictitious and says what the demo and MOCK are.
+  5. The Connection view's MOCK text contradicted its enabled buttons: it now says the mock is checked without network;
+     "Test again" became "Test connection (1 call)"; "memory only by default" is spelled out.
+  6. The chip's "Configured, not verified" is explained in its tooltip (configured is still not verified).
+  7. Resume eligible agents was offered with nothing paused: disabled with "Nothing is paused."
+  8. The model line in the agent panel now links to Connection; the Run tab says it is Run once and labels the last
+     exchange as kept on this page only; handles and the Coordinator crown explain themselves on hover; Prices marks a
+     priced model outside the allowlist (the operator's gpt-5-nano) as not selectable.
+  Not changed: the mock's fixed answer "MOCK: connection verified…" and the event text "Provider output recorded."
+  are server strings (Q-U3); selecting an agent from the sidebar pans the canvas to it, which can cut neighbouring
+  cards at the edge (existing behaviour, kept); card text is small only when the canvas is zoomed out to fit.
 
 #### Questions for João
 
@@ -218,6 +237,10 @@ panel, nothing copied or loaded from it.
 - **Q-U2** Graph events do not say which agent they concern, so Activity lines read "Agent created" without a name
   unless the live feed is on. Adding `agentId` to the graph event would be a small server change (outside this
   round): worth doing?
+- **Q-U3** The mock answers every Run once with "MOCK: connection verified. No external API was called.", and the graph
+  event says "Provider output recorded." even for the mock. Next to a chip that says "not verified", a first-time
+  reviewer read that as a contradiction. Both are server strings: reword them (for example "MOCK answer: no provider
+  was called.")?
 
 ## V0 review of Part 2 (`1445177`)
 

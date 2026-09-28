@@ -27,11 +27,16 @@ test('U4 the canvas stays laid out, but out of reach, while another view is open
   assert.match(workspace, /<div className=\{cn\('workspace-view', view !== 'workspace' && 'is-away'\)\} inert=\{view !== 'workspace'\}>/);
   const css = await readFile('app/globals.css', 'utf8');
   assert.match(css, /\.workspace-view\.is-away \{ visibility: hidden; \}/, 'hidden without losing its size, which React Flow needs');
+  // Only the name stretches and truncates in a sidebar row; the status icon and the Coordinator mark keep their size.
+  assert.match(workspace, /<span className="agent-list-name">\{a\.name\}<\/span>/); assert.match(css, /\.agent-list-name \{ flex: 1; min-width: 0;/);
+  assert.doesNotMatch(css, /\.agent-list-open > span/);
 });
 
 test('U4 the connection chip is a button that says where it leads, and the view keeps the key field transient', () => {
   const chip = renderToStaticMarkup(React.createElement(ConnectionChip, { source, open: () => {} }));
-  assert.match(chip, /^<button type="button" class="provider-badge is-verified" title="Open Connection"><span role="status">● Connected · mock-v1<\/span><\/button>$/);
+  assert.match(chip, /^<button type="button" class="provider-badge is-verified" title="Verified: a connection test with this provider and model succeeded\. Click to open Connection\."><span role="status">● Connected · mock-v1<\/span><\/button>$/);
+  const configured = renderToStaticMarkup(React.createElement(ConnectionChip, { source: { ...source, status: { ...status, state: 'configured', verified: false } }, open: () => {} }));
+  assert.match(configured, /title="Configured: Run once can use this provider and model, but no connection test has succeeded yet\./, 'configured is explained as not verified');
   const view = renderToStaticMarkup(React.createElement(ConnectionView, { source: { ...source, status: { ...status, mode: 'real', mocked: false, mockAvailable: false, provider: 'gemini', model: 'fictitious-model' } } }, React.createElement('p', null, 'Optional features here')));
   assert.match(view, /<h1 id="connection-title">Connection<\/h1>/); assert.match(view, /Optional features here/);
   assert.match(view, /<input type="password" autoComplete="off" spellCheck="false" maxLength="4096"\/>/, 'no value attribute: the key never enters React state');

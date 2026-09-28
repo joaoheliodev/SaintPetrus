@@ -72,7 +72,7 @@ const meterStates: Record<string, string> = { available: '', warning: ' · warni
 // The top-bar meter, from the same snapshot as Budgets: the fullest of the global and session scopes.
 export function BudgetMeter({ snapshot, open }: { snapshot: Pick<TokenSnapshot, 'rows' | 'stopped'> | undefined; open: () => void }) {
   const meter = snapshot ? budgetMeter(snapshot.rows) : undefined;
-  const text = !snapshot ? 'Budget …' : snapshot.stopped ? 'Budget · all paused' : meter ? `Budget ${meter.percent}%${meterStates[meter.state] ?? ''}` : 'Budget —';
+  const text = !snapshot ? 'Budget …' : snapshot.stopped ? 'Budget · all paused' : meter ? `Budget ${meter.percent}% used${meterStates[meter.state] ?? ''}` : 'Budget —';
   return <button type="button" className={cn('budget-meter', meter && `is-${snapshot?.stopped ? 'stopped' : meter.state}`)} onClick={open} title={meter ? `Fullest budget: ${meter.scope}, in ${meter.dimension}. Open Budgets.` : 'Open Budgets.'}>
     <Gauge size={15} aria-hidden="true" /><span>{text}</span><span className="meter-track" aria-hidden="true"><span style={{ width: `${Math.min(100, meter?.percent ?? 0)}%` }} /></span>
   </button>;
@@ -101,6 +101,7 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
   const moved = total ? `${total.used}:${total.reserved}:${total.estimated}:${total.saved}` : '';
   useEffect(() => { let live = true; readAccounting('/api/receipts').then(value => { if (live) setCalls(callCount(value)); }).catch(() => {}); return () => { live = false; }; }, [moved]);
   const status = data ? budgetStatus(data, name) : undefined;
+  const resumable = !!data && (data.stopped || data.paused.length > 0);
   return <section className="view token-panel" aria-labelledby="budgets-title">
         <h1 id="budgets-title">Budgets</h1>
         <p className="helper">Every call reserves its worst case before it leaves: peak price, no cache hits, full output. The mock&apos;s estimated tokens count against the token limits too, so the mock can reach a limit; its dollars are $0.</p>
@@ -110,7 +111,9 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
             {total && <><UsageBar label="Tokens" value={(total.used + total.reserved).toLocaleString('en-US')} limit={total.limit.toLocaleString('en-US')} share={rowUsage(total).tokens} unit="tokens" />
               <UsageBar label="Dollars" value={usd(total.costAccountedUsd + total.costReservedUsd)} limit={usd(total.costLimitUsd)} share={rowUsage(total).dollars} unit="" /></>}
             <p className="helper">{calls ? `${calls.truncated ? 'At least ' : ''}${calls.calls} ${calls.calls === 1 ? 'call' : 'calls'}` : 'Counting calls…'} · {data.reservations.length} held or expired {data.reservations.length === 1 ? 'reservation' : 'reservations'}{total && total.reserved > 0 ? ' · a call in flight' : ''}</p>
-            <Button disabled={pending} variant="outline" onClick={() => command({ action: 'resume' })}>Resume eligible agents</Button>
+            <p className="helper">Limits are changed under Details, below.</p>
+            {/* Resume only has something to do after a pause or the kill switch. */}
+            <div className="project-actions"><Button disabled={pending || !resumable} variant="outline" onClick={() => command({ action: 'resume' })}>Resume eligible agents</Button>{!resumable && <span className="helper">Nothing is paused.</span>}</div>
           </section>
           {scopes.map(({ scope, title, meaning }) => { const rows = data.rows.filter(row => row.scope === scope && (allScopes || !idle(row) || scope === 'global')); return rows.length ? <section key={scope} className="scope-block" aria-label={`${title} budgets`}>
             <h2>{title}</h2><p className="helper">{meaning}</p>{rows.map(row => <ScopeRow key={`${row.scope}:${row.id}`} row={row} name={name(row)} />)}
@@ -147,6 +150,6 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
 export function PricesView({ tokens }: { tokens: TokenSource }) {
   const { data, pending, priceError, command } = tokens;
   return <section className="view" aria-labelledby="prices-title"><h1 id="prices-title">Prices</h1>
-    <PricePanel catalog={data?.catalog} pending={pending} error={priceError} onAppend={body => command(body, '/api/prices')} />
+    <PricePanel catalog={data?.catalog} allowlisted={data ? Object.keys(data.models) : undefined} pending={pending} error={priceError} onAppend={body => command(body, '/api/prices')} />
   </section>;
 }
