@@ -174,7 +174,7 @@ test('A-04 the store saves privately, redacted and coalesced, restores through t
 test('A-04 the server restores the graph before it listens and saves the last change on shutdown', async () => {
   const server = await readFile('scripts/server.ts', 'utf8');
   assert.ok(server.indexOf('graphStore.restore(runtime().graph)') > 0);
-  assert.ok(server.indexOf('graphStore.restore(') < server.indexOf('graphRoutes(runtime().graph)'), 'before any route reads the graph');
+  assert.ok(server.indexOf('graphStore.restore(') < server.indexOf('graphRoutes(runtime().graph, graphStore)'), 'before any route reads the graph, and the routes get the store');
   assert.ok(server.indexOf('graphStore.attach(runtime().graph)') < server.indexOf('server.listen('));
   assert.match(server, /process\.on\(signal, \(\) => \{ try \{ graphStore\.flush\(\);/);
   assert.match(server, /new GraphStore\(userDataDirectory\(\)/);

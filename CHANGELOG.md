@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 4 on `main` (2026-09-29)
 
 Deleting a delegation left a graph the server could no longer save, and nothing on screen said so. No request with a
-real key was made. The test floor rose from 487 to 490.
+real key was made. The test floor rose from 487 to 495.
 
 - A delegation connection is deleted only with its subagent: `POST /api/graph` answers 400 to `disconnect` on a
   `delegation` edge with "A delegation connection cannot be deleted on its own. Remove the subagent instead.", and
@@ -17,6 +17,10 @@ real key was made. The test floor rose from 487 to 490.
   accepted one (R4-2). It found three more ways to leave a graph that could not be saved, now fixed: a subagent
   placed beside a parent at the edge of the canvas fell outside it; an output cut at 8000 inside
   "Bearer [REDACTED]" was redacted longer again when saved; and the demo's output could grow past 8000.
+- While the graph cannot be saved, for any reason, a warning under the top bar says why and stays until a change is
+  saved again. The new `GET /api/graph/persistence`, local and read-only, answers `{ saving: true }` or
+  `{ saving: false, reason, since }`; the reason is the parser's sentence or a fixed one, never the refused text
+  (R4-3). The browser check confirms the store keeps saving through the whole flow.
 
 ## Unreleased: Round 3 on `night/provider-validation-ready` (2026-09-28)
 

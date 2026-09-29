@@ -102,6 +102,8 @@ The saved graph, `graph.json`, sits in the same user data directory with the sam
 redactor like the export. It is read back at startup through the strict parser that checks an import, so a file
 edited outside the app is untrusted input like any other: unknown fields, credential-shaped text, foreign
 providers, oversize files and impossible graphs are refused, and a refused file is set aside, never overwritten.
+When the store cannot write the graph, the local, read-only `GET /api/graph/persistence` and the warning under the
+top bar give only the parser's own sentence (it names a field) or a fixed one, never the refused text or a path.
 
 The accounting journal, `accounting.jsonl`, sits beside it with the same permissions (0700/0600). Each record is one
 JSON line, synced before the change it records can take effect, and holds only IDs, counts, amounts, price versions,

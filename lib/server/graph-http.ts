@@ -1,12 +1,21 @@
 import type { GraphEvent } from '../orchestrator';
-import { safeStringify } from '../security/redact';
+import { safeJson, safeStringify } from '../security/redact';
 import { localRequest } from './http';
 import type { GraphService } from './graph-service';
+import type { GraphStore } from './graph-store';
 
-export function graphRoutes(graph: GraphService) {
+// The store exists only in the custom server's copy of the modules, so its state is served from here, read-only:
+// the server answers 405 to anything but GET on these paths.
+export function graphRoutes(graph: GraphService, store: Pick<GraphStore, 'persistence'>) {
   return new Map<string, (request: Request) => Response>([
     ['/api/graph/stream', request => graphStream(request, graph)],
+    ['/api/graph/persistence', request => graphPersistence(request, store)],
   ]);
+}
+
+export function graphPersistence(request: Request, store: Pick<GraphStore, 'persistence'>) {
+  if (!localRequest(request, false)) return safeJson({ error: 'Local requests only.' }, 403);
+  return safeJson(store.persistence());
 }
 
 export function graphStream(request: Request, graph: GraphService) {

@@ -60,7 +60,7 @@ try {
 } catch { console.error('The accounting journal cannot be opened. Real calls are blocked until access to it is fixed and the server restarts.'); }
 const handle = app.getRequestHandler();
 // No Next route file exists for optional endpoints. Disabled means absent from this registry.
-const routes = new Map([...graphRoutes(runtime().graph), ...optionalEventRoutes(), ...optionalPreviewRoutes()]);
+const routes = new Map([...graphRoutes(runtime().graph, graphStore), ...optionalEventRoutes(), ...optionalPreviewRoutes()]);
 const previewPort = Number(process.env.SAINTPETRUS_PREVIEW_PORT ?? port + 1);
 if (previewEnabled() && (!Number.isInteger(previewPort) || previewPort < 1024 || previewPort > 65535 || previewPort === port)) { console.error('Invalid isolated preview port.'); await app.close(); process.exit(1); }
 const previewServer = previewEnabled() ? createServer(async (req, res) => {

@@ -4,7 +4,8 @@ SaintPetrus is one Node.js process. `scripts/next.mjs` validates the command lin
 `scripts/server.ts`, a small HTTP server that binds to `127.0.0.1`, sets the security headers on every
 response and hands everything else to Next.js. Pages and most API routes are ordinary Next.js App Router
 files. The long-lived streams (the graph stream, the optional event feed and the optional artifact stream)
-are registered in the custom server instead, so a disabled feature has no route at all. With the preview
+are registered in the custom server instead, so a disabled feature has no route at all. So is the read-only
+`GET /api/graph/persistence`, because only the custom server's copy of the modules holds the `GraphStore`. With the preview
 enabled, a second listener on its own loopback port serves only the isolated preview document.
 
 Authoritative state lives in process-wide singletons kept on `globalThis`, so the custom server and every
@@ -21,7 +22,7 @@ Each kind of state has exactly one server owner; read
 | --- | --- | --- |
 | Launch | `scripts/next.mjs`, `scripts/server.ts` | Loopback binding, telemetry off, the dev-only mock default, security headers, optional routes and the preview listener |
 | Local boundary | `lib/server/http.ts`, `lib/server/read-json.ts`, `lib/server/security-headers.ts` | Host, exact Origin and JSON checks, bounded request bodies, graph command dispatch, the content security policy |
-| Graph | `lib/orchestrator.ts`, `lib/server/graph-service.ts`, `lib/server/graph-document.ts`, `lib/server/graph-store.ts`, `lib/server/graph-http.ts`, `lib/server/runtime.ts`, `lib/providers/mock-provider.ts` | Agent and edge rules, the server-owned graph, its revisioned stream, the strict file format for import and the saved copy, the mock demonstration |
+| Graph | `lib/orchestrator.ts`, `lib/server/graph-service.ts`, `lib/server/graph-document.ts`, `lib/server/graph-store.ts`, `lib/server/graph-http.ts`, `lib/graph-persistence.ts`, `lib/server/runtime.ts`, `lib/providers/mock-provider.ts` | Agent and edge rules, the server-owned graph, its revisioned stream, the strict file format for import and the saved copy, whether that copy keeps up, the mock demonstration |
 | Browser | `app/page.tsx`, `components/*`, `lib/store.ts`, `lib/graph-sync.ts`, `lib/use-graph-transport.ts`, `lib/node-moves.ts`, `lib/graph-deletion.ts`, `lib/agent-status.ts`, `lib/run-exchange.ts`, `lib/budget-summary.ts`, `lib/activity-log.ts`, `lib/first-steps.ts`, `lib/command-search.ts` | The sidebar of views, the canvas and the agent panel; a projection of server snapshots guarded by revision; commands; settled node moves; edge-only deletion; how status, exchanges, budgets, activity, first steps and commands are named on screen, never computed in place of the server |
 | Credentials | `lib/security/credentials.ts`, `lib/security/encrypted-vault.ts`, `lib/security/os-keyring.ts`, `lib/security/runtime.ts`, `app/api/credentials`, `scripts/key.mjs` | Keys in backend memory, opt-in encrypted copies under a keyring-held key, the terminal helper |
 | Redaction | `lib/security/redact.ts` | Secret-shaped text removed from inputs, outputs, events, exports and JSON responses |

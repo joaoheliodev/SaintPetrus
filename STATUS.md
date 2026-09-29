@@ -82,8 +82,11 @@ on `main`.
   by name and in a seeded random walk, and parses the redacted snapshot after each accepted one. It also found, and
   the round fixed, a subagent placed outside the canvas beside a parent at its edge, an output cut inside
   "Bearer [REDACTED]" that saved longer than its limit, and demo output past 8000 characters.
+- **R4-3** While the graph cannot be saved, a persistent warning under the top bar gives the store's reason until a
+  change is saved again; `GET /api/graph/persistence` serves that state read-only. The key configured after the
+  text (R-01) is one such reason; a failed write is another.
 - **R4-4** The browser check deletes a context connection (refused, then confirmed) and checks that deleting the
-  delegation is refused.
+  delegation is refused, and that the store keeps saving to the end.
 
 ## Not verified or pending
 
@@ -104,6 +107,7 @@ on `main`.
 
 ## Open debts and limits
 
+- The graph store learns it cannot save only when it tries to write: a key configured after the text (R-01) brings up the warning at the next change of the graph, not when the key is configured.
 - The graph and the global, agent and model accounting survive a restart. The session budget, the mock's usage, events, artifacts and the dispatch ledger are process-local. The journal is a checkpoint log, not an invoice: the input counter is still approximate.
 - An unresolved reservation converts after `reservationTtlMs` (300000 ms in the shipped policy) at the greater of the hold and the dearest eligible captured model at peak with no cache hits, using P3's provider rule, and stays marked as an expired estimate until manual reconciliation.
 - The input counter is approximate. The monetary ceiling is a guard, not a proof of the invoice.

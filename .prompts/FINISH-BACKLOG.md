@@ -346,7 +346,7 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
 | --- | --- | --- | --- |
 | R4-1 | A delegation is not deleted | The server refuses `disconnect` on a `delegation` edge with a message to remove the subagent; only `context` connections are deleted; the canvas explains it while a delegation is selected; recorded in `AGENTS.md` | done |
 | R4-2 | Savable after every command | A test runs every `GraphService` command (create, subagent, connect, delete connection, remove, edit, move, limits, reset, output, pause, import) and parses the redacted snapshot with `parseGraphDocument` after each accepted one | done |
-| R4-3 | Warning while the graph is not saved | While `GraphStore` refuses or fails to write, for any reason (R-01's key configured after the text included), a persistent warning shows the reason, never the refused text, until it saves again; a local read-only route exposes the state; documentation and tests in the same commit | todo |
+| R4-3 | Warning while the graph is not saved | While `GraphStore` refuses or fails to write, for any reason (R-01's key configured after the text included), a persistent warning shows the reason, never the refused text, until it saves again; a local read-only route exposes the state; documentation and tests in the same commit | done |
 | R4-4 | Browser check | Deletes a context connection (refused, then confirmed) and checks that deleting the delegation is refused; no check removed | done |
 
 #### Decisions taken
@@ -378,8 +378,29 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   (`savedOutput`, at most the length of that marker); (3) `appendMockOutput` appended without a limit, so demo output
   after a long answer passed 8000; it now goes through `savedOutput` as well. The mock's own text is unchanged by
   the redactor, so the demo and the preview are unaffected.
+- R4-3: `GraphStore` keeps `GraphPersistence` (`lib/graph-persistence.ts`): `{ saving: true }`, or
+  `{ saving: false, reason, since }` from the first refused or failed write until the next one that lands. The
+  reason is the parser's own sentence only when the error is a `GraphError` (a Node `TypeError` quotes what it was
+  given, so anything else becomes "Graph file refused."), or the fixed `GRAPH_UNWRITABLE` for a failed write, whose
+  error still reaches the caller and the terminal as before. `since` is when saving stopped and stays while the
+  reason changes. The route is `GET /api/graph/persistence`, registered in the custom server beside the stream
+  because only the server's copy of the modules holds the store (so the registry's 405 makes it read-only); it
+  checks `localRequest` and answers through `safeJson`. The panel reads it every second, like the token snapshot,
+  through the GET that `lib/use-graph-transport.ts` already made for the fallback snapshot, so the direct-fetch
+  ratchet is unchanged; it accepts only the exact shape and shows `GraphSaveWarning` under the top bar, with no
+  dismiss button, until the state says it is saving again. The store only learns it cannot save when it tries to
+  write, so a key configured after the text (R-01) brings the warning at the next change of the graph, not at the
+  moment the key is configured (recorded in STATUS). The browser check asserts the route says `saving: true` after
+  the connection steps and at the end. Checked by hand in Chromium on a throwaway instance: a file put where the data
+  directory was made the next change fail, the route answered `saving: false` with the fixed reason, and the warning
+  appeared right under the top bar (`role="alert"`, no button); with the directory back, the next change was saved
+  and the warning went away. The delegation explanation was checked the same way, over the canvas.
 
 #### Questions for João
+
+- R4-3: should configuring a key make the store try to write at once, so a key that matches text already in the
+  graph brings up the warning immediately instead of at the next change? Not done: it would tie the credential path
+  to the graph store, and the round asked for the warning while the store refuses, which it does.
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -509,6 +530,16 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R4-2 | no trim after the output cut | killed by both R4-2 tests ("output with a bearer token at 7983", random walk step 62) |
 | R4-2 | demo output appended without `savedOutput` | killed by both R4-2 tests ("demo output after it", random walk step 115) |
 | R4-2 | `disconnect` without the delegation refusal | killed by both R4-2 tests as well ("delete a delegation", random walk step 246) |
+| R4-3 | the store never records a refusal | killed by the two store tests; restored, sha256 identical (store, route, guard, workspace, transport) |
+| R4-3 | `since` restarts at every refusal | killed by the same two tests |
+| R4-3 | a failed write left out of the state | killed by "a write that fails is reported with a fixed sentence…" |
+| R4-3 | a saved write does not clear the state | killed by "the store says it is not saving, and why…" |
+| R4-3 | `instanceof Error` instead of `GraphError.is` for the reason | first survived (the parser throws only `GraphError`); a test with something that is not a graph now kills it, showing Node's "…Received undefined" would have reached the panel |
+| R4-3 | the route without `localRequest` | killed by "GET /api/graph/persistence serves the store state, to local requests only…" |
+| R4-3 | the client guard accepts extra keys | killed by "the panel takes only the route shape…" |
+| R4-3 | the warning without the store's reason | killed by the same test |
+| R4-3 | the warning not rendered under the top bar | killed by the same test (wiring assertion) |
+| R4-3 | the transport never reads the route | killed by the same test (wiring assertion) |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

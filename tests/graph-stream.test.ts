@@ -19,7 +19,7 @@ const graphAt = (revision: number, objective: string): Graph => {
 };
 
 test('graph mutation reaches its always-on SSE route without polling and is redacted on the wire', async () => {
-  const graph = new GraphService(); const routes = graphRoutes(graph);
+  const graph = new GraphService(); const routes = graphRoutes(graph, { persistence: () => ({ saving: true }) });
   assert.ok(routes.has('/api/graph/stream')); assert.equal(optionalEventRoutes(false).size, 0);
   assert.equal(graphStream(new Request('http://127.0.0.1:3100/api/graph/stream', { headers: { Origin: 'null' } }), graph).status, 403);
   const response = routes.get('/api/graph/stream')!(new Request('http://127.0.0.1:3100/api/graph/stream'));

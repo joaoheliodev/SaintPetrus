@@ -21,6 +21,7 @@ import { ArtifactPreview } from './artifact-preview';
 import { EventFeed } from './event-feed';
 import { GraphActivity } from './activity-log';
 import { ConfirmProvider, useConfirm } from './confirm-dialog';
+import { GraphSaveWarning } from './graph-save-warning';
 import { ConnectionChip, ConnectionView, connectionTarget, useProviderStatus } from './provider-status';
 import type { ProviderStatusSnapshot } from '@/lib/providers/runtime';
 import type { RunExchange } from '@/lib/run-exchange';
@@ -54,7 +55,7 @@ type Draft = { parentId: string | null; position?: { x: number; y: number } };
 type Props = { initialGraph: Graph; mockEnabled: boolean; feedEnabled?: boolean; previewPort?: number };
 function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previewPort }: Props) {
   const { graph, selectedId, notice, events, select } = useProjection();
-  const { command, importGraph, pending } = useGraphTransport(initialGraph);
+  const { command, importGraph, pending, persistence } = useGraphTransport(initialGraph);
   const connection = useProviderStatus(); const tokens = useTokenSnapshot(); const confirm = useConfirm();
   // Which view fills the main column; presentation state in memory only.
   const [view, setView] = useState<View>('workspace'); const [drawerOpen, setDrawerOpen] = useState(true);
@@ -224,6 +225,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
     </aside>
     <div className="main-column">
       <header className="topbar"><ConnectionChip source={connection} open={() => setView('connection')} /><BudgetMeter snapshot={tokens.data} open={() => setView('budgets')} /><div className="topbar-actions"><Button variant="ghost" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Control+K"><Search />Commands<kbd>Ctrl K</kbd></Button><PauseAllButton tokens={tokens} /></div></header>
+      <GraphSaveWarning state={persistence} />
       <CommandPalette commands={commands} open={paletteOpen} onOpenChange={setPaletteOpen} />
       {/* The canvas stays laid out under the other views: React Flow measures nodes and draws its background from its own size. */}
       <div className={cn('workspace-view', view !== 'workspace' && 'is-away')} inert={view !== 'workspace'}><div className="center-panel"><div className="canvas-toolbar"><span>Canvas · {graph.agents.length} {graph.agents.length === 1 ? 'agent' : 'agents'} · {graph.edges.length} {graph.edges.length === 1 ? 'connection' : 'connections'}</span><div className="project-actions">

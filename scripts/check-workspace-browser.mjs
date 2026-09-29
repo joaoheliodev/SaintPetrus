@@ -215,6 +215,12 @@ try {
   await until(async () => await edges() === 1, 'confirmed deletion');
   assert.deepEqual((await serverEdges()).map(edge => edge.id), [delegationId], 'only the context connection went');
   console.log('PASS: connection deletion asks first and honours the answer');
+  // Every change so far could be saved: the store says so, and the panel shows no warning.
+  const persistence = () => evaluate(`fetch('/api/graph/persistence', { cache: 'no-store' }).then(r => r.json())`);
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  assert.deepEqual(await persistence(), { saving: true }, 'the store is still saving the graph');
+  assert.equal(await evaluate(`document.querySelector('.save-warning') === null`), true, 'no warning that the graph is not saved');
+  console.log('PASS: the graph is still being saved and the panel shows no warning');
   // Walk the whole page with Tab from a fresh load; every stop, cards and connections included, must show where focus is.
   await sync(); await call('Page.reload', {}, session);
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 3 && document.querySelectorAll('.react-flow__edge').length === 1`), 'canvas after reload');
@@ -248,6 +254,7 @@ try {
   await until(() => evaluate(`document.querySelector('.react-flow__node .status')?.textContent.includes('Paused')`), 'agents paused');
   console.log('PASS: pause all asks first and pauses every agent');
   await new Promise(resolve => setTimeout(resolve, 500));
+  assert.deepEqual(await persistence(), { saving: true }, 'the store saved the graph to the end');
   assert.deepEqual(problems, [], 'no CSP violation, uncaught exception or console error');
   await sync();
   assert.ok(dialogs.length >= 7 && focusStarts.every(focus => focus === 'Cancel'), `every confirmation opened in the app with focus on Cancel: ${JSON.stringify(focusStarts)}`);
