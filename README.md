@@ -89,7 +89,9 @@ meter (the fullest of the global and session budgets; click it to open **Budgets
 8. **More** (canvas toolbar) holds **Import graph…**, **Export graph** (redacted JSON), **Reset graph…** (with the
    objective the Coordinator receives on reset) and, in MOCK mode, **Load demo…**. Every action that replaces the
    canvas asks first.
-9. **Delete a connection**: select it and press Delete or Backspace, then confirm.
+9. **Delete a connection**: select it and press Delete or Backspace, then confirm. Only context connections can
+   be deleted. A delegation goes with its subagent: selecting one says so, and the server refuses to delete it on
+   its own, so remove the subagent instead (**Details → Remove agent**).
 10. Every confirmation opens inside the app with the focus on **Cancel**.
 
 The server owns the graph: every tab sees the same one. It is saved to `graph.json` in the user data directory

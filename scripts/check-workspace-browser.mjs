@@ -181,15 +181,21 @@ try {
   await until(() => click('Create subagent'), 'Create subagent button');
   await until(async () => await nodes() === 3 && await edges() === 1, 'subagent with its delegation edge');
   if (mocked) await until(async () => await firstSteps() === 'gone', 'checklist done once an agent was added, connected and run');
-  // Delete the connection from the keyboard: first refuse, then confirm.
-  const edgeId = await evaluate(`document.querySelector('.react-flow__edge')?.getAttribute('data-id')`);
-  const pressDelete = async () => { await evaluate(`document.querySelector('.react-flow__edge-path, .react-flow__edge-interaction')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`); await until(() => evaluate(`document.querySelector('.react-flow__edge.selected') !== null`), 'edge selected'); await press('Delete'); };
-  await decide(false); await pressDelete(); await until(async () => (await sync()).some(text => text.startsWith('Delete the selected connection')), 'deletion question');
-  await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await edges(), 1, 'a refused deletion keeps the connection');
-  const asked = (await sync()).length; await pressDelete(); await until(async () => (await sync()).length > asked, 'second deletion question');
-  await until(async () => await edges() === 0, 'confirmed deletion');
-  assert.ok(edgeId, 'the edge had an identity');
-  console.log('PASS: connection deletion asks first and honours the answer');
+  const serverEdges = () => evaluate(`fetch('/api/graph', { cache: 'no-store' }).then(r => r.json()).then(g => g.edges)`);
+  const selectEdge = async id => { await evaluate(`document.querySelector('.react-flow__edge[data-id="${id}"] .react-flow__edge-path, .react-flow__edge[data-id="${id}"] .react-flow__edge-interaction')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`); await until(() => evaluate(`document.querySelector('.react-flow__edge.selected')?.getAttribute('data-id') === ${JSON.stringify(id)}`), 'edge selected'); };
+  const pressDelete = async id => { await selectEdge(id); await press('Delete'); };
+  // A delegation goes only with its subagent: selecting it says so, and the server refuses to delete it, without a question.
+  const delegationId = await evaluate(`document.querySelector('.react-flow__edge')?.getAttribute('data-id')`);
+  assert.ok(delegationId, 'the delegation had an identity');
+  await selectEdge(delegationId);
+  await until(() => evaluate(`document.querySelector('.canvas-hint [role=status]')?.textContent.includes('cannot be deleted on its own. Remove the subagent instead')`), 'selected delegation explained');
+  const questionsBefore = (await sync()).length; await press('Delete');
+  await until(() => evaluate(`document.querySelector('.notice span')?.textContent === 'A delegation connection cannot be deleted on its own. Remove the subagent instead.'`), 'the server refusal on screen');
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.equal((await sync()).length, questionsBefore, 'nothing asks to confirm what the server refuses');
+  assert.equal(await edges(), 1, 'the delegation stays on the canvas');
+  assert.deepEqual((await serverEdges()).map(edge => [edge.id, edge.kind]), [[delegationId, 'delegation']], 'and on the server');
+  console.log('PASS: a delegation cannot be deleted; selecting it explains why and the server refuses it');
   // Connect two existing agents without a mouse: pick the target in the inspector, Tab to Connect, press Enter.
   await until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('.agent-list-open')).find(b => b.textContent.includes('Renamed smoke agent')); item?.click(); return document.querySelector('.inspector h2')?.textContent === 'Renamed smoke agent'; })()`), 'smoke agent selected');
   await tab('Details');
@@ -198,8 +204,17 @@ try {
   await until(() => evaluate(`document.querySelector('section[aria-label="Connect this agent"] select').value !== ''`), 'target chosen from the keyboard');
   await key('Tab'); assert.equal(await evaluate(`document.activeElement?.textContent`), 'Connect');
   await key('Enter');
-  await until(async () => await edges() === 1, 'connection created from the keyboard');
+  await until(async () => await edges() === 2, 'connection created from the keyboard');
   console.log('PASS: two agents connected from the keyboard');
+  // Delete the context connection from the keyboard: first refuse, then confirm.
+  const edgeId = (await serverEdges()).find(edge => edge.kind === 'context')?.id;
+  assert.ok(edgeId, 'the edge had an identity');
+  await decide(false); await pressDelete(edgeId); await until(async () => (await sync()).some(text => text.startsWith('Delete the selected connection')), 'deletion question');
+  await new Promise(resolve => setTimeout(resolve, 300)); assert.equal(await edges(), 2, 'a refused deletion keeps the connection');
+  const asked = (await sync()).length; await pressDelete(edgeId); await until(async () => (await sync()).length > asked, 'second deletion question');
+  await until(async () => await edges() === 1, 'confirmed deletion');
+  assert.deepEqual((await serverEdges()).map(edge => edge.id), [delegationId], 'only the context connection went');
+  console.log('PASS: connection deletion asks first and honours the answer');
   // Walk the whole page with Tab from a fresh load; every stop, cards and connections included, must show where focus is.
   await sync(); await call('Page.reload', {}, session);
   await until(() => evaluate(`document.querySelectorAll('.react-flow__node').length === 3 && document.querySelectorAll('.react-flow__edge').length === 1`), 'canvas after reload');

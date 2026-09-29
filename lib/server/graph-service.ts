@@ -151,6 +151,8 @@ export class GraphService {
   disconnect(id: string) {
     const edge = this.graph.edges.find(e => e.id === id);
     if (!edge) throw new GraphError('Connection not found.');
+    // A delegation is what makes its target a subagent: without it the graph could no longer be saved or restored.
+    if (edge.kind === 'delegation') throw new GraphError('A delegation connection cannot be deleted on its own. Remove the subagent instead.');
     this.graph.edges = this.graph.edges.filter(e => e.id !== id);
     this.record('connection.removed', edge.source, 'Connection removed.', { source: edge.source, destination: edge.target });
     this.emit('edge.removed', 'Connection removed.', { source: this.graph.agents.find(a => a.id === edge.source), target: this.graph.agents.find(a => a.id === edge.target) });

@@ -3,6 +3,17 @@
 Notable changes, newest first. Dates are UTC. No release has been tagged; entries are grouped by the branch
 that carried them.
 
+## Unreleased: Round 4 on `main` (2026-09-29)
+
+Deleting a delegation left a graph the server could no longer save, and nothing on screen said so. No request with a
+real key was made. The test floor rose from 487 to 488.
+
+- A delegation connection is deleted only with its subagent: `POST /api/graph` answers 400 to `disconnect` on a
+  `delegation` edge with "A delegation connection cannot be deleted on its own. Remove the subagent instead.", and
+  context connections are deleted as before. The canvas explains this while a delegation is selected and asks
+  nothing before sending one (R4-1). The browser check deletes a context connection and checks that the delegation
+  is refused (R4-4).
+
 ## Unreleased: Round 3 on `night/provider-validation-ready` (2026-09-28)
 
 Operator decisions and server fixes. No request with a real key was made. The test floor rose from 463 to 484.

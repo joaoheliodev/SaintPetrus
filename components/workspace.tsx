@@ -1,7 +1,7 @@
 'use client';
 // Adapted canvas geometry and interactions; all mutations go to the local server.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Position, MarkerType, useEdgesState, useNodesState, useReactFlow, type Edge, type EdgeChange, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Panel, Position, MarkerType, useEdgesState, useNodesState, useReactFlow, type Edge, type EdgeChange, type Node, type NodeProps, type NodeChange, type FinalConnectionState } from '@xyflow/react';
 import { Bot, ChevronDown, ChevronUp, Circle, CircleCheck, CornerDownRight, Crown, Download, Ellipsis, Gauge, GitBranch, History, LayoutGrid, Maximize, Plug, Search, Tag, Pause, Play, Plus, RotateCcw, ShieldCheck, Upload, Workflow, X } from 'lucide-react';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ import { ConnectionChip, ConnectionView, connectionTarget, useProviderStatus } f
 import type { ProviderStatusSnapshot } from '@/lib/providers/runtime';
 import type { RunExchange } from '@/lib/run-exchange';
 import { firstSteps } from '@/lib/first-steps';
-import { allowSelectedEdgesOnly } from '@/lib/graph-deletion';
+import { allowSelectedEdgesOnly, byDeletability, delegationHint } from '@/lib/graph-deletion';
 import { latestMoveSender, settledMoves } from '@/lib/node-moves';
 import { cn } from '@/lib/utils';
 import '@xyflow/react/dist/style.css';
@@ -122,14 +122,19 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
     // A remove change is only a request; deletion must be accepted and reflected by the server.
     onEdgesChange(items.filter(item => item.type === 'select'));
   }, [onEdgesChange]);
-  // Keyboard deletion reaches only selected connections, and only after the user confirms.
+  // Keyboard deletion reaches only selected connections, and only after the user confirms. A delegation alone asks
+  // nothing: the server refuses it and says why, so there is nothing to confirm.
   const confirmDeletion = useCallback(async (candidates: { nodes: AgentNodeType[]; edges: AgentEdgeType[] }) => {
     const allowed = await allowSelectedEdgesOnly(candidates);
-    return allowed.edges.length > 0 && await confirm({ message: `Delete ${allowed.edges.length === 1 ? 'the selected connection' : `${allowed.edges.length} selected connections`}? This cannot be undone.`, confirmLabel: 'Delete', destructive: true }) ? allowed : false;
-  }, [confirm]);
+    const { contexts } = byDeletability(graph, allowed.edges);
+    if (!contexts.length) return allowed.edges.length > 0 ? allowed : false;
+    return await confirm({ message: `Delete ${contexts.length === 1 ? 'the selected connection' : `${contexts.length} selected connections`}? This cannot be undone.`, confirmLabel: 'Delete', destructive: true }) ? allowed : false;
+  }, [confirm, graph]);
   async function deleteEdges(items: AgentEdgeType[]) {
-    for (const edge of items) await command({ action: 'disconnect', id: edge.id });
+    const { contexts, delegations } = byDeletability(graph, items);
+    for (const edge of [...contexts, ...delegations]) await command({ action: 'disconnect', id: edge.id });
   }
+  const edgeHint = delegationHint(graph, edges.filter(edge => edge.selected).map(edge => edge.id));
   function openDraft(next: Draft) {
     const parent = next.parentId ? graph.agents.find(a => a.id === next.parentId) : undefined;
     setName(parent ? `${parent.name} subagent` : `Agent ${graph.agents.length + 1}`);
@@ -246,7 +251,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         <p className="helper">{steps.steps.find(step => !step.done)?.how}{mockEnabled && lonely && <> Or <Button variant="link" disabled={pending} onClick={loadDemo}>Load demo…</Button> to replace this canvas with a fixed demonstration.</>}</p>
         <Button variant="ghost" size="sm" onClick={() => setStepsDismissed(true)}>Dismiss</Button>
       </section>}
-      <div className="canvas-area"><ConnectionContext.Provider value={connection.status}><ReactFlow<AgentNodeType, AgentEdgeType> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={changes} onEdgesChange={edgeChanges} onBeforeDelete={confirmDeletion} onEdgesDelete={deleteEdges} onNodeClick={(_, n) => select(n.id)} onConnect={c => connect(c.source, c.target)} onConnectEnd={connectEnd} onPaneClick={() => useProjection.setState({ notice: '' })} onDoubleClick={paneDoubleClick} zoomOnDoubleClick={false} minZoom={.25} maxZoom={1.5} deleteKeyCode={['Backspace', 'Delete']} colorMode="dark" fitView fitViewOptions={{ maxZoom: 1, padding: .25 }} aria-label="Agent graph"><Background /><Controls showInteractive={false} /><MiniMap pannable zoomable style={MINIMAP} /></ReactFlow></ConnectionContext.Provider>
+      <div className="canvas-area"><ConnectionContext.Provider value={connection.status}><ReactFlow<AgentNodeType, AgentEdgeType> nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={changes} onEdgesChange={edgeChanges} onBeforeDelete={confirmDeletion} onEdgesDelete={deleteEdges} onNodeClick={(_, n) => select(n.id)} onConnect={c => connect(c.source, c.target)} onConnectEnd={connectEnd} onPaneClick={() => useProjection.setState({ notice: '' })} onDoubleClick={paneDoubleClick} zoomOnDoubleClick={false} minZoom={.25} maxZoom={1.5} deleteKeyCode={['Backspace', 'Delete']} colorMode="dark" fitView fitViewOptions={{ maxZoom: 1, padding: .25 }} aria-label="Agent graph">{edgeHint && <Panel position="top-center" className="canvas-hint"><p role="status">{edgeHint}</p></Panel>}<Background /><Controls showInteractive={false} /><MiniMap pannable zoomable style={MINIMAP} /></ReactFlow></ConnectionContext.Provider>
       </div>
       <Tabs className={cn('drawer', !drawerOpen && 'is-collapsed')} defaultValue="activity"><div className="drawer-bar"><TabsList aria-label="Canvas panels"><TabsTrigger value="activity">Activity</TabsTrigger>{previewPort && <TabsTrigger value="preview">Preview</TabsTrigger>}</TabsList>
         <Button variant="ghost" size="sm" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(!drawerOpen)}>{drawerOpen ? <ChevronDown /> : <ChevronUp />}{drawerOpen ? 'Collapse panel' : 'Expand panel'}</Button></div>

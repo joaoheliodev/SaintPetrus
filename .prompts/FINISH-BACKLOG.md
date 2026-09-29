@@ -337,6 +337,36 @@ panel, nothing copied or loaded from it.
 
 #### Questions for João
 
+### Phase 10 — Round 4: a deleted delegation stopped the graph being saved (2026-09-29)
+
+On `main`, after the merge of `night/provider-validation-ready` (`6c69307`). Found by the merge's browser check: the
+server logged "Graph file refused: a subagent has no delegation connection." once and saved nothing more.
+
+| ID | Item | Acceptance criterion | Status |
+| --- | --- | --- | --- |
+| R4-1 | A delegation is not deleted | The server refuses `disconnect` on a `delegation` edge with a message to remove the subagent; only `context` connections are deleted; the canvas explains it while a delegation is selected; recorded in `AGENTS.md` | done |
+| R4-2 | Savable after every command | A test runs every `GraphService` command (create, subagent, connect, delete connection, remove, edit, move, limits, reset, output, pause, import) and parses the redacted snapshot with `parseGraphDocument` after each accepted one | todo |
+| R4-3 | Warning while the graph is not saved | While `GraphStore` refuses or fails to write, for any reason (R-01's key configured after the text included), a persistent warning shows the reason, never the refused text, until it saves again; a local read-only route exposes the state; documentation and tests in the same commit | todo |
+| R4-4 | Browser check | Deletes a context connection (refused, then confirmed) and checks that deleting the delegation is refused; no check removed | done |
+
+#### Decisions taken
+
+- R4-1: `GraphService.disconnect` refuses a `delegation` edge before changing anything, with "A delegation connection
+  cannot be deleted on its own. Remove the subagent instead."; the route answers 400 with it (the message survives
+  the response redactor). Removing the subagent stays the only way a delegation goes. On the canvas, while a
+  delegation is selected, a status line over the canvas names the subagent and points to **Details → Remove agent**
+  (`delegationHint`). Delete on a delegation alone asks nothing and sends it, so the server's refusal is what the
+  notice shows; in a mixed selection only the context connections are counted in the question and they are sent
+  first, so an accepted deletion does not clear the refusal (`byDeletability`). The route test that expected a
+  delegation deletion to succeed now expects the refusal and deletes a context connection instead, keeping every
+  assertion it had and adding that removing the subagent takes the delegation with it.
+- R4-4: the browser check tries the delegation first (the explanation shown, no question asked, the server's message
+  on screen, the delegation still on the canvas and on the server), connects two agents from the keyboard, then
+  deletes that context connection (refused, then confirmed) and checks that only it went. The two PASS lines for
+  connecting and deleting swap order; none was removed.
+
+#### Questions for João
+
 ## V0 review of Part 2 (`1445177`)
 
 Checked every section of `docs/provider-validation.md` and the `STATUS.md` change against the code.
@@ -458,6 +488,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R1-09 | generation guard removed | killed by both generation tests |
 | R1-09 | route records without its generation | killed by "R1 a probe that finishes after a credential change…" |
 | R1-09 | clearing starts no new generation | killed by both generation tests |
+| R4-1 | `disconnect` without the delegation refusal | killed by "edge deletion dispatch removes only the requested context connection, refuses a delegation…"; restored, sha256 identical |
+| R4-1 | the delegation explanation never shown | killed by "R4-1 a selected delegation says it goes with its subagent…" |
+| R4-1 | every edge treated as a context connection | killed by the same test |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

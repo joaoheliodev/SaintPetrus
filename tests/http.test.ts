@@ -20,17 +20,28 @@ test('HTTP graph guard rejects invalid edges even with no client validation', as
   assert.deepEqual(runtime().graph.snapshot(), before);
 });
 
-test('edge deletion dispatch removes only the requested connection; agent removal is its own guarded command', async () => {
+test('edge deletion dispatch removes only the requested context connection, refuses a delegation, and agent removal is its own guarded command', async () => {
   runtime().mock.reset();
   assert.equal((await post({ action: 'add', name: 'Child', objective: 'Deletion guard', parentId: 'root' })).status, 200);
-  const connected = runtime().graph.snapshot(); const edge = connected.edges[0];
-  assert.ok(edge);
+  assert.equal((await post({ action: 'add', name: 'Peer', objective: 'Context source' })).status, 200);
+  const peer = runtime().graph.snapshot().agents.find(a => a.name === 'Peer')!;
+  assert.equal((await post({ action: 'connect', source: peer.id, target: 'root' })).status, 200);
+  const connected = runtime().graph.snapshot();
+  const delegation = connected.edges.find(e => e.kind === 'delegation')!; const edge = connected.edges.find(e => e.kind === 'context')!;
+  assert.ok(delegation && edge);
+  // A delegation goes only with its subagent (operator decision, Round 4): refused with the way out, and nothing changes.
+  const refused = await post({ action: 'disconnect', id: delegation.id });
+  assert.equal(refused.status, 400);
+  assert.deepEqual(await refused.json(), { error: 'A delegation connection cannot be deleted on its own. Remove the subagent instead.' });
+  assert.deepEqual(runtime().graph.snapshot(), connected);
   assert.equal((await post({ action: 'disconnect', id: edge.id })).status, 200);
   const disconnected = runtime().graph.snapshot();
-  assert.equal(disconnected.edges.length, 0); assert.deepEqual(disconnected.agents, connected.agents);
+  assert.deepEqual(disconnected.edges, [delegation]); assert.deepEqual(disconnected.agents, connected.agents);
   const beforeRejectedRootDelete = runtime().graph.snapshot();
   assert.equal((await post({ action: 'remove-agent', id: 'root' })).status, 400, 'never the coordinator');
   assert.deepEqual(runtime().graph.snapshot(), beforeRejectedRootDelete);
+  assert.equal((await post({ action: 'remove-agent', id: delegation.target })).status, 200, 'the way out the refusal names');
+  assert.deepEqual(runtime().graph.snapshot().edges, [], 'the delegation left with its subagent');
 });
 
 test('mock flag, origin and payload boundaries fail closed', () => withRunMode('real', async () => {

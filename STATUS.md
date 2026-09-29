@@ -1,6 +1,6 @@
 # SaintPetrus — current status
 
-Branch: `night/provider-validation-ready`, continuing `night/provider-validation` from the operator's price-admin commit `0662647` on `night/price-admin`, following `night/price-schema`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`; timestamped events live in the append-only `NIGHT-LOG.md`.
+Branch: `main`, which merged `night/provider-validation-ready` on 2026-09-29 (Round 4 below). That branch continued `night/provider-validation` from the operator's price-admin commit `0662647` on `night/price-admin`, following `night/price-schema`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`; timestamped events live in the append-only `NIGHT-LOG.md`.
 
 ## Verification checkpoint (2026-09-27)
 
@@ -68,6 +68,18 @@ questions are in `.prompts/FINISH-BACKLOG.md` (Phase 8, "Questions for João").
   receipts. The session budget and the mock's usage stay per process. A call in flight at a crash returns
   `unverifiable` with its agent paused. An unreadable journal is set aside and blocks real calls until **Start a new
   budget period**.
+
+## Round 4 on `main` (2026-09-29)
+
+`night/provider-validation-ready` was merged into `main` with its history (merge commit `6c69307`); work continues
+on `main`.
+
+- **R4-1** A delegation connection is deleted only with its subagent. The server refuses `disconnect` on a
+  delegation with a message to remove the subagent; only context connections can be deleted. The canvas explains
+  this while a delegation is selected. Until now the deletion was accepted and left a subagent without its
+  delegation, a graph the store refuses to save, so every later change was lost at the next restart.
+- **R4-4** The browser check deletes a context connection (refused, then confirmed) and checks that deleting the
+  delegation is refused.
 
 ## Not verified or pending
 
