@@ -1,0 +1,40 @@
+import type { ModelProvider } from './model-id';
+export type InputBreakdown = { cacheHit: number; cacheMiss: number };
+// `reasoning` is the provider-reported part of `completion` spent thinking: a count, never the text.
+export type Usage = { prompt: number; completion: number; total: number; cachedPromptFullRate?: number; inputBreakdown?: InputBreakdown; reasoning?: number };
+export type ThinkingControl = { mode: 'disabled' } | { mode: 'enabled'; effort: 'minimal' | 'low' | 'high' | 'max' };
+export type RequestOptions = { onText?: (text: string) => void; systemPrompt: string; messages: { role: 'user' | 'assistant' | 'system'; content: string }[]; temperature: number; maxTokens: number; thinking?: ThinkingControl };
+// `billingModel` is what the provider says it served. It is the pricing key, because a provider
+// may reroute a request to another model and bill at that model's rate.
+export type Completion = { text: string; usage?: Usage; outcome?: 'output_limit'; billingModel?: string };
+export interface ProviderAdapter {
+  readonly id: ModelProvider;
+  readonly model: string;
+  // `onDispatch` runs immediately before the request leaves for the provider, never for a local refusal.
+  complete(input: string, signal: AbortSignal, options?: RequestOptions, onDispatch?: () => void): Promise<Completion>;
+}
+const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+// Key names only, one level deep, capped. A name is never a value and never an error body.
+export function fieldNames(value: unknown): string[] | undefined {
+  if (!record(value)) return undefined;
+  const names: string[] = [];
+  for (const [key, item] of Object.entries(value)) {
+    names.push(key);
+    if (record(item)) for (const nested of Object.keys(item)) names.push(`${key}.${nested}`);
+  }
+  return names.slice(0, 32).map(name => name.slice(0, 64));
+}
+export const providerFailureCodes = ['unconfigured', 'disabled', 'invalid_request', 'invalid_model_format', 'model_not_allowlisted', 'unauthorized', 'insufficient_balance', 'not_found', 'rate_limited', 'upstream', 'timeout', 'cancelled', 'busy'] as const;
+export type ProviderFailureCode = typeof providerFailureCodes[number];
+// The custom server runs its own copy of these modules (tsx) beside Next's route bundle, and both reach the same
+// singletons through globalThis, where `instanceof` fails across copies. A brand registered with Symbol.for does not.
+const providerFailureBrand = Symbol.for('saintpetrus.ProviderFailure');
+export class ProviderFailure extends Error {
+  // Adapters translate their own HTTP semantics into this shared vocabulary. Provider error
+  // bodies are never read, echoed or logged.
+  // `fields` carries the names of the keys a response actually had when its shape could not be
+  // parsed, and never a value. Names are not an error body: they are what turns a failed first call
+  // into one correction instead of a blind second attempt.
+  constructor(readonly code: ProviderFailureCode, readonly fields?: readonly string[]) { super(code); Object.defineProperty(this, providerFailureBrand, { value: true }); }
+  static is(value: unknown): value is ProviderFailure { return value instanceof Error && Reflect.get(value, providerFailureBrand) === true; }
+}

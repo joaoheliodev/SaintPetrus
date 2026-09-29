@@ -1,0 +1,34 @@
+{
+  "global": 1024,
+  "perAgent": 1024,
+  "perModel": 1024,
+  "perSession": 1024,
+  "costLimitsUsd": {
+    "global": 0.0004096,
+    "perAgent": 0.0004096,
+    "perModel": 0.0004096,
+    "perSession": 0.0004096
+  },
+  "cacheTtlMs": 0,
+  "reservationTtlMs": 300000,
+  "models": {
+    "mock-v1": {
+      "provider": "mock",
+      "max_tokens": 64,
+      "temperature": 0,
+      "deterministic": true,
+      "thinking": {
+        "mode": "disabled"
+      }
+    },
+    "gemini-2.5-flash-lite": {
+      "provider": "gemini",
+      "max_tokens": 64,
+      "temperature": 0,
+      "thinking": {
+        "mode": "disabled"
+      },
+      "deterministic": true
+    }
+  }
+}

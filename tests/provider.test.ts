@@ -1,0 +1,271 @@
+import { TokenService } from '../lib/tokens/service';
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { mkdir, mkdtemp, rm, readFile } from 'node:fs/promises';
+import { ProviderProxy } from '../lib/providers/proxy';
+import { OpenAIAdapter, openAIErrorCode } from '../lib/providers/openai';
+import { MockLLMAdapter } from '../lib/providers/mock-provider';
+import { Credentials } from '../lib/security/credentials';
+import { EncryptedVault } from '../lib/security/encrypted-vault';
+import { safeLog, safeStringify } from '../lib/security/redact';
+import { POST } from '../app/api/provider/route';
+import { GET as exportGraph } from '../app/api/graph/export/route';
+import { runtime } from '../lib/server/runtime';
+import { withRunMode } from './run-mode';
+const freePrice = { effectiveAt: '1970-01-01', verifiedAt: '1970-01-01', peakWindowsUtc: [], offPeak: { inputCacheHitPerMillion: 0, inputCacheMissPerMillion: 0, outputPerMillion: 0 }, peak: { inputCacheHitPerMillion: 0, inputCacheMissPerMillion: 0, outputPerMillion: 0 } };
+const costLimitsUsd = { global: 1, perAgent: 1, perModel: 1, perSession: 1 };
+function tokenFixture() {
+  const host = globalThis as typeof globalThis & { saintpetrusTokens?: TokenService }; const previous = host.saintpetrusTokens;
+  host.saintpetrusTokens = new TokenService({ global: 10000, perAgent: 10000, perModel: 10000, perSession: 10000, costLimitsUsd, cacheTtlMs: 0, reservationTtlMs: 300000, models: { 'test-model': { provider: 'openai', max_tokens: 64, temperature: 0 }, 'other-model': { provider: 'openai', max_tokens: 64, temperature: 0 } } }, { date: '2026-09-06', currency: 'USD', models: { 'test-model': freePrice, 'other-model': freePrice } }, { ids: () => runtime().graph.snapshot().agents.map(a => a.id), pause: id => runtime().graph.setAgentStatus(id, 'paused'), pauseAll: () => runtime().graph.pauseAll() });
+  return () => { host.saintpetrusTokens = previous; };
+}
+const signal = () => new AbortController().signal;
+
+test('validation probe uses the low policy and documented nano payload without persisting credentials', async () => {
+  const { loadConfig } = await import('../lib/tokens/config');
+  const { policy, prices } = loadConfig();
+  assert.equal(policy.global, 1024);
+  assert.equal(Object.values(policy.models).some(model => model.provider === 'openai'), false, 'OpenAI stays out of the allowlist until the operator validates it (Q-07)');
+  assert.equal(policy.cacheTtlMs, 0);
+  assert.equal(prices.models['gpt-5-nano'].peak.inputCacheMissPerMillion, 0.05);
+  assert.equal(prices.models['gpt-5-nano'].peak.outputPerMillion, 0.4);
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/nano-');
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
+  const secret = Buffer.from(randomBytes(32).toString('hex')); let calls = 0;
+  try {
+    await store.configure('openai', secret);
+    assert.equal(store.status('openai').remembered, false);
+    const adapter = new OpenAIAdapter('gpt-5-nano', store, async (_url, options) => {
+      calls++; const payload = JSON.parse(String(options?.body));
+      assert.equal(Object.hasOwn(payload, 'temperature'), false);
+      assert.deepEqual(payload.reasoning, { effort: 'minimal' });
+      assert.equal(payload.max_output_tokens, 128);
+      assert.equal(payload.store, false);
+      return Response.json({ model: 'gpt-5-nano', output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }], usage: { input_tokens: 12, output_tokens: 1, total_tokens: 13 } });
+    });
+    const result = await adapter.complete('Reply OK.', signal(), { systemPrompt: '', messages: [{ role: 'user', content: 'Reply OK.' }], temperature: 1, maxTokens: 128, thinking: { mode: 'enabled', effort: 'minimal' } });
+    assert.equal(calls, 1); assert.deepEqual(result.usage, { prompt: 12, completion: 1, total: 13 });
+  } finally { store.disconnect('openai'); secret.fill(0); await rm(dir, { recursive: true }); }
+});
+
+test('D1 keeps provider error semantics local and removes model-specific adapter branches', async () => {
+  assert.equal(openAIErrorCode(400), 'unauthorized');
+  assert.equal(openAIErrorCode(401), 'unauthorized');
+  assert.equal(openAIErrorCode(404), 'not_found');
+  assert.equal(openAIErrorCode(429), 'rate_limited');
+  assert.equal(openAIErrorCode(500), 'upstream');
+  const shared = await readFile('lib/providers/adapter.ts', 'utf8');
+  const adapters = `${await readFile('lib/providers/openai.ts', 'utf8')}\n${await readFile('lib/providers/gemini.ts', 'utf8')}`;
+  assert.doesNotMatch(shared, /upstreamCode/);
+  assert.doesNotMatch(adapters, /if\s*\(\s*this\.model\s*===/);
+});
+const request = (body: unknown) => new Request('http://127.0.0.1:3000/api/provider', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+test('M2 proxy mock, input validation, busy, timeout and cancellation', async () => {
+  const proxy = new ProviderProxy(20);
+  const result = await proxy.execute(new MockLLMAdapter(), 'Hello', signal());
+  assert.equal(result.mocked, true); assert.ok(result.latencyMs >= 0);
+  await assert.rejects(proxy.execute(new MockLLMAdapter(), '', signal()), /invalid_request/);
+  const waiting = { id: 'mock' as const, model: 'mock-v1', complete: async (_input: string, abort: AbortSignal): Promise<{text: string}> => new Promise((_resolve, reject) => abort.addEventListener('abort', () => reject(new Error('aborted')), { once: true })) };
+  const pending = proxy.execute(waiting, 'Hello', signal());
+  const timedOut = assert.rejects(pending, /timeout/);
+  await assert.rejects(proxy.execute(waiting, 'Hello', signal()), /busy/);
+  await timedOut;
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(proxy.execute(waiting, 'Hello', controller.signal), /cancelled/);
+  assert.equal((await proxy.execute(new MockLLMAdapter(), 'Again', signal())).mocked, true);
+});
+
+test('M2 frontend test request carries no credential; server rejects credential fields', async () => {
+  const priceFile = await readFile('config/prices.json', 'utf8');
+  const { loadConfig } = await import('../lib/tokens/config');
+  const { policy, prices } = loadConfig();
+  const previousTokens = Reflect.get(globalThis, 'saintpetrusTokens');
+  Reflect.set(globalThis, 'saintpetrusTokens', new TokenService(policy, prices, { ids: () => runtime().graph.snapshot().agents.map(agent => agent.id), pause: () => {}, pauseAll: () => {} }));
+  const previous = process.env.SAINTPETRUS_MOCK, selected = process.env.SAINTPETRUS_PROVIDER;
+  process.env.SAINTPETRUS_MOCK = 'true'; process.env.SAINTPETRUS_PROVIDER = 'mock';
+  try {
+    const req = request({ action: 'test' });
+    assert.deepEqual(await req.clone().json(), { action: 'test' });
+    assert.equal(req.headers.has('authorization'), false);
+    assert.equal(new URL(req.url).search, '');
+    assert.equal((await POST(req)).status, 200);
+    assert.equal((await POST(request({ action: 'test', key: 'sk-REPLACE_ME' }))).status, 400);
+    assert.equal((await POST(request({ action: 'test', url: 'https://example.invalid' }))).status, 400);
+    // In REAL mode the mock is gone and nothing is connected.
+    await withRunMode('real', async () => assert.equal((await POST(request({ action: 'test' }))).status, 409));
+    const client = await readFile('components/provider-status.tsx', 'utf8');
+    assert.ok(client.includes("JSON.stringify({ action: 'test' })"));
+    assert.ok(!/Authorization|localStorage|sessionStorage/.test(client));
+    assert.equal(await readFile('config/prices.json', 'utf8'), priceFile, 'Mock route tests must never write the operator price file.');
+  } finally {
+    Reflect.set(globalThis, 'saintpetrusTokens', previousTokens);
+    if (previous === undefined) delete process.env.SAINTPETRUS_MOCK; else process.env.SAINTPETRUS_MOCK = previous;
+    if (selected === undefined) delete process.env.SAINTPETRUS_PROVIDER; else process.env.SAINTPETRUS_PROVIDER = selected;
+  }
+});
+
+test('M2 adapter keeps credentials in backend header; proxy redacts output, log, stack, API error and export', () => withRunMode('real', async () => {
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/proxy-');
+  const restoreTokens = tokenFixture();
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden in this test'); } }));
+  const secret = Buffer.from(randomBytes(32).toString('hex'));
+  const host = globalThis as typeof globalThis & { saintpetrusCredentials?: Credentials };
+  const previousStore = host.saintpetrusCredentials, oldFetch = globalThis.fetch;
+  const previousProvider = process.env.SAINTPETRUS_PROVIDER, previousModel = process.env.SAINTPETRUS_MODEL;
+  let calls = 0;
+  try {
+    await store.configure('openai', secret); host.saintpetrusCredentials = store;
+    const transport: typeof fetch = async (url, options) => {
+      calls++; assert.equal(url, 'https://api.openai.com/v1/responses');
+      assert.equal(options?.redirect, 'error');
+      assert.ok(new Headers(options?.headers).get('authorization') === `Bearer ${secret.toString()}`);
+      assert.ok(!String(options?.body).includes(secret.toString()));
+      const body = JSON.parse(String(options?.body)); assert.equal(body.store, false); assert.equal(body.max_output_tokens, 64);
+      return Response.json({ model: 'test-model', usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: secret.toString() }] }] });
+    };
+    const output = await new ProviderProxy().execute(new OpenAIAdapter('test-model', store, transport), secret.toString(), signal());
+    assert.equal(calls, 1); assert.ok(!JSON.stringify(output).includes(secret.toString()));
+    runtime().graph.add({ name: 'Proxy export', provider: 'Unconfigured', context: { objective: 'Test', summary: output.text, artifacts: [] } });
+    assert.ok(!(await (await exportGraph(new Request('http://127.0.0.1:3000/api/graph/export'))).text()).includes(secret.toString()));
+    const failing: typeof fetch = async () => { throw new Error(secret.toString()); };
+    let caught: unknown;
+    try { await new ProviderProxy().execute(new OpenAIAdapter('test-model', store, failing), 'Hello', signal()); } catch (error) { caught = error; }
+    assert.ok(caught instanceof Error); assert.ok(!String(caught.stack).includes(secret.toString()));
+    let logged = ''; safeLog(caught, text => { logged = text; });
+    assert.ok(!logged.includes(secret.toString())); assert.ok(!safeStringify(caught).includes(secret.toString()));
+    globalThis.fetch = failing; process.env.SAINTPETRUS_PROVIDER = 'openai'; process.env.SAINTPETRUS_MODEL = 'test-model';
+    const errorResponse = await POST(request({ action: 'test' }));
+    assert.equal(errorResponse.status, 502); assert.ok(!(await errorResponse.text()).includes(secret.toString()));
+    // Status class is mapped, body is never read: a rejected credential is reported as such,
+    // while malformed or oversized successful bodies stay generic.
+    for (const [response, code] of [[Response.json({ error: secret.toString() }, { status: 401 }), /unauthorized/], [Response.json({ unexpected: true }), /upstream/], [new Response('x'.repeat(262145)), /upstream/]] as const) {
+      await assert.rejects(new OpenAIAdapter('test-model', store, async () => response).complete('Hi', signal()), code);
+    }
+    for (const [status, code] of [[400, /unauthorized/], [403, /unauthorized/], [404, /not_found/], [429, /rate_limited/], [500, /upstream/]] as const) {
+      await assert.rejects(new OpenAIAdapter('test-model', store, async () => Response.json({ error: secret.toString() }, { status })).complete('Hi', signal()), code);
+    }
+  } finally {
+    restoreTokens(); globalThis.fetch = oldFetch; host.saintpetrusCredentials = previousStore; store.disconnect('openai'); secret.fill(0); runtime().mock.reset();
+    if (previousProvider === undefined) delete process.env.SAINTPETRUS_PROVIDER; else process.env.SAINTPETRUS_PROVIDER = previousProvider;
+    if (previousModel === undefined) delete process.env.SAINTPETRUS_MODEL; else process.env.SAINTPETRUS_MODEL = previousModel;
+    await rm(dir, { recursive: true });
+  }
+}));
+
+test('RF-01 same-origin UI configures memory-only credentials, tests once, and disconnects', () => withRunMode('real', async () => {
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/ui-');
+  const restoreTokens = tokenFixture();
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
+  const { POST: configure } = await import('../app/api/credentials/route');
+  const { providerStatus } = await import('../lib/providers/runtime');
+  const host = globalThis as typeof globalThis & { saintpetrusCredentials?: Credentials; saintpetrusSelection?: {provider: string; model: string} };
+  const previous = host.saintpetrusCredentials, selection = host.saintpetrusSelection, transport = globalThis.fetch;
+  host.saintpetrusCredentials = store;
+  const key = randomBytes(32).toString('hex'); let calls = 0;
+  const browserRequest = (body: unknown, origin = 'http://127.0.0.1:3000') => new Request('http://127.0.0.1:3000/api/credentials', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'X-SaintPetrus-Client': 'browser', 'Sec-Fetch-Site': 'same-origin' }, body: JSON.stringify(body) });
+  try {
+    const body = { action: 'set', provider: 'openai', model: 'test-model', key };
+    assert.equal((await configure(browserRequest(body, 'https://example.invalid'))).status, 403);
+    const malformed = await configure(browserRequest({ ...body, model: 'invalid model' }));
+    assert.equal(malformed.status, 400); assert.deepEqual(await malformed.json(), { error: 'invalid_model_format' });
+    const outsidePolicy = await configure(browserRequest({ ...body, model: 'valid-but-missing' }));
+    assert.equal(outsidePolicy.status, 400); assert.deepEqual(await outsidePolicy.json(), { error: 'model_not_allowlisted' });
+    assert.equal(store.status('openai').connected, false);
+    const saved = await configure(browserRequest(body)); assert.equal(saved.status, 200); assert.ok(!(await saved.text()).includes(key));
+    assert.equal(store.status('openai').remembered, false); assert.equal(providerStatus().model, 'test-model');
+    globalThis.fetch = async (_url, options) => {
+      calls++; assert.ok(new Headers(options?.headers).get('authorization') === `Bearer ${key}`);
+      return Response.json({ model: 'test-model', usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] });
+    };
+    const result = await POST(request({ action: 'test' })); assert.equal(result.status, 200); assert.equal(calls, 1);
+    assert.ok(!(await result.text()).includes(key));
+    assert.equal((await configure(browserRequest({ action: 'disconnect', provider: 'openai' }))).status, 200);
+    assert.equal(store.status('openai').connected, false);
+    assert.equal((await POST(request({ action: 'test' }))).status, 409); assert.equal(calls, 1);
+  } finally { restoreTokens(); store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }
+}));
+
+test('B proxy invokes the injected core TokenCounter on the request path', async () => {
+  const { tokenCounterFrom } = await import('../lib/core/token-estimate'); let measured = '';
+  const counter = tokenCounterFrom('integration-test', text => { measured = text; return 7; }, true);
+  const result = await new ProviderProxy(100, counter).execute(new MockLLMAdapter(), 'Actual request', signal());
+  assert.equal(measured, 'Actual request'); assert.deepEqual(result.preflight, { tokens: 7, approximate: true, counterName: 'integration-test' });
+});
+
+test('connection state is proved by a live call, never by a stored credential, and dies with it', () => withRunMode('real', async () => {
+  await mkdir('.audit', { recursive: true }); const dir = await mkdtemp('.audit/verify-');
+  const restoreTokens = tokenFixture();
+  const store = new Credentials(new EncryptedVault(dir, { loadOrCreate: async () => { throw new Error('Persistence forbidden'); } }));
+  const { POST: configure } = await import('../app/api/credentials/route');
+  const { providerStatus, clearVerification } = await import('../lib/providers/runtime');
+  const host = globalThis as typeof globalThis & { saintpetrusCredentials?: Credentials; saintpetrusSelection?: { provider: string; model: string }; saintpetrusVerification?: unknown };
+  const previous = host.saintpetrusCredentials, selection = host.saintpetrusSelection, transport = globalThis.fetch;
+  host.saintpetrusCredentials = store; clearVerification();
+  const key = randomBytes(32).toString('hex');
+  const browserRequest = (body: unknown) => new Request('http://127.0.0.1:3000/api/credentials', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json', 'X-SaintPetrus-Client': 'browser', 'Sec-Fetch-Site': 'same-origin' }, body: JSON.stringify(body) });
+  const ok = async () => Response.json({ model: 'test-model', usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 }, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] });
+  try {
+    await configure(browserRequest({ action: 'set', provider: 'openai', model: 'test-model', key }));
+    // A stored key is only "configured": nothing has proved it works.
+    assert.equal(providerStatus().state, 'configured'); assert.equal(providerStatus().verified, false);
+    globalThis.fetch = async () => Response.json({ error: 'nope' }, { status: 401 });
+    assert.equal((await POST(request({ action: 'test' }))).status, 401);
+    assert.equal(providerStatus().state, 'rejected'); assert.equal(providerStatus().verified, false);
+    globalThis.fetch = ok;
+    assert.equal((await POST(request({ action: 'test' }))).status, 200);
+    assert.equal(providerStatus().state, 'verified'); assert.equal(providerStatus().verified, true);
+    // A wrong key must not jam the workspace: nothing was billed, so no reservation is left dangling
+    // and the agent stays runnable for the retry.
+    const rows = () => (globalThis as typeof globalThis & { saintpetrusTokens?: TokenService }).saintpetrusTokens!.snapshot().rows;
+    assert.ok(rows().every(row => row.reserved === 0 && row.unverifiable === 0));
+    // Replacing the credential retracts the proof: the new key has proved nothing.
+    globalThis.fetch = ok;
+    await configure(browserRequest({ action: 'set', provider: 'openai', model: 'test-model', key: randomBytes(32).toString('hex') }));
+    assert.equal(providerStatus().state, 'configured');
+    assert.equal((await POST(request({ action: 'test' }))).status, 200);
+    assert.equal(providerStatus().state, 'verified');
+    // So does switching the model under the same key.
+    await configure(browserRequest({ action: 'set', provider: 'openai', model: 'other-model', key }));
+    assert.equal(providerStatus().state, 'configured');
+    await configure(browserRequest({ action: 'set', provider: 'openai', model: 'test-model', key }));
+    assert.equal((await POST(request({ action: 'test' }))).status, 200);
+    // An outage must not retract a proof that already succeeded, and it does stay unverifiable:
+    // a lost answer may still have been billed.
+    globalThis.fetch = async () => Response.json({ error: 'down' }, { status: 500 });
+    assert.equal((await POST(request({ action: 'test' }))).status, 502);
+    assert.equal(providerStatus().state, 'verified');
+    assert.ok(rows().some(row => row.unverifiable > 0));
+    await configure(browserRequest({ action: 'disconnect', provider: 'openai' }));
+    assert.equal(providerStatus().state, 'disconnected');
+  } finally { restoreTokens(); clearVerification(); store.disconnect('openai'); host.saintpetrusCredentials = previous; host.saintpetrusSelection = selection; globalThis.fetch = transport; await rm(dir, { recursive: true }); }
+}));
+
+test('F2 running one agent records the answer as that agent output; a connection probe records nothing', async () => {
+  const { loadConfig } = await import('../lib/tokens/config');
+  const { policy, prices } = loadConfig();
+  const previous = { tokens: Reflect.get(globalThis, 'saintpetrusTokens'), mock: process.env.SAINTPETRUS_MOCK, provider: process.env.SAINTPETRUS_PROVIDER };
+  runtime().mock.reset(); const graph = runtime().graph;
+  Reflect.set(globalThis, 'saintpetrusTokens', new TokenService(policy, prices, { ids: () => graph.snapshot().agents.map(agent => agent.id), pause: () => {}, pauseAll: () => {} }));
+  process.env.SAINTPETRUS_MOCK = 'true'; process.env.SAINTPETRUS_PROVIDER = 'mock';
+  try {
+    const child = graph.add({ name: 'Runner', provider: 'Unconfigured', context: { objective: 'Answer once.', summary: 'Runner summary', artifacts: [] } });
+    assert.equal((await POST(request({ action: 'test' }))).status, 200);
+    assert.ok(graph.snapshot().agents.every(agent => agent.output === ''), 'a probe proves the connection; it is not agent work');
+    const response = await POST(request({ action: 'complete', input: 'Say something.', agentId: child }));
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    const outputs = new Map(graph.snapshot().agents.map(agent => [agent.id, agent.output]));
+    assert.equal(outputs.get(child), body.text); assert.equal(body.text, 'MOCK answer: no model was called and nothing was billed.', 'the mock never claims a verified connection');
+    const events: string[] = []; const stop = graph.subscribe(event => { if (event.type === 'agent.output') events.push(event.message); });
+    await POST(request({ action: 'complete', input: 'Again.', agentId: child })); stop();
+    assert.deepEqual(events, ['Answer recorded.'], 'the event names no provider, which the mock is not');
+    assert.equal(outputs.get('root'), '', 'only the agent that ran gets the answer');
+    assert.equal((await POST(request({ action: 'complete', input: 'x'.repeat(2001), agentId: child }))).status, 409, 'input bounds still apply');
+  } finally {
+    Reflect.set(globalThis, 'saintpetrusTokens', previous.tokens); runtime().mock.reset();
+    if (previous.mock === undefined) delete process.env.SAINTPETRUS_MOCK; else process.env.SAINTPETRUS_MOCK = previous.mock;
+    if (previous.provider === undefined) delete process.env.SAINTPETRUS_PROVIDER; else process.env.SAINTPETRUS_PROVIDER = previous.provider;
+  }
+});

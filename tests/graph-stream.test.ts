@@ -1,0 +1,146 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
+import { graphRoutes, graphStream } from '../lib/server/graph-http';
+import { GraphService } from '../lib/server/graph-service';
+import { optionalEventRoutes } from '../lib/events/http';
+import { registerSecret } from '../lib/security/redact';
+import { applyGraphCommandResponse, startGraphSync, type GraphEventSource } from '../lib/graph-sync';
+import { createGraph, type Graph, type GraphEvent } from '../lib/orchestrator';
+import { useProjection } from '../lib/store';
+
+const readFrame = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
+  const result = await Promise.race([reader.read(), delay(1000).then(() => { throw new Error('Timed out waiting for graph SSE.'); })]);
+  return new TextDecoder().decode(result.value);
+};
+const graphAt = (revision: number, objective: string): Graph => {
+  const graph = createGraph(); graph.revision = revision; graph.agents[0].context.objective = objective; return graph;
+};
+
+test('graph mutation reaches its always-on SSE route without polling and is redacted on the wire', async () => {
+  const graph = new GraphService(); const routes = graphRoutes(graph);
+  assert.ok(routes.has('/api/graph/stream')); assert.equal(optionalEventRoutes(false).size, 0);
+  assert.equal(graphStream(new Request('http://127.0.0.1:3100/api/graph/stream', { headers: { Origin: 'null' } }), graph).status, 403);
+  const response = routes.get('/api/graph/stream')!(new Request('http://127.0.0.1:3100/api/graph/stream'));
+  const reader = response.body!.getReader(); const secret = Buffer.from(randomBytes(32).toString('hex')); const unregister = registerSecret(secret);
+  try {
+    await readFrame(reader);
+    // The objective was written before the key was configured; the stream redacts it anyway.
+    unregister(); graph.reset(secret.toString()); await readFrame(reader); registerSecret(secret);
+    graph.move('root', { x: 1, y: 1 });
+    const wire = await readFrame(reader);
+    assert.match(wire, /agent\.moved/); assert.match(wire, /\[REDACTED\]/); assert.ok(!wire.includes(secret.toString().slice(0, 12)));
+  } finally { await reader.cancel(); unregister(); secret.fill(0); }
+});
+
+test('graph subscribers are isolated from mutation and listener failures', () => {
+  const graph = new GraphService(); let received: GraphEvent | undefined;
+  graph.subscribe(event => { event.snapshot.agents[0].name = 'Tampered'; throw new Error('Listener failed'); });
+  graph.subscribe(event => { received = event; });
+  assert.doesNotThrow(() => graph.move('root', { x: 10, y: 20 }));
+  assert.equal(received?.snapshot.agents[0].name, 'Coordinator'); assert.equal(graph.snapshot().agents[0].name, 'Coordinator');
+});
+
+class FakeEventSource implements GraphEventSource {
+  onopen: ((event: Event) => unknown) | null = null;
+  onerror: ((event: Event) => unknown) | null = null;
+  onmessage: ((event: MessageEvent<string>) => unknown) | null = null;
+  closed = false;
+  open() { this.onopen?.(new Event('open')); }
+  fail() { this.onerror?.(new Event('error')); }
+  emit(event: GraphEvent) { this.onmessage?.(new MessageEvent('message', { data: JSON.stringify(event) })); }
+  emitRaw(data: string) { this.onmessage?.(new MessageEvent('message', { data })); }
+  close() { this.closed = true; }
+}
+
+test('graph stream is primary; stream failure polls and the revision guard rejects delayed snapshots', async () => {
+  const source = new FakeEventSource(); let polls = 0; let unavailable = false;
+  useProjection.getState().hydrate(graphAt(0, 'initial'));
+  const stop = startGraphSync({
+    createSource: () => source,
+    fetchSnapshot: async () => { polls++; return graphAt(3, 'fallback'); },
+    apply: event => useProjection.getState().apply(event),
+    unavailable: value => { unavailable = value; },
+    pollMs: 1,
+  });
+  try {
+    source.open(); await delay(5); assert.equal(polls, 0);
+    source.emit({ id: 1, type: 'graph.updated', message: 'stream', at: 0, snapshot: graphAt(1, 'stream') });
+    assert.equal(useProjection.getState().graph.agents[0].context.objective, 'stream');
+    source.fail();
+    for (let i = 0; i < 20 && polls === 0; i++) await delay(1);
+    assert.ok(polls > 0); assert.equal(useProjection.getState().graph.agents[0].context.objective, 'fallback');
+    source.emit({ id: 2, type: 'graph.updated', message: 'delayed', at: 0, snapshot: graphAt(2, 'delayed') });
+    source.emit({ id: 3, type: 'graph.updated', message: 'equal', at: 0, snapshot: graphAt(3, 'equal') });
+    assert.equal(useProjection.getState().graph.agents[0].context.objective, 'fallback');
+    source.open(); await delay(3); const afterOpen = polls; await delay(5);
+    assert.equal(polls, afterOpen); assert.equal(unavailable, false);
+  } finally { stop(); }
+  assert.equal(source.closed, true);
+});
+
+test('graph sync rejects malformed stream events and fallback snapshots before projection', async () => {
+  const source = new FakeEventSource(); let polls = 0; let unavailable = false;
+  useProjection.getState().hydrate(graphAt(5, 'safe'));
+  const stop = startGraphSync({
+    createSource: () => source,
+    fetchSnapshot: async () => { polls++; return { revision: 99, agents: [] }; },
+    apply: event => useProjection.getState().apply(event),
+    unavailable: value => { unavailable = value; },
+    pollMs: 1,
+  });
+  try {
+    source.open();
+    source.emitRaw(JSON.stringify({ id: 99, type: 'graph.updated', message: 'malformed', snapshot: { revision: 99, agents: [] } }));
+    for (let i = 0; i < 20 && polls === 0; i++) await delay(1);
+    assert.ok(polls > 0); assert.equal(unavailable, true);
+    assert.equal(useProjection.getState().graph.revision, 5);
+    assert.equal(useProjection.getState().graph.agents[0].context.objective, 'safe');
+  } finally { stop(); }
+});
+
+test('graph command responses are validated before the revision guard sees them', () => {
+  useProjection.getState().hydrate(graphAt(5, 'safe'));
+  const malformed = { ...graphAt(99, 'poisoned'), agents: [] };
+
+  assert.throws(
+    () => applyGraphCommandResponse(malformed, 'move', event => useProjection.getState().apply(event)),
+    /Invalid graph snapshot/,
+  );
+  assert.equal(useProjection.getState().graph.revision, 5);
+  assert.equal(useProjection.getState().graph.agents[0].context.objective, 'safe');
+
+  const accepted = applyGraphCommandResponse(graphAt(6, 'accepted'), 'move', event => useProjection.getState().apply(event));
+  assert.ok(accepted);
+  assert.equal(accepted.revision, 6);
+  assert.equal(useProjection.getState().graph.agents[0].context.objective, 'accepted');
+});
+
+test('a stale command response cannot escape the projection revision guard', () => {
+  useProjection.getState().hydrate(graphAt(7, 'newest projection'));
+  let usedByCaller = '';
+
+  const stale = applyGraphCommandResponse(graphAt(6, 'stale command'), 'add', event => useProjection.getState().apply(event));
+  usedByCaller = stale.agents[0].context.objective;
+
+  assert.equal(stale.revision, 7);
+  assert.equal(usedByCaller, 'newest projection');
+  assert.equal(useProjection.getState().graph.revision, 7);
+  assert.equal(useProjection.getState().graph.agents[0].context.objective, 'newest projection');
+
+  const newer = applyGraphCommandResponse(graphAt(8, 'newer command'), 'add', event => useProjection.getState().apply(event));
+  if (newer) usedByCaller = newer.agents[0].context.objective;
+
+  assert.equal(newer?.revision, 8);
+  assert.equal(usedByCaller, 'newer command');
+  assert.equal(useProjection.getState().graph.agents[0].context.objective, 'newer command');
+});
+
+test('the projection owner retains accepted graph events newest first', () => {
+  useProjection.getState().hydrate(graphAt(5, 'safe'));
+  useProjection.getState().apply({ id: 6, type: 'graph.updated', message: 'Six', snapshot: graphAt(6, 'six') });
+  useProjection.getState().apply({ id: 7, type: 'graph.updated', message: 'Seven', snapshot: graphAt(7, 'seven') });
+
+  assert.deepEqual(useProjection.getState().events.map(event => event.id), [7, 6]);
+});
