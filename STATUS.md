@@ -78,6 +78,10 @@ on `main`.
   delegation with a message to remove the subagent; only context connections can be deleted. The canvas explains
   this while a delegation is selected. Until now the deletion was accepted and left a subagent without its
   delegation, a graph the store refuses to save, so every later change was lost at the next restart.
+- **R4-2** No accepted graph command leaves a graph the app cannot save: a test runs every `GraphService` command,
+  by name and in a seeded random walk, and parses the redacted snapshot after each accepted one. It also found, and
+  the round fixed, a subagent placed outside the canvas beside a parent at its edge, an output cut inside
+  "Bearer [REDACTED]" that saved longer than its limit, and demo output past 8000 characters.
 - **R4-4** The browser check deletes a context connection (refused, then confirmed) and checks that deleting the
   delegation is refused.
 

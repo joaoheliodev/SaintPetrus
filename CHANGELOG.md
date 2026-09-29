@@ -6,13 +6,17 @@ that carried them.
 ## Unreleased: Round 4 on `main` (2026-09-29)
 
 Deleting a delegation left a graph the server could no longer save, and nothing on screen said so. No request with a
-real key was made. The test floor rose from 487 to 488.
+real key was made. The test floor rose from 487 to 490.
 
 - A delegation connection is deleted only with its subagent: `POST /api/graph` answers 400 to `disconnect` on a
   `delegation` edge with "A delegation connection cannot be deleted on its own. Remove the subagent instead.", and
   context connections are deleted as before. The canvas explains this while a delegation is selected and asks
   nothing before sending one (R4-1). The browser check deletes a context connection and checks that the delegation
   is refused (R4-4).
+- A test runs every graph command, by name and in a seeded random walk, and parses the redacted snapshot after each
+  accepted one (R4-2). It found three more ways to leave a graph that could not be saved, now fixed: a subagent
+  placed beside a parent at the edge of the canvas fell outside it; an output cut at 8000 inside
+  "Bearer [REDACTED]" was redacted longer again when saved; and the demo's output could grow past 8000.
 
 ## Unreleased: Round 3 on `night/provider-validation-ready` (2026-09-28)
 

@@ -32,7 +32,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 488 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 490 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -127,6 +127,8 @@ Accounting is journaled (Round 3): `accounting.jsonl` in the user data directory
 A new budget period zeroes consumption and keeps limits, pauses and Pause all; it is refused while a reservation is open. It never resumes an agent: resuming stays an explicit action, as after raising a limit, and Budgets says which agents are still paused and points to **Resume eligible agents** (Round 3, R3-2).
 
 A delegation connection is deleted only with its subagent (Round 4, 2026-09-29). The server refuses `disconnect` on a `delegation` edge with a message that says to remove the subagent; only `context` connections can be deleted. The canvas explains this while a delegation is selected, but the server decides.
+
+No accepted graph command may leave a graph the app cannot save (Round 4, R4-2). `tests/graph-invariant.test.ts` runs every `GraphService` command, by name and in a seeded random walk, and parses the redacted snapshot with `parseGraphDocument` after each accepted one; a refused command must change nothing. A new command joins that test in the change that adds it.
 
 ## Interface vocabulary
 

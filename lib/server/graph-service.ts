@@ -18,6 +18,15 @@ function refuseCredentials(fields: Record<string, string | readonly string[]>) {
     if ((typeof value === 'string' ? [value] : value).some(text => redactText(text) !== text)) throw new GraphError(`The ${field} contains text shaped like a credential (an API key or an authorization header). Remove it and try again.`);
   }
 }
+// Output is redacted before the cut, so it is within its limit as the file will hold it. A cut inside
+// "Bearer [REDACTED]" leaves text the redactor would lengthen again, so it is trimmed back until the redactor leaves it.
+function savedOutput(text: string) {
+  let output = redactText(text).slice(0, 8000);
+  while (redactText(output) !== output) output = output.slice(0, -1);
+  return output;
+}
+// The saved graph refuses a position outside this square (graph-document.ts), so placement never leaves it.
+const onCanvas = (value: number) => Math.max(-100000, Math.min(100000, value));
 export class GraphService {
   private graph = createGraph();
   constructor() { this.record('agent.created', 'root', 'Coordinator created.'); }
@@ -70,7 +79,8 @@ export class GraphService {
     let candidate = parent ? { x: parent.position.x + 360, y: parent.position.y } : { x: 40 + (row % 3) * 360, y: 180 + Math.floor(row / 3) * 280 };
     const taken = (spot: { x: number; y: number }) => this.graph.agents.some(a => Math.abs(a.position.x - spot.x) < 320 && Math.abs(a.position.y - spot.y) < 240);
     for (let step = 0; step < 64 && taken(candidate); step++) candidate = { x: candidate.x, y: candidate.y + 260 };
-    return candidate;
+    // Beside a parent at the edge of the canvas the free spot would fall outside it.
+    return { x: onCanvas(candidate.x), y: onCanvas(candidate.y) };
   }
   private createAgent(callerId: string | null, request: SpawnRequest, requested?: { x: number; y: number }) {
     const parent = this.graph.agents.find(a => a.id === callerId);
@@ -129,8 +139,7 @@ export class GraphService {
   recordOutput(id: string, text: string): boolean {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) return false;
-    // Redacted before the cut, so the saved output is within its limit as the file will hold it.
-    agent.output = redactText(text).slice(0, 8000); this.emit('agent.output', 'Answer recorded.', { agent }); return true;
+    agent.output = savedOutput(text); this.emit('agent.output', 'Answer recorded.', { agent }); return true;
   }
   connect(source: string, target: string) {
     // Authoritative validation: never trust client feedback or supplied edge IDs.
@@ -186,6 +195,6 @@ export class GraphService {
       this.emit('budget.exhausted', 'Mock budget exhausted.', { agent }); return false;
     }
     if (charge) this.graph.costCents++;
-    agent.output += character; observeArtifact(id, agent.name, agent.output); this.record('agent.message', id, agent.output); this.emit('mock.delta', 'Mock output updated.', { agent }); return true;
+    agent.output = savedOutput(agent.output + character); observeArtifact(id, agent.name, agent.output); this.record('agent.message', id, agent.output); this.emit('mock.delta', 'Mock output updated.', { agent }); return true;
   }
 }

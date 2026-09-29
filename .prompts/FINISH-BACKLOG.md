@@ -345,7 +345,7 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
 | ID | Item | Acceptance criterion | Status |
 | --- | --- | --- | --- |
 | R4-1 | A delegation is not deleted | The server refuses `disconnect` on a `delegation` edge with a message to remove the subagent; only `context` connections are deleted; the canvas explains it while a delegation is selected; recorded in `AGENTS.md` | done |
-| R4-2 | Savable after every command | A test runs every `GraphService` command (create, subagent, connect, delete connection, remove, edit, move, limits, reset, output, pause, import) and parses the redacted snapshot with `parseGraphDocument` after each accepted one | todo |
+| R4-2 | Savable after every command | A test runs every `GraphService` command (create, subagent, connect, delete connection, remove, edit, move, limits, reset, output, pause, import) and parses the redacted snapshot with `parseGraphDocument` after each accepted one | done |
 | R4-3 | Warning while the graph is not saved | While `GraphStore` refuses or fails to write, for any reason (R-01's key configured after the text included), a persistent warning shows the reason, never the refused text, until it saves again; a local read-only route exposes the state; documentation and tests in the same commit | todo |
 | R4-4 | Browser check | Deletes a context connection (refused, then confirmed) and checks that deleting the delegation is refused; no check removed | done |
 
@@ -364,6 +364,20 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   on screen, the delegation still on the canvas and on the server), connects two agents from the keyboard, then
   deletes that context connection (refused, then confirmed) and checks that only it went. The two PASS lines for
   connecting and deleting swap order; none was removed.
+- R4-2: `tests/graph-invariant.test.ts` holds two tests. One runs every command by name (create, create at a drop
+  position, subagent, spawn, connect, move, edit, output, demo output, delete connection, remove, limits, pause one,
+  compare-and-set, pause all, run status, import, reset), with the refusals that matter (a cycle, a delegation, an
+  agent with subagents, limits the graph exceeds, an import while paused). The other is a seeded random walk of 3000
+  steps over the same commands with valid and invalid arguments, and checks that each command was accepted at least
+  once. After an accepted command the redacted snapshot must parse; after a refused one the graph must be unchanged
+  and the error a `GraphError`. The test found three more ways to leave a graph the app could not save, fixed in
+  `GraphService`: (1) automatic placement beside a parent at x or y near 100000 put the subagent outside the canvas,
+  so placement is now clamped to ±100000 (two subagents placed at the very edge can overlap; they can be moved);
+  (2) `recordOutput` cut the redacted text at 8000, and a cut inside `Bearer [REDACTED]` (as `Bearer [R`) was
+  redacted longer again at write time, so the output is now trimmed back until the redactor leaves it unchanged
+  (`savedOutput`, at most the length of that marker); (3) `appendMockOutput` appended without a limit, so demo output
+  after a long answer passed 8000; it now goes through `savedOutput` as well. The mock's own text is unchanged by
+  the redactor, so the demo and the preview are unaffected.
 
 #### Questions for João
 
@@ -491,6 +505,10 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R4-1 | `disconnect` without the delegation refusal | killed by "edge deletion dispatch removes only the requested context connection, refuses a delegation…"; restored, sha256 identical |
 | R4-1 | the delegation explanation never shown | killed by "R4-1 a selected delegation says it goes with its subagent…" |
 | R4-1 | every edge treated as a context connection | killed by the same test |
+| R4-2 | placement not clamped to the canvas | killed by both R4-2 tests ("subagent of an agent on the edge of the canvas", random walk step 702); restored, sha256 identical |
+| R4-2 | no trim after the output cut | killed by both R4-2 tests ("output with a bearer token at 7983", random walk step 62) |
+| R4-2 | demo output appended without `savedOutput` | killed by both R4-2 tests ("demo output after it", random walk step 115) |
+| R4-2 | `disconnect` without the delegation refusal | killed by both R4-2 tests as well ("delete a delegation", random walk step 246) |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
