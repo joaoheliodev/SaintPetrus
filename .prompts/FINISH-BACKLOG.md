@@ -694,3 +694,6 @@ Everything below is yours; nothing in it needs this conversation.
   `AGENTS.md`. Floor → 387.
 - Phase 6: two independent reviewers; 16 findings dispositioned (12 fixed, including a regression of this branch in
   which provider failures lost their codes in the running app). Final gate green at 400 tests; Gitleaks clean.
+- Phase 10 (Round 4, 2026-09-29, on `main`): R4-1 and R4-4 in `897265a`, R4-2 in `eb507c3`, R4-3 in `894d41d`.
+  Floor 487 → 495, every fix mutation-tested. On fresh instances `test:e2e` passed in development (20 checks) and
+  `test:browser` in production; Gitleaks clean on every staged diff, the working directory and the full history.
