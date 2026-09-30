@@ -114,6 +114,8 @@ async function walk(mode: 'mock' | 'real', seed: number, steps: number) {
       // A call pauses at most the agent it was made for; the connection test's is the Coordinator.
       const newly = paused(after).filter(id => !before.paused.includes(id));
       if (command === 'call') assert.ok(newly.length <= 1, `${label}: one call paused ${newly.length} agents`);
+      // The worst case not fitting is a refusal, not a pause: only a full scope pauses (Round 5, R5-Q3).
+      if (answer.error === 'Preflight reservation exceeds token or monetary budget.') assert.deepEqual(newly, [], `${label}: a preflight refusal paused ${newly.join(', ')}`);
       if (command === 'connection test') assert.ok(newly.every(id => id === 'root'), `${label}: the connection test paused ${newly.join(', ')}`);
       if (newly.length && (command === 'call' || command === 'connection test')) count('a call paused its agent');
       // A resume releases exactly the agents that nothing but Pause all holds, says whom, and every other hold stays.

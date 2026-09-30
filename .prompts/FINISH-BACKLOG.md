@@ -545,6 +545,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-10 | Unverifiable usage names no cause it cannot know (C2) | Found re-running E5 at the end: the refused resume, the pause and Budgets said "a call lost contact with its provider" for every unverifiable reservation; lost contact, unreadable usage and an unpriced served model now read alike, without a false cause | done |
 | R5-11 | A new budget period clears the mock's tokens everywhere (answer to R5-Q1) | The period zeroes the global, agent and model rows and the mock's tokens in every row; the session row loses only its mock part and keeps what real calls spent; a scope the mock filled is released by the period and the next Resume; limits, pauses, Pause all and the journal format unchanged | done |
 | R5-12 | An ordinary expired estimate does not hold its agent (answer to R5-Q2) | No code change: `holds()` holds an agent only for an estimate with reported usage (an unpriced served model); a test pins that a present agent's ordinary estimate holds nothing, the agent resumes and calls again, and the estimate stays counted in all four rows | done |
+| R5-13 | A preflight refusal no longer pauses (answer to R5-Q3) | "Preflight reservation exceeds token or monetary budget." is refused as before, with nothing sent, and pauses no one; a full scope, unverifiable usage, an estimate awaiting reconciliation and Pause all still pause; route, service and walk tests; docs say only a full scope pauses | done |
 
 #### R5-1 reproduction (2026-09-30, before any change, at `23f3052`)
 
@@ -770,6 +771,19 @@ global and session nobody is paused, yet Budgets ends "then use Resume eligible 
   no hold, `resume()` releases the agent, the estimate counted in `used` and `estimated` of the global, agent, model
   and session rows, and the next call accepted. `AGENTS.md` records the decision after the unpriced served model
   paragraph, and `docs/reference/reservation-expiry.md` says it with its anchors kept. Floor 540 → 541.
+- R5-13 (2026-09-30, operator decision R5-Q3). `plan()` refuses "Preflight reservation exceeds token or monetary
+  budget." with `pause` false; the sentence and `budget.refused` are unchanged, and "Token or monetary budget
+  exhausted." (a scope already full) and "Agent paused." still pause. Only the Activity log reads `budget.refused`,
+  and only to label it, so no other path turns a preflight refusal into a status. Tests that used the refusal only
+  to get a paused agent now use a zero limit, which is a full scope (`pauseByBudget` in R5-3, O4); RF-06 (four
+  scopes, 100%), P2 and the direct API test now assert no pause, the four-scope test also shows a full scope still
+  pausing, and the direct API test checks the refused connection test over the route (409, the sentence, the
+  Coordinator Ready in the graph and the snapshot). New `tests/preflight-refusal.test.ts`: no pause and a smaller
+  call accepted right after; a full scope still pausing and a quote pausing no one; over the routes, quote and
+  complete answering 409 with the sentence, the agent Ready and neither the notice nor Resume on screen. The walk
+  asserts after each call that a preflight refusal paused no one, and still reaches both the refusal and "a pause
+  nothing holds" (now through a raised limit after a full scope). README and `docs/architecture.md` say only a
+  full scope pauses. Floor 541 → 544.
 
 #### Questions for João
 
@@ -1021,6 +1035,8 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-11 | the session row loses its real part too | killed by the first ("the session row loses exactly the mock part"). Its swap back matched twice, because the mutated line equalled the other branch; the line was restored by hand to the same sha256 |
 | R5-11 | `used` goes to zero but `mock` and `mockCost` stay | killed by the first ("global all starts again from zero", on `mock.total`) |
 | R5-12 | `holds()` without `&& item.reported` (every expired estimate holds its agent) | killed by "an ordinary expired estimate does not hold its agent…", the only test of 541 that failed: A-10 and every unpriced served model test stayed green, so the mutation separates the two cases; restored, sha256 identical |
+| R5-13 | the preflight refusal pauses again (`fail(…, true)`) | killed by "a preflight refusal pauses no one, and a smaller call…", "over the routes, a Run once refused at preflight…", the walk's new check ("a preflight refusal paused …"), RF-06 (four scopes, 100%, direct API) and P2: 7 of 544; restored, sha256 identical |
+| R5-13 | a scope exactly full no longer pauses (`Token or monetary budget exhausted.` with `false`) | killed by "a scope exactly full still refuses and pauses…", RF-06 four scopes, O4, R5-3, R5-4 and R5-11: 10 of 544 |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

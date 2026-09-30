@@ -356,7 +356,8 @@ export class TokenService {
     const entry = !verification && reusable ? this.cache.get(hash) : undefined;
     const cached = entry && entry.expires > this.now() ? entry : undefined;
     const reservedTokens = inputEstimate + options.maxTokens;
-    if (!cached && (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costAccountedUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd))) fail('Preflight reservation exceeds token or monetary budget.', true);
+    // Every scope has room, just not for this call's worst case: refused, but nothing is full, so no pause (Round 5, R5-Q3).
+    if (!cached && (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || rows.some(row => row.used + row.reserved + reservedTokens > row.limit || row.costAccountedUsd + row.costReservedUsd + reservedCostUsd > row.costLimitUsd))) fail('Preflight reservation exceeds token or monetary budget.', false);
     return { options, hash, inputEstimate, reservedCostUsd, reservedTokens, reusable, cached, rows, createdAt, priceVersions, selectedPrice };
   }
   // What a call with this input would reserve, decided by the same checks and without reserving or pausing anything.

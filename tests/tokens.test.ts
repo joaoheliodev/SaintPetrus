@@ -79,8 +79,12 @@ test('C2 local refusal codes cannot fire while a reservation is live', async () 
 test('RF-06 reserves before dispatch and enforces each of four scopes', async () => {
   for (const scope of ['global','agent','model','session']) {
     const f = fixture(); const id = scope === 'global' ? 'all' : scope === 'agent' ? 'a' : scope === 'model' ? 'test-model' : f.service.sessionId;
+    // The worst case does not fit: refused before dispatch, and nothing is full, so nothing pauses (Round 5, R5-Q3).
     f.service.setLimit(scope, id, 1);
-    await assert.rejects(f.run(), /reservation/); assert.equal(f.calls(), 0); assert.ok(f.paused.has('a'));
+    await assert.rejects(f.run(), /reservation/); assert.equal(f.calls(), 0); assert.equal(f.paused.has('a'), false, `${scope}: a preflight refusal pauses no one`);
+    // A scope exactly full refuses too, and that pauses the agent.
+    f.service.setLimit(scope, id, 0);
+    await assert.rejects(f.run(), /exhausted/); assert.equal(f.calls(), 0); assert.ok(f.paused.has('a'), `${scope}: a full scope pauses`);
     assert.equal(f.service.snapshot().rows.find(row => row.scope === 'global')!.actual.total, 0);
   }
 });
@@ -92,7 +96,7 @@ test('RF-06 reconciles actual usage, costs, 80% warning and 100% pause', async (
   let row = f.service.snapshot().rows.find(row => row.scope === 'global')!;
   assert.deepEqual(row.actual, { prompt: 50, completion: 30, total: 80 }); assert.equal(row.reserved, 0); assert.equal(row.state, 'warning');
   assert.equal(row.costAccountedUsd, (50 * 2 + 30 * 4) / 1e6);
-  await assert.rejects(f.run('Different'), /reservation/); assert.ok(f.paused.has('a'));
+  await assert.rejects(f.run('Different'), /reservation/); assert.equal(f.paused.has('a'), false, 'the worst case does not fit, but nothing is full');
   const g = fixture(100); g.adapter.complete = async () => ({ text: 'Answer', billingModel: 'test-model', usage: { prompt: 60, completion: 40, total: 100 } });
   await g.run(); row = g.service.snapshot().rows.find(row => row.scope === 'global')!;
   assert.equal(row.state, 'stopped'); assert.ok(g.paused.has('a')); await assert.rejects(g.run(), /paused/);
@@ -245,8 +249,10 @@ test('RF-06 direct API cannot override limits, forge session or evade kill throu
     assert.equal((await providerPost(req('provider', { action: 'test', limit: 999999 }))).status, 400);
     assert.equal((await providerPost(req('provider', { action: 'test', sessionId: 'forged' }))).status, 400);
     assert.equal((await providerPost(req('provider', { action: 'test', agentId: 'forged' }))).status, 400);
-    assert.equal((await providerPost(req('provider', { action: 'test' }))).status, 409);
-    assert.equal(graph.snapshot().agents[0].status, 'paused');
+    // Refused at preflight: the sentence comes back and the Coordinator is not paused, in the graph or the snapshot (R5-Q3).
+    const refused = await providerPost(req('provider', { action: 'test' }));
+    assert.deepEqual([refused.status, (await refused.json()).error], [409, 'Preflight reservation exceeds token or monetary budget.']);
+    assert.equal(graph.snapshot().agents[0].status, 'ready'); assert.deepEqual(service.snapshot().paused, []);
     const costLimit = await controls(req('tokens', { action: 'cost-limit', scope: 'global', id: 'all', limit: .5 }));
     assert.equal(costLimit.status, 200); assert.equal((await costLimit.json()).rows.find((row: { scope: string }) => row.scope === 'global').costLimitUsd, .5);
     assert.equal((await controls(req('tokens', { action: 'cost-limit', scope: 'global', id: 'all', limit: 'invalid' }))).status, 400);
@@ -273,10 +279,11 @@ test('O4 resume changes only graph pauses owned and released by TokenService', a
   const request = (data: unknown) => new Request('http://127.0.0.1:3000/api/tokens', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
   try {
     graph.setAgentStatus('root', 'paused');
-    service.setLimit('agent', child, 1);
-    await assert.rejects(service.execute(f.proxy, f.adapter, 'Question', signal(), child, 'System'), /reservation/);
-    service.setLimit('agent', superseded, 1);
-    await assert.rejects(service.execute(f.proxy, f.adapter, 'Question', signal(), superseded, 'System'), /reservation/);
+    // A zero limit is a full scope, which pauses the agent that meets it.
+    service.setLimit('agent', child, 0);
+    await assert.rejects(service.execute(f.proxy, f.adapter, 'Question', signal(), child, 'System'), /exhausted/);
+    service.setLimit('agent', superseded, 0);
+    await assert.rejects(service.execute(f.proxy, f.adapter, 'Question', signal(), superseded, 'System'), /exhausted/);
     assert.deepEqual(service.snapshot().paused, [child, superseded]);
     service.setLimit('agent', child, 1000);
     service.setLimit('agent', superseded, 1000);
@@ -384,7 +391,7 @@ test('P2 preflight adds a new reservation to the accounted cost, not to its unme
   assert.equal(row.costAccountedUsd, 40); assert.equal(row.costUnmeasuredUsd, 0); assert.equal(row.costReservedUsd, 0); assert.equal(row.state, 'available'); assert.equal(f.paused.has('a'), false);
   await assert.rejects(f.service.execute(new ProviderProxy(), f.adapter, 'Other', signal(), 'a', 'System'), /Preflight reservation exceeds/);
   row = f.service.snapshot().rows.find(item => item.scope === 'global')!;
-  assert.equal(adapterCalls, 1); assert.equal(row.costAccountedUsd, 40); assert.equal(row.costReservedUsd, 0); assert.ok(f.paused.has('a'));
+  assert.equal(adapterCalls, 1); assert.equal(row.costAccountedUsd, 40); assert.equal(row.costReservedUsd, 0); assert.equal(f.paused.has('a'), false, 'a preflight refusal pauses no one (Round 5, R5-Q3)');
 });
 
 test('D2 TokenService reconciliation passes actual cache split and both call timestamps', async () => {

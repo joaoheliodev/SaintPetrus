@@ -181,8 +181,8 @@ key as an argument.
 ## Budgets, prices and receipts
 
 **Budgets** shows global, agent, model and session limits in tokens and in USD. Either dimension warns at 80%;
-a call whose reservation would pass any limit is refused before provider I/O and pauses its agent, and at 100%
-further calls are blocked. Raising a limit does not restart work: use **Resume eligible agents**. The view opens
+a call whose reservation would pass any limit is refused before provider I/O without pausing its agent, and at 100%
+a scope is full: further calls are refused and the agent that meets it is paused. Raising a limit does not restart work: use **Resume eligible agents**. The view opens
 with a summary and one sentence saying what is blocked and how to unblock it; the full table is under **Details**.
 The mock's estimated tokens count against the token limits too, so the mock alone can reach a limit.
 Beside **Resume eligible agents**, Budgets says what the last resume did and, for every agent still paused, what holds

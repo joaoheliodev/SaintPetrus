@@ -158,6 +158,10 @@ round's handoff); each fix below answers a cell that did not come back.
   and call again while the estimate stays counted, conservatively, in all four budgets and Budgets names it; only an
   unpriced served model's estimate holds its agent until it is reconciled by hand. The service already did this; a
   test now pins it, and `docs/reference/reservation-expiry.md` says it.
+- **R5-13** Operator decision R5-Q3: a preflight refusal, where every scope has room but not for this call's worst
+  case, no longer pauses the agent. The call is refused as before and nothing is sent. An agent is paused only by a
+  full budget, unverifiable usage, an estimate awaiting reconciliation or Pause all, so the loop R5-1 found (S4:
+  Resume, the next call refused, paused again) is gone.
 
 ## Not verified or pending
 

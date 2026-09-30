@@ -40,9 +40,9 @@ async function seed() {
 }
 const until = async (check: () => boolean, label: string) => { for (let i = 0; i < 100 && !check(); i++) await delay(20); assert.ok(check(), label); };
 const snapshot = async () => (await tokensGet(new Request(`${origin}/api/tokens`))).json();
-// A limit smaller than one call: the call is refused before any I/O and pauses its agent.
+// A zero limit is a full scope: the call is refused before any I/O and pauses its agent.
 async function pauseByBudget(agent: string) {
-  assert.equal((await tokens({ action: 'limit', scope: 'agent', id: agent, limit: 1 })).status, 200);
+  assert.equal((await tokens({ action: 'limit', scope: 'agent', id: agent, limit: 0 })).status, 200);
   assert.equal((await providerPost(request('provider', { action: 'complete', input: 'Question', agentId: agent }))).status, 409);
   assert.ok((await snapshot()).paused.includes(agent), 'paused by the refused call');
 }

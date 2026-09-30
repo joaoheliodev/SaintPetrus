@@ -36,7 +36,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 541 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 544 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -137,6 +137,8 @@ Accounting is journaled (Round 3): `accounting.jsonl` in the user data directory
 A new budget period zeroes consumption in the global, agent and model budgets and keeps limits, pauses and Pause all; it is refused while a reservation is open. It never resumes an agent: resuming stays an explicit action, as after raising a limit, and Budgets says which agents are still paused and points to **Resume eligible agents** (Round 3, R3-2).
 
 Start a new budget period zeroes the mock's estimated tokens in every budget row, the session row's mock part included (Round 5, R5-Q1, 2026-09-30). What real calls spent since the server started stays in the session row. Limits, pauses and Pause all do not change. The mock's tokens are not spend and a restart already clears them; the period gives back only the room they took.
+
+A preflight refusal, where the call's worst case does not fit the room left, does not pause the agent. An agent is paused only by a full budget (used plus reserved at or over a token or dollar limit), by unverifiable usage, by an estimate awaiting reconciliation or by Pause all (Round 5, R5-Q3, 2026-09-30).
 
 A delegation connection is deleted only with its subagent (Round 4, 2026-09-29). The server refuses `disconnect` on a `delegation` edge with a message that says to remove the subagent; only `context` connections can be deleted. The canvas explains this while a delegation is selected, but the server decides.
 

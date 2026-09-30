@@ -66,8 +66,8 @@ reasoning turned off where the provider allows it, and no response cache.
    `max_tokens`. Cost is priced at the peak rate with no cache hits. If the request is reproducible and a
    fresh cached answer exists, it is returned here without a provider call.
 6. **Reservation.** Tokens and USD are reserved synchronously across the global, agent, model and session
-   scopes. If any scope would pass its limit, the agent is paused and the call refused. Nothing has left the
-   process yet.
+   scopes. If any scope would pass its limit, the call is refused; the agent is paused only when a scope is already
+   full (used plus reserved at its token or dollar limit). Nothing has left the process yet.
 7. **Proxy.** `ProviderProxy` admits one call at a time, starts the timeout (15 s unless the startup-only
    validation flag shortens it) and passes the redacted input to the adapter.
 8. **Adapter.** The adapter builds the request for its fixed endpoint with the key only in a header, records
