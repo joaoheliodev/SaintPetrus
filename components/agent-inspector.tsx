@@ -7,7 +7,7 @@ import { readAccounting } from './token-panel';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import type { Agent, Graph } from '../lib/orchestrator';
-import { connectionTarget, postProviderAction, verificationMessage } from './provider-status';
+import { connectionTarget, postProviderAction, refusalMessage } from './provider-status';
 import { AgentStatusBadge } from './agent-status-badge';
 import { useConfirm } from './confirm-dialog';
 import { agentPlacement } from '../lib/agent-status';
@@ -46,21 +46,19 @@ export function AgentInspector({ agent, agents, pending, command, connect, conne
   // The keyboard path to what a drag between two cards does; the canvas validates and the server decides.
   const [target, setTarget] = useState(''); const others = agents.filter(other => other.id !== agent.id);
   const [message, setMessage] = useState(''); const [phase, setPhase] = useState<RunPhase>('idle'); const [result, setResult] = useState('');
-  // A 409 carries either a known code or the server's own fixed refusal sentence; both are safe to show.
-  const refusal = (status: number, error: unknown) => status === 409 && typeof error === 'string' && !/^[a-z_]+$/.test(error) ? `Stopped by the server: ${error}` : verificationMessage(status, typeof error === 'string' ? error : undefined);
   // One budgeted call through the connected provider; the server records the answer as this agent's output.
   // It asks first with the server's own quote of the most the call can reserve (operator decision Q-09).
   async function run() {
     setPhase('quoting'); setResult('');
     try {
       const quoted = await postProviderAction(JSON.stringify({ action: 'quote', input: message, agentId: agent.id }));
-      if (!quoted.ok) { setResult(refusal(quoted.status, quoted.data?.error)); return; }
+      if (!quoted.ok) { setResult(refusalMessage(quoted.status, quoted.data?.error)); return; }
       setPhase('asking');
       if (!await confirm({ message: runQuestion(quoted.data?.quote), confirmLabel: 'Send (1 call)' })) { setResult('Not sent.'); return; }
       setPhase('sending');
       const sent = message;
       const { ok, status, data } = await postProviderAction(JSON.stringify({ action: 'complete', input: sent, agentId: agent.id }));
-      if (!ok) { setResult(refusal(status, data?.error)); return; }
+      if (!ok) { setResult(refusalMessage(status, data?.error)); return; }
       const answered = exchangeFromResponse(sent, data);
       setResult(`${answered.mocked ? 'Mock answer' : `Answer from ${answered.model}`} · ${answered.tokens} tokens · ${answered.latencyMs} ms`);
       onExchange?.({ ...answered, costPending: true }); setMessage('');

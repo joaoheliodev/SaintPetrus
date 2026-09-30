@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { PauseNotice, ResumeEligibleButton, type TokenSource } from '../components/token-panel';
 import { AgentInspector } from '../components/agent-inspector';
 import { ConfirmProvider } from '../components/confirm-dialog';
+import { refusalMessage, verificationMessage } from '../components/provider-status';
 import { TokenService } from '../lib/tokens/service';
 import type { Prices, TokenPolicy } from '../lib/tokens/config';
 import { createGraph, type Agent } from '../lib/orchestrator';
@@ -47,4 +48,11 @@ test('R5-5 the panel of a Paused agent says why and opens Budgets; a Ready one s
   const paused = panel({ ...root, status: 'paused' });
   assert.match(paused, /class="inspector-pause" role="status"><p>Coordinator is paused: Pause all agents is on\. Use Resume eligible agents\.<\/p><button[^>]*>Open Budgets<\/button>/);
   assert.doesNotMatch(panel(root), /inspector-pause/);
+});
+
+test('R5-8 a refused connection test gives the server\'s reason, as Run once does; a code keeps its own sentence', () => {
+  assert.equal(refusalMessage(409, 'Token or monetary budget exhausted.'), 'Stopped by the server: Token or monetary budget exhausted.');
+  assert.equal(refusalMessage(409, 'busy'), verificationMessage(409, 'busy'), 'a code is never shown raw');
+  assert.equal(refusalMessage(409, undefined), verificationMessage(409));
+  assert.equal(refusalMessage(401, 'A sentence.'), verificationMessage(401), 'only a 409 carries a sentence of the server');
 });

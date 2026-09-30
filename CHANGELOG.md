@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 5 on `main` (2026-09-30)
 
 The operator could not un-pause the agents. Every way into a pause was tried against every way out on fresh instances
-before anything changed. No request with a real key was made. The test floor rose from 514 to 537.
+before anything changed. No request with a real key was made. The test floor rose from 514 to 538.
 
 - After **Pause all agents** and **Resume eligible agents** the graph is usable again: Pause all no longer marks the
   run paused when no demo is running, so Import, Reset, Load demo and Graph limits are enabled and the server accepts
@@ -37,6 +37,10 @@ before anything changed. No request with a real key was made. The test floor ros
   step holds the round's guarantees: the graph shows exactly the pauses the token service holds, a way back is offered
   whenever anything is paused, every pause says what releases it, a resume releases exactly the agents nothing but
   Pause all holds, every refusal says why, and the run is never left paused without a demo (R5-7).
+- A connection test that a budget refuses gives the server's reason, as Run once does ("Stopped by the server: Token
+  or monetary budget exhausted."), instead of a generic sentence; it is the panel's call that pauses its agent when
+  refused. The browser check now follows a full scope that Resume eligible agents cannot release until its limit
+  rises, and checks that no Resume demo is offered after Pause all (R5-8).
 
 ## Unreleased: Round 4 on `main` (2026-09-29)
 

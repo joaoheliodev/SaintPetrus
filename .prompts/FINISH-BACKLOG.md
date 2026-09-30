@@ -540,7 +540,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-5 | A visible way back (C3) | Resume eligible agents next to Pause all agents in the top bar while something is paused, and in Ctrl+K, with the same command and text; the panel of a Paused agent says why and opens Budgets; the kill switch refusal names the way | done |
 | R5-6 | A new budget period says what it clears (H5) | The dialog and Details say that the mock's usage and the session budget stay until a restart; the semantics wait for the operator | done |
 | R5-7 | Pause and resume invariants | A seeded walk over pause all, resume, raise a limit, new period, reset, import, remove, add and a call refused by a full scope, with the invariants written and justified | done |
-| R5-8 | Browser checks | The workspace check goes back from Pause all through the new Resume, and through a full scope that Resume cannot release until the limit rises; no PASS removed; REAL without a key shows Pause all and Resume and no Resume demo | pending |
+| R5-8 | Browser checks | The workspace check goes back from Pause all through the new Resume, and through a full scope that Resume cannot release until the limit rises; no PASS removed; REAL without a key shows Pause all and Resume and no Resume demo | done |
 | R5-9 | Documentation | STATUS, CHANGELOG, README and a one-line guarantee in `AGENTS.md` | pending |
 
 #### R5-1 reproduction (2026-09-30, before any change, at `23f3052`)
@@ -688,6 +688,23 @@ there is no Resume demo, so only a restart gets out.
   runs: its timers would make the walk irreproducible, and `tests/pause-resume.test.ts` covers it; for the same
   reason the walk does not try the demo's own status changes (the R5-3 guard in `setAgentStatus` is covered there).
   The file runs in about 9 s.
+- R5-8 (2026-09-30). From the panel only the connection test pauses an agent on a budget refusal: Run once asks for a
+  quote first, which refuses without pausing, and the mock's usage never fills a scope its reservation fitted. So the
+  browser check sets the global limit in Details to what is used, runs Test connection, and follows the Coordinator
+  through the notice, its panel, a Resume that answers "No agent was resumed.", Open Budgets, the raised limit and the
+  Resume that releases it. The Connection view answered that refusal with the generic 409 sentence; it now shares
+  `refusalMessage` with Run once (moved from the inspector to `components/provider-status.tsx`): a 409 with the
+  server's fixed sentence shows "Stopped by the server: …", a code keeps its own sentence. The Pause all step also
+  checks that no Resume demo is offered. 24 PASS lines, none removed, on a fresh MOCK instance. REAL without a key was
+  checked by a probe outside the checkout, screen and GETs only, because the operator ruled out Run once in REAL and the
+  workspace check sends one: Pause all, then the top-bar Resume; before it, REAL badge, Pause all agents beside Resume
+  eligible agents, the notice and the inspector with the Pause all sentence, three Paused cards, no Resume demo; after
+  it, three Ready cards, no notice, no Resume, Import, Export and Reset enabled, Apply graph limits enabled, import 200
+  and remove 200, no console problem. No provider route was called.
+- Housekeeping (2026-09-30). A safety check refused a cleanup that removed a data directory named by a command
+  substitution. Directories are now printed first and removed by their literal paths; the probe no longer deletes its
+  own. Three data directories left by an earlier run (05:14 to 05:16, mock graph and accounting files only) were
+  looked at and removed.
 
 #### Questions for João
 
@@ -929,6 +946,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-7 | Pause all holds no pause in the token service | killed ("mock step 2 (pause all): Coordinator is paused, and the token service holds no pause for it") |
 | R5-7 | import accepted while Pause all is on (R5-2) | killed ("mock step 776 (import): Pause all is on and Agent 31 does not say so") |
 | R5-7 | `resumable` ignores Pause all and a single pause (R5-5) | killed ("mock step 2 (pause all): something is paused and no Resume eligible agents is offered") |
+| R5-8 | the Connection view words a refused test generically again | killed by the browser check ("Timed out: the refused test gives the server reason", after 21 PASS lines); every file restored, sha256 identical |
+| R5-8 | Resume demo offered while Pause all is on (the old dead end, in the panel) | killed by the browser check ("no Resume demo without a demo", after 19 PASS lines) |
+| R5-8 | `refusalMessage` drops the server's sentence | killed by "a refused connection test gives the server's reason, as Run once does…" |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

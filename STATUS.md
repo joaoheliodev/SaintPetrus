@@ -139,6 +139,13 @@ round's handoff); each fix below answers a cell that did not come back.
   releases exactly who nothing but Pause all holds, and that every refusal says why and changes nothing. It kills the
   regressions of R5-2 to R5-5 it was tried against. No demo runs in it: its timers would make the walk
   irreproducible, and `tests/pause-resume.test.ts` covers the demo.
+- **R5-8** The browser check fills the global budget in Details, runs the connection test (Run once asks for a quote
+  first and pauses no one), and follows the Coordinator: the test says "Stopped by the server: Token or monetary budget
+  exhausted.", the notice and the Paused agent's panel name the full scope, Resume eligible agents answers "No agent
+  was resumed.", the panel opens Budgets, and after the limit rises Resume releases it. After Pause all no Resume demo
+  is offered. In REAL without a key, screen and GETs only (no provider route, no Run once): after Pause all the top bar
+  shows Resume eligible agents, the notice and the inspector say why and no Resume demo exists; after it every agent is
+  Ready, Import, Reset and Graph limits are enabled and the server accepts import and remove.
 
 ## Not verified or pending
 

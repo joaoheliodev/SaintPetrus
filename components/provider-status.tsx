@@ -41,6 +41,9 @@ const badges: Record<ConnectionState, (status: ProviderStatusSnapshot) => string
 export const connectionLabel = (status: ProviderStatusSnapshot) => badges[status.state](status);
 // Exported so the distinct meaning of each failure is pinned by a test, not only by the panel.
 export const verificationMessage = (status: number, code?: unknown) => (typeof code === 'string' ? codeFailures[code] : undefined) ?? failures[status] ?? 'Connection verification failed.';
+// A 409 carries either a known code or the server's own fixed refusal sentence, never input; both are safe to show.
+// Run once and the connection test word a refusal alike, so a budget that pauses an agent names itself (Round 5, R5-8).
+export const refusalMessage = (status: number, error: unknown) => status === 409 && typeof error === 'string' && !/^[a-z_]+$/.test(error) ? `Stopped by the server: ${error}` : verificationMessage(status, typeof error === 'string' ? error : undefined);
 const failures: Record<number, string> = {
   401: 'The provider rejected the credential or model. Check the API key and model ID.',
   402: 'The provider account has no balance left. The key is valid and the service is up, so the connection is not rejected: top up the account and test again.',
@@ -146,7 +149,7 @@ export function ConnectionView({ source, children }: { source: ProviderStatusSou
     await refresh('explicit');
     setResult(ok
       ? `${mocked ? 'Mock verified' : 'Connection verified'} · ${data.latencyMs} ms`
-      : verificationMessage(status, data?.error));
+      : refusalMessage(status, data?.error));
   }
   async function run(action: 'connect' | 'test' | 'disconnect' | 'forget') {
     if (action === 'disconnect' && !await confirm({ message: `Disconnect the ${status?.provider ?? ''} key? It is cleared from backend memory and a call in flight is cancelled.`, confirmLabel: 'Disconnect', destructive: true })) return;

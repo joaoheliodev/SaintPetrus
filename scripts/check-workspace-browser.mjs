@@ -264,6 +264,8 @@ try {
   const topResume = `Array.from(document.querySelectorAll('.topbar-actions button')).find(button => button.textContent.trim() === 'Resume eligible agents')`;
   await until(() => evaluate(`document.querySelector('.pause-notice')?.textContent.includes('Pause all agents is on, so every agent is paused.')`), 'the notice says why');
   await until(() => evaluate(`!!${topResume}`), 'Resume eligible agents beside Pause all agents');
+  // No demo runs, so nothing offers to resume one (the old dead end, in MOCK and in REAL).
+  assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).some(button => button.textContent.trim() === 'Resume demo')`), false, 'no Resume demo without a demo');
   await until(() => click('Resume eligible agents'), 'Resume eligible agents');
   await until(() => evaluate(`!document.querySelector('.pause-notice') && !${topResume}`), 'nothing left to resume');
   await until(() => click('Budgets'), 'Budgets view');
@@ -273,7 +275,7 @@ try {
   const usable = await menuItems();
   assert.deepEqual([usable['Import graph…'], usable['Reset graph…'], ...(mocked ? [usable['Load demo…']] : [])], [false, false, ...(mocked ? [false] : [])], 'nothing in More stays disabled');
   assert.equal(await evaluate(`Array.from(document.querySelectorAll('.budget-card button')).every(button => !button.disabled)`), true, 'Graph limits can be applied');
-  console.log('PASS: after Pause all agents a notice says why, and Resume eligible agents beside it gives the graph back: agents Ready, Import, Reset and Graph limits enabled, "Nothing is paused."');
+  console.log('PASS: after Pause all agents a notice says why, no Resume demo is offered, and Resume eligible agents beside it gives the graph back: agents Ready, Import, Reset and Graph limits enabled, "Nothing is paused."');
   // Ctrl+K reaches the same command (Round 5, R5-5).
   await until(() => click('Pause all agents'), 'Pause all agents again');
   await until(async () => (await sync()).filter(text => text.startsWith('Pause every agent?')).length >= 2, 'second pause question');
@@ -285,6 +287,36 @@ try {
   await key('Enter');
   await until(() => evaluate(`!document.querySelector('.pause-notice') && !${topResume} && Array.from(document.querySelectorAll('.react-flow__node .status')).every(badge => badge.textContent.includes('Ready'))`), 'resumed from the palette');
   console.log('PASS: Ctrl+K reaches Resume eligible agents too');
+  if (mocked) {
+    // A full scope holds its agent through Resume eligible agents until its limit rises (Round 5, R5-8). The connection
+    // test is the panel's call that a budget refusal pauses; Run once asks for a quote first, which pauses no one.
+    const openDetails = () => evaluate(`(() => { const details = document.querySelector('details.budget-details'); if (details) details.open = true; return !!details; })()`);
+    const setGlobal = async limit => { await until(openDetails, 'budget details'); await type('input[aria-label="Budget global:all"]', String(limit)); await until(() => click('Apply global'), 'Apply global'); };
+    const used = await evaluate(`fetch('/api/tokens', { cache: 'no-store' }).then(r => r.json()).then(t => t.rows.find(row => row.scope === 'global').used)`);
+    assert.ok(used > 0, 'the mock call earlier used tokens');
+    await until(() => click('Budgets'), 'Budgets view'); await setGlobal(used);
+    await until(() => evaluate(`document.querySelector('.budget-status')?.textContent.startsWith('Blocked: the global budget is full in tokens.')`), 'the global budget full');
+    await until(() => click('Connection'), 'Connection view'); await until(() => click('Test connection (1 call)'), 'Test connection');
+    await until(() => evaluate(`document.querySelector('.provider-panel [role=status]')?.textContent === 'Stopped by the server: Token or monetary budget exhausted.'`), 'the refused test gives the server reason');
+    const holds = "Coordinator is paused: the global budget is full in tokens, filled by the mock's estimated tokens. Raise its limit in Details or restart the server";
+    await until(() => evaluate(`document.querySelector('.pause-notice')?.textContent.includes(${JSON.stringify(holds)})`), 'the notice names the full scope');
+    await until(() => click('Workspace'), 'Workspace view');
+    await until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('.agent-list-open')).find(b => b.textContent.includes('Coordinator')); item?.click(); return document.querySelector('.inspector h2')?.textContent === 'Coordinator'; })()`), 'coordinator selected');
+    await until(() => evaluate(`document.querySelector('.inspector-pause')?.textContent.includes(${JSON.stringify(holds)})`), "the Paused agent's panel says why");
+    await until(() => click('Resume eligible agents'), 'Resume eligible agents');
+    await until(() => evaluate(`document.querySelector('.pause-notice')?.textContent.startsWith('No agent was resumed.')`), 'Resume says it released no one');
+    assert.equal(await evaluate(`document.querySelector('.react-flow__node .status')?.textContent.includes('Paused')`), true, 'the Coordinator stays Paused');
+    // The panel leads to Budgets, where the limit rises; only then does Resume release it.
+    await until(() => evaluate(`(() => { const button = Array.from(document.querySelectorAll('.inspector-pause button')).find(b => b.textContent.trim() === 'Open Budgets'); button?.click(); return !!button; })()`), 'Open Budgets from the panel');
+    await until(() => evaluate(`!!document.querySelector('#budgets-title')`), 'Budgets opened from the panel');
+    await setGlobal(100000);
+    await until(() => evaluate(`document.querySelector('.pause-reasons')?.textContent.includes('Coordinator is paused, and nothing holds it now: use Resume eligible agents.')`), 'nothing holds it after the raise');
+    await until(() => click('Resume eligible agents'), 'Resume eligible agents');
+    await until(() => evaluate(`document.querySelector('.pause-reasons')?.textContent.includes('Resumed Coordinator.') && document.querySelector('.budget-summary')?.textContent.includes('Nothing is paused.')`), 'resumed once the limit rose');
+    await until(() => click('Workspace'), 'Workspace view');
+    await until(() => evaluate(`!document.querySelector('.pause-notice') && !${topResume} && document.querySelector('.react-flow__node .status')?.textContent.includes('Ready')`), 'the Coordinator Ready again');
+    console.log('PASS: a full scope holds its agent through Resume eligible agents ("No agent was resumed." and why) until its limit rises; the refused test, the notice and the Paused agent\'s panel say why, and the panel opens Budgets');
+  }
   if (mocked) {
     // A demo paused on purpose says how to get the graph back, and Reset graph ends it (Round 5, R5-2).
     await menu('Load demo…'); await until(async () => (await sync()).some(text => text.startsWith('Load the demo?')), 'load demo question');
