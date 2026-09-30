@@ -146,6 +146,10 @@ round's handoff); each fix below answers a cell that did not come back.
   is offered. In REAL without a key, screen and GETs only (no provider route, no Run once): after Pause all the top bar
   shows Resume eligible agents, the notice and the inspector say why and no Resume demo exists; after it every agent is
   Ready, Import, Reset and Graph limits are enabled and the server accepts import and remove.
+- **R5-10** Re-running E5 on the final code showed that unverifiable usage was always explained as "a call lost contact
+  with its provider", also for an answer whose usage could not be read and for an unpriced served model (A-10). The
+  refused resume, the pause and Budgets now say that a call's cost could not be confirmed; the exact cause stays in
+  the Run once result and the Activity feed.
 
 ## Not verified or pending
 

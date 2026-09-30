@@ -43,7 +43,7 @@ const fullIn = (row: BudgetRow) => [...(row.used + row.reserved >= row.limit ? [
 // One sentence: what is wrong, if anything, and the way out. Names come from the graph; a removed agent keeps its id.
 export function budgetStatus(snapshot: { rows: readonly BudgetRow[]; stopped: boolean; reservations: readonly { status: string }[]; accounting?: JournalState }, name: (row: BudgetRow) => string): BudgetStatus {
   const label = (row: BudgetRow) => row.scope === 'global' || row.scope === 'session' ? `the ${row.scope} budget` : `the ${row.scope} budget for ${name(row)}`;
-  if (snapshot.rows.some(row => row.unverifiable > 0)) return { tone: 'red', text: 'A call lost contact with its provider, so its usage is unverifiable. Its reservation stays held until it expires into an estimate; check the provider billing, then apply the confirmed usage in Details.' };
+  if (snapshot.rows.some(row => row.unverifiable > 0)) return { tone: 'red', text: "A call's cost could not be confirmed (the provider lost contact, its usage could not be read, or the model that served it has no price), so its usage is unverifiable. Its reservation stays held until it expires into an estimate; check the provider billing, then apply the confirmed usage in Details." };
   // Every full scope, since raising one limit may not be enough; a removed agent's row blocks no call and cannot be raised.
   const stopped = snapshot.rows.filter(row => row.state === 'stopped' && !('removed' in row && row.removed));
   if (stopped.length) return { tone: 'red', text: `Blocked: ${listed(stopped.map(row => `${label(row)} is full in ${fullIn(row)}`))}. Raise ${stopped.length === 1 ? 'its limit' : 'their limits'} in Details, then use Resume eligible agents.` };
@@ -79,7 +79,7 @@ export function pauseSentence(pause: Pause, agentName: (id: string) => string) {
   const holds: string[] = []; const steps: string[] = []; let mock = false; let session = false; let lost = false; let budgets = 0;
   for (const reason of pause.reasons) {
     if (reason.kind === 'pause_all') holds.push('Pause all agents is on');
-    else if (reason.kind === 'unverifiable') { lost = true; holds.push(`a call lost contact with its provider, so usage is unverifiable ${reason.until === null ? 'until its reservation expires' : `until ${clockTime(reason.until)}`}`); }
+    else if (reason.kind === 'unverifiable') { lost = true; holds.push(`a call's cost could not be confirmed, so usage is unverifiable ${reason.until === null ? 'until its reservation expires' : `until ${clockTime(reason.until)}`}`); }
     else if (reason.kind === 'reconciliation') { holds.push(`its expired estimate ${reason.reservationId} waits for the provider-confirmed usage`); steps.push(`apply the confirmed usage to ${reason.reservationId} in Details`); }
     else if (reason.kind === 'reservation') { holds.push(`its reservation ${reason.reservationId} is ${reservationStates[reason.status]}`); steps.push(`settle ${reason.reservationId} in Details`); }
     else { budgets++; mock ||= reason.mock; session ||= reason.scope === 'session'; holds.push(`${scopeLabel(reason.scope, reason.id, agentName)} is full in ${reason.dimensions.join(' and ')}${reason.mock ? ", filled by the mock's estimated tokens" : ''}`); }

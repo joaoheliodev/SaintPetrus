@@ -542,6 +542,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-7 | Pause and resume invariants | A seeded walk over pause all, resume, raise a limit, new period, reset, import, remove, add and a call refused by a full scope, with the invariants written and justified | done |
 | R5-8 | Browser checks | The workspace check goes back from Pause all through the new Resume, and through a full scope that Resume cannot release until the limit rises; no PASS removed; REAL without a key shows Pause all and Resume and no Resume demo | done |
 | R5-9 | Documentation | STATUS, CHANGELOG, README and a one-line guarantee in `AGENTS.md` | done |
+| R5-10 | Unverifiable usage names no cause it cannot know (C2) | Found re-running E5 at the end: the refused resume, the pause and Budgets said "a call lost contact with its provider" for every unverifiable reservation; lost contact, unreadable usage and an unpriced served model now read alike, without a false cause | done |
 
 #### R5-1 reproduction (2026-09-30, before any change, at `23f3052`)
 
@@ -714,6 +715,13 @@ there is no Resume demo, so only a restart gets out.
   changed handler bodies only (a refusal's sentence and status, `resumed` in the answer), no segment config moved
   since `23f3052`, POST handlers are never cached, `runtime = 'nodejs'` is the default and `dynamic` stays valid
   because `cacheComponents` is off.
+- R5-10 (2026-09-30). Re-running E5 on the final code for the report: an unpriced served model (A-10) paused its
+  agent with "a call lost contact with its provider", the resume refusal said the same, and so did Budgets' summary,
+  which predates this round. Unverifiable usage has three causes the snapshot does not tell apart (lost contact,
+  usage that could not be read, a served model without a price); the Run once result (`served_model_unpriced`,
+  the timeout sentence) and the Activity feed (`provider.unpriced`) already name the exact one. So the three
+  sentences now name none: "a call's cost could not be confirmed", and Budgets lists the three causes. No API change.
+  The R5-4 test pinned the old sentence twice and follows it.
 
 #### Questions for João
 
@@ -958,6 +966,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-8 | the Connection view words a refused test generically again | killed by the browser check ("Timed out: the refused test gives the server reason", after 21 PASS lines); every file restored, sha256 identical |
 | R5-8 | Resume demo offered while Pause all is on (the old dead end, in the panel) | killed by the browser check ("no Resume demo without a demo", after 19 PASS lines) |
 | R5-8 | `refusalMessage` drops the server's sentence | killed by "a refused connection test gives the server's reason, as Run once does…" |
+| R5-10 | the refused resume says lost contact again | killed by "unverifiable usage names no cause it cannot know…" and the R5-4 pin; every file restored, sha256 identical |
+| R5-10 | the pause sentence says lost contact again | killed by the same and the R5-4 wording test |
+| R5-10 | Budgets says lost contact again | killed by the same |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
@@ -1129,7 +1140,7 @@ Everything below is yours; nothing in it needs this conversation.
   residue is an accepted risk that opens no new round. Documentation only, floor unchanged at 514.
 - Phase 11, Round 5 (2026-09-30, on `main`): agents could not be un-paused. Reproduced entry by exit on fresh
   instances before any change (R5-1), then R5-A `aa64b2f` (next 16.3.8 for a critical advisory), R5-2 `d09ccba`,
-  R5-3 `4d3f6fe`, R5-4 `b629d9f`, R5-5 `2496768`, R5-6 `804f58f`, R5-7 `70dc0e0`, R5-8 `eba4b40`, and R5-9 in the
-  commit that carries this entry. Floor 514 → 538. Fifty-one mutations, all killed. `test:e2e` passed on fresh MOCK
-  instances (24 checks); REAL without a key was checked on screen only. Gitleaks clean on every staged diff. No
-  request reached a provider. Three questions wait for the operator (R5-Q1 to R5-Q3).
+  R5-3 `4d3f6fe`, R5-4 `b629d9f`, R5-5 `2496768`, R5-6 `804f58f`, R5-7 `70dc0e0`, R5-8 `eba4b40`, R5-9 `4482d28`,
+  and R5-10 in the commit that carries this entry. Floor 514 → 539. Fifty-four mutations, all killed. `test:e2e`
+  passed on fresh MOCK instances (24 checks); REAL without a key was checked on screen only. Gitleaks clean on every
+  staged diff. No request reached a provider. Three questions wait for the operator (R5-Q1 to R5-Q3).

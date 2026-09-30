@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 5 on `main` (2026-09-30)
 
 The operator could not un-pause the agents. Every way into a pause was tried against every way out on fresh instances
-before anything changed. No request with a real key was made. The test floor rose from 514 to 538.
+before anything changed. No request with a real key was made. The test floor rose from 514 to 539.
 
 - After **Pause all agents** and **Resume eligible agents** the graph is usable again: Pause all no longer marks the
   run paused when no demo is running, so Import, Reset, Load demo and Graph limits are enabled and the server accepts
@@ -41,6 +41,10 @@ before anything changed. No request with a real key was made. The test floor ros
   or monetary budget exhausted."), instead of a generic sentence; it is the panel's call that pauses its agent when
   refused. The browser check now follows a full scope that Resume eligible agents cannot release until its limit
   rises, and checks that no Resume demo is offered after Pause all (R5-8).
+- Unverifiable usage no longer claims a cause the server cannot know. The refused resume, the pause and the Budgets
+  summary said "a call lost contact with its provider" also when the provider had answered with usage it could not
+  read or with a served model that has no price; they now say that a call's cost could not be confirmed, and Budgets
+  lists the three causes. Run once and the Activity feed still name the exact one (R5-10).
 
 ## Unreleased: Round 4 on `main` (2026-09-29)
 

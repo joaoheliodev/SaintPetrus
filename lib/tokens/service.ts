@@ -36,8 +36,9 @@ export type PauseReason =
   | { kind: 'reconciliation'; reservationId: string }
   | { kind: 'budget'; scope: Scope; id: string; dimensions: Dimension[]; mock: boolean }
   | { kind: 'reservation'; reservationId: string; status: Reservation['status'] };
-// A resume refused because usage is unverifiable says until when, and what to do meanwhile.
-const unverifiableRefusal = (until: number | null) => `Usage unverifiable: a call lost contact with its provider, so no agent can be resumed ${until === null ? 'until its reservation expires' : `until ${new Date(until).toISOString()}, when its reservation becomes an estimate`}. Check the provider billing meanwhile.`;
+// A resume refused because usage is unverifiable says until when, and what to do meanwhile. It names no cause: lost
+// contact, unreadable usage and an unpriced served model all end here (Round 5, R5-10).
+const unverifiableRefusal = (until: number | null) => `Usage unverifiable: a call's cost could not be confirmed, so no agent can be resumed ${until === null ? 'until its reservation expires' : `until ${new Date(until).toISOString()}, when its reservation becomes an estimate`}. Check the provider billing meanwhile.`;
 type Hooks = { pause: (id: string) => void; pauseAll: () => void; resumeAll?: () => void; ids: () => string[]; role?: (id: string) => string };
 type JournalWriter = { append(entry: JournalRecord): void };
 // memory: nothing is journaled (tests, tools). recorded: every durable change is on disk. blocked: the journal could not be

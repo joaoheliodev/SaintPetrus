@@ -51,7 +51,7 @@ test('R5-4 unverifiable usage says until when; an unpriced served model waits fo
   const { tokens, clock, ids } = service(['root', 'a', 'b']);
   await assert.rejects(tokens.execute(new ProviderProxy(), keyed(async () => { throw new ProviderFailure('timeout'); }), 'Question', signal(), 'a', 'System'), /timeout/);
   assert.deepEqual(reasonsOf(tokens, 'a'), [{ kind: 'unverifiable', until: 1100 }]);
-  assert.throws(() => tokens.resume(), /^Error: Usage unverifiable: a call lost contact with its provider, so no agent can be resumed until 1970-01-01T00:00:01\.100Z, when its reservation becomes an estimate\. Check the provider billing meanwhile\.$/);
+  assert.throws(() => tokens.resume(), /^Error: Usage unverifiable: a call's cost could not be confirmed, so no agent can be resumed until 1970-01-01T00:00:01\.100Z, when its reservation becomes an estimate\. Check the provider billing meanwhile\.$/);
   ids.splice(1, 1);
   assert.deepEqual(tokens.snapshot().pauses.find(pause => pause.agent === 'a'), { agent: 'a', removed: true, reasons: [{ kind: 'unverifiable', until: 1100 }, { kind: 'reservation', reservationId: 'reservation-1', status: 'unverifiable' }] });
   await assert.rejects(tokens.execute(new ProviderProxy(), keyed(async () => ({ text: 'Answer', billingModel: 'unpriced-model', usage: { prompt: 10, completion: 10, total: 20 } })), 'Question', signal(), 'b', 'System'), /no verified price/);
@@ -83,12 +83,31 @@ test('R5-4 resume answers whom it released beside what still holds the others, a
   } finally { Reflect.set(globalThis, 'saintpetrusTokens', previous); runtime().mock.reset(); }
 });
 
+test('R5-10 unverifiable usage names no cause it cannot know: lost contact, unreadable usage and an unpriced served model read alike', async () => {
+  const failures: [string, ProviderAdapter['complete']][] = [
+    ['lost contact', async () => { throw new ProviderFailure('timeout'); }],
+    ['unreadable usage', async () => ({ text: 'Answer', billingModel: 'fictitious-model', usage: { prompt: 10, completion: 10, total: 999 } })],
+    ['unpriced served model', async () => ({ text: 'Answer', billingModel: 'unpriced-model', usage: { prompt: 10, completion: 10, total: 20 } })],
+  ];
+  const answers = new Set<string>();
+  for (const [cause, complete] of failures) {
+    const { tokens } = service();
+    await assert.rejects(tokens.execute(new ProviderProxy(), keyed(complete), 'Question', signal(), 'a', 'System'));
+    assert.deepEqual(reasonsOf(tokens, 'a'), [{ kind: 'unverifiable', until: 1100 }], cause);
+    assert.throws(() => tokens.resume(), (error: Error) => { answers.add(error.message); return !/lost contact/.test(error.message); }, cause);
+    const state = tokens.snapshot();
+    assert.doesNotMatch(pauseSentence(state.pauses[0], names), /lost contact/, cause);
+    assert.match(budgetStatus(state, row => names(row.id)).text, /^A call's cost could not be confirmed \(the provider lost contact, its usage could not be read, or the model that served it has no price\)/, cause);
+  }
+  assert.deepEqual([...answers], ["Usage unverifiable: a call's cost could not be confirmed, so no agent can be resumed until 1970-01-01T00:00:01.100Z, when its reservation becomes an estimate. Check the provider billing meanwhile."], 'one answer for every cause');
+});
+
 test('R5-4 the panel words every hold and the way out, from the server reasons alone', () => {
   const pause = (agent: string, reasons: Parameters<typeof pauseSentence>[0]['reasons'], removed = false) => ({ agent, removed, reasons });
   assert.equal(pauseSentence(pause('a', [{ kind: 'budget', scope: 'global', id: 'all', dimensions: ['tokens'], mock: true }, { kind: 'budget', scope: 'agent', id: 'a', dimensions: ['tokens', 'dollars'], mock: false }]), names),
     "Writer is paused: the global budget is full in tokens, filled by the mock's estimated tokens and the agent budget for Writer is full in tokens and dollars. Raise their limits in Details or restart the server, which clears the mock's estimated tokens (a new budget period keeps them), then use Resume eligible agents.");
   assert.equal(pauseSentence(pause('a', [{ kind: 'budget', scope: 'session', id: 's', dimensions: ['tokens'], mock: false }]), names), 'Writer is paused: the session budget is full in tokens. Raise its limit in Details or restart the server, which starts a new session budget, then use Resume eligible agents.');
-  assert.equal(pauseSentence(pause('a', [{ kind: 'unverifiable', until: Date.UTC(2026, 8, 30, 12, 5) }]), names), 'Writer is paused: a call lost contact with its provider, so usage is unverifiable until 12:05 UTC. Check the provider billing and wait until then, then use Resume eligible agents.');
+  assert.equal(pauseSentence(pause('a', [{ kind: 'unverifiable', until: Date.UTC(2026, 8, 30, 12, 5) }]), names), "Writer is paused: a call's cost could not be confirmed, so usage is unverifiable until 12:05 UTC. Check the provider billing and wait until then, then use Resume eligible agents.");
   assert.equal(pauseSentence(pause('a', [{ kind: 'reconciliation', reservationId: 'reservation-2' }]), names), 'Writer is paused: its expired estimate reservation-2 waits for the provider-confirmed usage. Apply the confirmed usage to reservation-2 in Details, then use Resume eligible agents.');
   assert.equal(pauseSentence(pause('3e835e66-5413', [{ kind: 'reservation', reservationId: 'reservation-1', status: 'estimated' }], true), names), 'A removed agent (3e835e66) is paused: its reservation reservation-1 is an expired estimate. Settle reservation-1 in Details; the pause goes with it then.');
   assert.equal(pauseSentence(pause('a', []), names), 'Writer is paused, and nothing holds it now: use Resume eligible agents.');
