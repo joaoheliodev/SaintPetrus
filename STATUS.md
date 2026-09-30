@@ -83,10 +83,15 @@ on `main`.
   the round fixed, a subagent placed outside the canvas beside a parent at its edge, an output cut inside
   "Bearer [REDACTED]" that saved longer than its limit, and demo output past 8000 characters.
 - **R4-3** While the graph cannot be saved, a persistent warning under the top bar gives the store's reason until a
-  change is saved again; `GET /api/graph/persistence` serves that state read-only. The key configured after the
-  text (R-01) is one such reason; a failed write is another.
+  change is saved again; `GET /api/graph/persistence` serves that state read-only. A failed write is one such
+  reason.
 - **R4-4** The browser check deletes a context connection (refused, then confirmed) and checks that deleting the
   delegation is refused, and that the store keeps saving to the end.
+- **R4-5** A key typed into the graph before it was configured stayed in plain text on disk: in memory the graph was
+  never redacted, the store wrote a redacted copy only at the next change (it did not refuse, as R-01 assumed), and
+  once the key was disconnected or forgotten the next change wrote it back in plain text. Now configuring a key tells
+  the process graph, which replaces every text the redactor would change with the redacted text, within its limit,
+  as its own event, and the store saves that at once. The live event feed redacts again as it sends.
 
 ## Not verified or pending
 
@@ -107,7 +112,7 @@ on `main`.
 
 ## Open debts and limits
 
-- The graph store learns it cannot save only when it tries to write: a key configured after the text (R-01) brings up the warning at the next change of the graph, not when the key is configured.
+- A configured key leaves the graph, its saved file and the live feed (R4-5). Activity lines the open panel received before the key was configured keep the names they showed until the page reloads, and copies the file system keeps of replaced blocks are outside what the app controls.
 - The graph and the global, agent and model accounting survive a restart. The session budget, the mock's usage, events, artifacts and the dispatch ledger are process-local. The journal is a checkpoint log, not an invoice: the input counter is still approximate.
 - An unresolved reservation converts after `reservationTtlMs` (300000 ms in the shipped policy) at the greater of the hold and the dearest eligible captured model at peak with no cache hits, using P3's provider rule, and stays marked as an expired estimate until manual reconciliation.
 - The input counter is approximate. The monetary ceiling is a guard, not a proof of the invoice.

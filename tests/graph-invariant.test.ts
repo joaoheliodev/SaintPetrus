@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { GraphError, GraphService } from '../lib/server/graph-service';
 import { parseGraphDocument } from '../lib/server/graph-document';
-import { safeStringify } from '../lib/security/redact';
+import { registerSecret, safeStringify } from '../lib/security/redact';
 import type { Agent, Graph, Provider } from '../lib/orchestrator';
 
 // GraphStore writes the redacted snapshot, and refuses to write whatever this parser refuses.
@@ -26,6 +26,9 @@ const request = (name: string, provider: Provider = 'Unconfigured') => ({ name, 
 // Synthetic material generated at runtime, shaped so the redactor replaces it.
 const bearer = () => `Bearer ${randomBytes(8).toString('hex')}`;
 const keyLike = () => `sk-1${randomBytes(6).toString('hex')}`;
+// A key as a person pastes it before configuring it: plain text until it is registered.
+const typedKey = (bytes: number) => randomBytes(bytes).toString('hex');
+const pad = (text: string, length: number) => text + 'x'.repeat(length - text.length);
 
 test('R4-2 every GraphService command leaves a graph the app can save, or refuses and changes nothing', () => {
   const graph = new GraphService();
@@ -42,6 +45,15 @@ test('R4-2 every GraphService command leaves a graph the app can save, or refuse
   accept('subagent of an agent on the edge of the canvas', () => graph.add(request('Edge child'), { parentId: lead }));
   accept('another, pushed further along by the first', () => graph.add(request('Edge child 2'), { parentId: lead }));
   accept('edit', () => graph.update(helper, { name: 'Renamed helper', objective: 'Help more.' }));
+  // A key typed before it was configured (R4-5), shorter than "[REDACTED]", so redacting lengthens a name at its limit.
+  const typed = typedKey(4); let forget = () => {};
+  try {
+    accept('type a key into a name at its limit and an objective', () => graph.update(peer, { name: pad(`Peer ${typed} `, 70), objective: `Use ${typed} here.` }));
+    accept('configure it, which redacts the graph', () => { forget = registerSecret(Buffer.from(typed)); graph.redactSecrets(); });
+    assert.ok(!JSON.stringify(graph.snapshot()).includes(typed), 'no field keeps the key');
+    accept('redact with nothing left to change', () => graph.redactSecrets());
+  } finally { forget(); }
+  accept('a change after the key is forgotten', () => graph.move(peer, { x: -100000, y: 100000 }));
   accept('output', () => graph.recordOutput(helper, 'An answer.'));
   // Redacted and then cut at 8000: a cut inside "Bearer [REDACTED]" leaves text the redactor would change again.
   for (let at = 7980; at < 8000; at++) accept(`output with a bearer token at ${at}`, () => graph.recordOutput(helper, `${'w'.repeat(at)} ${bearer()}`));
@@ -81,6 +93,8 @@ test('R4-2 a seeded random walk over every command never leaves a graph the app 
   const agents = () => [...graph.snapshot().agents.map(agent => agent.id), 'missing'];
   // Half the deletions aim at context connections, which are rarer than delegations and the only ones deleted.
   const edges = () => [...graph.snapshot().edges.filter(edge => random() < 0.5 || edge.kind === 'context').map(edge => edge.id), 'missing'];
+  // Keys typed into the graph, and the ones configured since; at most five stay configured at a time.
+  const typedKeys: string[] = []; const forgets: (() => void)[] = [];
   const commands: [string, () => unknown][] = [
     ['create', () => graph.add({ name: text(70), provider: pick<Provider>(['Unconfigured', 'Mock']), context: { objective: text(2000), summary: pick(['', 'Summary', 'x'.repeat(2001)]), artifacts: pick([[], ['note'], ['x'.repeat(501)]]) } }, random() < 0.5 ? {} : { position: { x: coordinate(), y: coordinate() } })],
     ['subagent', () => graph.add({ name: text(70), provider: 'Unconfigured', context: context(text(2000)) }, { parentId: pick(agents()) })],
@@ -99,11 +113,17 @@ test('R4-2 a seeded random walk over every command never leaves a graph the app 
     ['pause all', () => graph.pauseAll()],
     ['run status', () => graph.setRunStatus(pick(runs))],
     ['import', () => graph.replace(parseGraphDocument(safeStringify(pick([graph, other]).snapshot())), 'imported')],
+    ['type a key', () => { const key = typedKey(pick([4, 16])); typedKeys.push(key); graph.update(pick(agents()), { name: pick([`Agent ${key}`, pad(`A ${key} `, 70)]), objective: `Use ${key} here.` }); }],
+    ['configure a key', () => { if (forgets.length >= 5) forgets.shift()?.(); forgets.push(registerSecret(Buffer.from(pick([...typedKeys, typedKey(16)])))); graph.redactSecrets(); }],
+    ['forget a key', () => { forgets.splice(Math.floor(random() * forgets.length), 1)[0]?.(); }],
+    ['redact', () => graph.redactSecrets()],
   ];
   const accepted = new Set<string>();
-  for (let step = 0; step < 3000; step++) {
-    const [label, command] = pick(commands);
-    if (run(graph, `step ${step} (${label})`, command)) accepted.add(label);
-  }
+  try {
+    for (let step = 0; step < 3000; step++) {
+      const [label, command] = pick(commands);
+      if (run(graph, `step ${step} (${label})`, command)) accepted.add(label);
+    }
+  } finally { forgets.forEach(forget => forget()); }
   assert.deepEqual([...accepted].sort(), commands.map(([label]) => label).sort(), 'every command was accepted at least once');
 });

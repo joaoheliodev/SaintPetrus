@@ -348,6 +348,7 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
 | R4-2 | Savable after every command | A test runs every `GraphService` command (create, subagent, connect, delete connection, remove, edit, move, limits, reset, output, pause, import) and parses the redacted snapshot with `parseGraphDocument` after each accepted one | done |
 | R4-3 | Warning while the graph is not saved | While `GraphStore` refuses or fails to write, for any reason (R-01's key configured after the text included), a persistent warning shows the reason, never the refused text, until it saves again; a local read-only route exposes the state; documentation and tests in the same commit | done |
 | R4-4 | Browser check | Deletes a context connection (refused, then confirmed) and checks that deleting the delegation is refused; no check removed | done |
+| R4-5 | A configured key leaves the graph | Registering a key tells the graph through `lib/security/redact.ts` (listeners on `globalThis`, credentials not coupled to the store); the graph replaces every text the redactor would change with the redacted text, as its own event, and the store saves it at once; the command joins the invariant test; the live feed redacts again as it sends; tests with a key generated at runtime; recorded in `AGENTS.md` | done |
 
 #### Decisions taken
 
@@ -395,12 +396,54 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   directory was made the next change fail, the route answered `saving: false` with the fixed reason, and the warning
   appeared right under the top bar (`role="alert"`, no button); with the directory back, the next change was saved
   and the warning went away. The delegation explanation was checked the same way, over the canvas.
+- R4-5 (2026-09-30), the operator's answer to the R4-3 question. Their reproduction on `a77fdcc`, repeated here with
+  a fictitious 32-character key generated at runtime and typed into an objective before it was registered, showed
+  that the premise of R-01 and R4-3 did not hold for a key longer than "[REDACTED]": after `registerSecret`, with no
+  change, `graph.json` kept the key in plain text; at the next change the store wrote the redacted copy with
+  `saving: true`, because redaction shortened the text and the parser accepted it; and the graph in memory was never
+  redacted, so once the key left the registry (Disconnect, Forget key) the next change wrote it back in plain text,
+  still `saving: true`, with no warning. Only a key shorter than "[REDACTED]" in a field near its limit made the store
+  refuse, which is the case R-01 tested.
+- R4-5, what changed. `lib/security/redact.ts` keeps a second set on `globalThis`, `saintpetrusRedactionListeners`,
+  read at every call rather than captured at load, so both copies of the modules always use the same one.
+  `registerSecret` adds the key and then calls each listener, isolated, without passing the key; `onSecretRegistered`
+  returns the unsubscribe. `GraphService.followSecrets()` subscribes `redactSecrets()`, and only `runtime()` calls it:
+  the process graph follows the registry, while a graph built for a test, an import or a file does not.
+  `redactSecrets()` runs every name (70), objective (2000), summary (2000), artifact (500) and output (8000) through
+  `savedText` (the old `savedOutput` generalised: redact, cut to the limit, trim back to text the redactor leaves;
+  names are trimmed too), and emits `graph.redacted` ("A configured key was removed from the graph.") only when
+  something changed, so the store saves it with its usual 250 ms coalescing and a key the graph does not hold
+  publishes nothing. Credentials still only register and unregister keys; they know nothing of the graph or the store.
+  The live event feed sends `safeStringify(batch)`: the window's field names match none of the redactor's sensitive
+  key names, so the shape the panel checks is unchanged. Activity names the new event "Configured key removed from
+  the graph".
+- R4-5, left as is. The artifact preview stream still sends its versions as stored: `observeArtifact` is called only
+  by `appendMockOutput`, and the demo resets the graph before it writes its fixed text, so no key can reach it. Activity
+  lines the open panel received before the key was configured keep the names they showed until the page reloads
+  (STATUS says so). A key that is itself part of "[REDACTED]" would make redaction non-idempotent; real keys are long
+  random strings, so it is not handled. The R-01 and R4-3 tests that register a key under a graph that does not
+  follow the registry still hold: they test the store's refusal on its own.
+- R4-5, tests. `tests/configured-key.test.ts`: with no other change, memory and the saved file lose the key and one
+  `graph.redacted` event is published, and after the key is forgotten a later change still writes no key; a short key
+  inside a name at its limit is cut back into the limit and the graph still saves; the process graph follows the
+  registry while a standalone graph waits for `redactSecrets()`; the feed does not repeat the key or a fragment of it
+  in an event published before it was configured. `tests/module-copies.test.ts`: a key configured through the routes'
+  copy of the modules cleans the graph the server's copy built. `tests/graph-invariant.test.ts`: the command by name,
+  with a key that lengthens a name at its limit, and in the random walk (type a key, configure it, forget it, redact),
+  at most five keys configured at a time. Floor 495 → 500.
+- R4-5, checked by hand on a throwaway instance started in REAL mode (the credentials route refuses keys in MOCK),
+  with a fictitious key generated inside the check and never printed, and no action that calls a provider: typed
+  into an objective, the key was in `graph.json`; configured through `POST /api/credentials` as the terminal client,
+  with no other change, it was gone from the file (`[REDACTED]` in its place); after **Disconnect** and a change it
+  stayed gone; `GET /api/graph/persistence` said `saving: true`. This is the real pair of module copies: the route
+  bundle configured the key and the graph the custom server built was cleaned.
 
 #### Questions for João
 
-- R4-3: should configuring a key make the store try to write at once, so a key that matches text already in the
-  graph brings up the warning immediately instead of at the next change? Not done: it would tie the credential path
-  to the graph store, and the round asked for the warning while the store refuses, which it does.
+- Answered (R4-5): configuring a key takes it out of the graph at once, through a notification from the redactor, so
+  credentials stay uncoupled from the store. Was (R4-3): should configuring a key make the store try to write at
+  once, so a key that matches text already in the graph brings up the warning immediately instead of at the next
+  change? Not done then: it would tie the credential path to the graph store.
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -540,6 +583,13 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R4-3 | the warning without the store's reason | killed by the same test |
 | R4-3 | the warning not rendered under the top bar | killed by the same test (wiring assertion) |
 | R4-3 | the transport never reads the route | killed by the same test (wiring assertion) |
+| R4-5 | `registerSecret` tells no listener | killed by the three graph tests in `configured-key` and the module-copies test; restored, sha256 identical (redact, graph service, runtime, feed) |
+| R4-5 | `redactSecrets` changes nothing | killed by the same four and both R4-2 tests |
+| R4-5 | listeners in a set of the module instead of `globalThis` | killed only by "a key configured through the routes' copy of the modules…", the one test that can tell |
+| R4-5 | the name not cut back into its limit | killed by "a configured key that makes a field longer…" and both R4-2 tests |
+| R4-5 | the redaction not published as an event | killed by the two store tests in `configured-key` |
+| R4-5 | `runtime()` without `followSecrets()` | killed by "the process graph follows the key registry…" and the module-copies test |
+| R4-5 | the feed sends without redacting again | killed by "the feed redacts again when it sends…" |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
@@ -697,3 +747,5 @@ Everything below is yours; nothing in it needs this conversation.
 - Phase 10 (Round 4, 2026-09-29, on `main`): R4-1 and R4-4 in `897265a`, R4-2 in `eb507c3`, R4-3 in `894d41d`.
   Floor 487 → 495, every fix mutation-tested. On fresh instances `test:e2e` passed in development (20 checks) and
   `test:browser` in production; Gitleaks clean on every staged diff, the working directory and the full history.
+- Phase 10, R4-5 (2026-09-30, on `main`): a configured key leaves the graph at once, and the live feed redacts again
+  as it sends. Floor 495 → 500, every change mutation-tested (seven mutations, all killed).

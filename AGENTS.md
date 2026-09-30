@@ -32,7 +32,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 495 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 500 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -131,6 +131,8 @@ A delegation connection is deleted only with its subagent (Round 4, 2026-09-29).
 No accepted graph command may leave a graph the app cannot save (Round 4, R4-2). `tests/graph-invariant.test.ts` runs every `GraphService` command, by name and in a seeded random walk, and parses the redacted snapshot with `parseGraphDocument` after each accepted one; a refused command must change nothing. A new command joins that test in the change that adds it.
 
 While `GraphStore` cannot save the graph, for whatever reason, the panel shows a persistent warning with the store's reason until it saves again (Round 4, R4-3). The reason is the parser's own sentence or a fixed one, never the refused text or a path. `GET /api/graph/persistence` serves that state read-only from the custom server, the only copy of the modules that holds the store.
+
+A key configured after it was typed into the graph leaves the graph at once (Round 4, R4-5). `registerSecret` tells the listeners registered with `onSecretRegistered`, kept on `globalThis` like the keys so either copy of the modules reaches them, and never passes them the key. The process graph (`runtime()`) follows that registry: `GraphService.redactSecrets` replaces every name, objective, summary, artifact and output the redactor would change with the redacted text, within its limit, as its own `graph.redacted` event, so the store saves it at once and a later Disconnect or Forget key cannot write the key back from memory. Credentials never call the graph or the store. The graph stream and the live event feed redact again as they send, so a record retained from before a key was configured cannot repeat it.
 
 ## Interface vocabulary
 

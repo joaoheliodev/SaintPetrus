@@ -1,4 +1,5 @@
 import { localRequest } from '../server/http';
+import { safeStringify } from '../security/redact';
 import { eventBus, type EventBus } from './bus';
 export const feedEnabled = () => process.env.SAINTPETRUS_FEED === 'true';
 export function optionalEventRoutes(enabled = feedEnabled(), bus: EventBus = eventBus()) {
@@ -17,9 +18,10 @@ export function eventStream(request: Request, bus: EventBus) {
       const send = () => {
         if (closed) return;
         if ((controller.desiredSize ?? 0) <= 0) { cleanup(); controller.close(); return; }
-        // Every frame is the server-owned retained window. Clients replace their mirror verbatim.
+        // Every frame is the server-owned retained window. Clients replace their mirror verbatim. It is redacted again
+        // on the way out, as the graph stream is, so an event retained from before a key was configured cannot repeat it.
         const batch = bus.window(cursor); cursor = batch.cursor;
-        controller.enqueue(encoder.encode(`id: ${cursor}\nevent: update\ndata: ${JSON.stringify(batch)}\n\n`));
+        controller.enqueue(encoder.encode(`id: ${cursor}\nevent: update\ndata: ${safeStringify(batch)}\n\n`));
       };
       const unsubscribe = bus.subscribe(send);
       const heartbeat = setInterval(() => {

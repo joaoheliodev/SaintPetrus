@@ -5,7 +5,7 @@
 const graphTitles: Record<string, string> = {
   'agent.created': 'Agent created', 'agent.updated': 'Agent updated', 'agent.moved': 'Card moved', 'agent.removed': 'Agent removed',
   'agent.output': 'Run once answered', 'edge.created': 'Connection created', 'edge.removed': 'Connection deleted',
-  'graph.reset': 'Graph reset', 'graph.imported': 'Graph imported', 'graph.restored': 'Graph restored',
+  'graph.reset': 'Graph reset', 'graph.imported': 'Graph imported', 'graph.restored': 'Graph restored', 'graph.redacted': 'Configured key removed from the graph',
   'budget.updated': 'Graph limits changed', 'budget.exhausted': 'Demo cost limit reached', 'agents.paused': 'All agents paused',
   'run.updated': 'Demo status changed', 'mock.delta': 'Demo output',
 };

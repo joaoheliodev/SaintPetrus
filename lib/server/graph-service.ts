@@ -2,7 +2,7 @@ import { observeArtifact } from '../preview/store';
 import { eventBus } from '../events/bus';
 // Server authority. Node imports prevent accidental use in the browser bundle.
 import { randomUUID } from 'node:crypto';
-import { redactText } from '../security/redact';
+import { onSecretRegistered, redactText } from '../security/redact';
 import { createGraph, type Graph, type GraphEvent, type ExecutionBudget, type SpawnRequest, type Agent } from '../orchestrator';
 // Thrown by the graph the custom server builds from its own copy of lib/ and caught by the route bundle's copy, so it
 // is recognized by a Symbol.for brand, like ProviderFailure, never by instanceof.
@@ -18,13 +18,14 @@ function refuseCredentials(fields: Record<string, string | readonly string[]>) {
     if ((typeof value === 'string' ? [value] : value).some(text => redactText(text) !== text)) throw new GraphError(`The ${field} contains text shaped like a credential (an API key or an authorization header). Remove it and try again.`);
   }
 }
-// Output is redacted before the cut, so it is within its limit as the file will hold it. A cut inside
+// Text is redacted before the cut, so it is within its limit as the file will hold it. A cut inside
 // "Bearer [REDACTED]" leaves text the redactor would lengthen again, so it is trimmed back until the redactor leaves it.
-function savedOutput(text: string) {
-  let output = redactText(text).slice(0, 8000);
-  while (redactText(output) !== output) output = output.slice(0, -1);
-  return output;
+function savedText(text: string, max: number) {
+  let value = redactText(text).slice(0, max);
+  while (redactText(value) !== value) value = value.slice(0, -1);
+  return value;
 }
+const savedOutput = (text: string) => savedText(text, 8000);
 // The saved graph refuses a position outside this square (graph-document.ts), so placement never leaves it.
 const onCanvas = (value: number) => Math.max(-100000, Math.min(100000, value));
 export class GraphService {
@@ -135,6 +136,20 @@ export class GraphService {
     agent.name = name; agent.context = { ...agent.context, objective: changes.objective };
     this.emit('agent.updated', 'Agent updated.', { agent });
   }
+  // A key configured after it was typed: every text keeps what the redactor leaves of it, within its limit, as the
+  // screen already showed it, so the store saves that at once and a key forgotten later cannot come back from memory.
+  redactSecrets(): boolean {
+    const before = JSON.stringify(this.graph.agents);
+    for (const agent of this.graph.agents) {
+      agent.name = savedText(agent.name, 70).trim();
+      agent.context = { objective: savedText(agent.context.objective, 2000), summary: savedText(agent.context.summary, 2000), artifacts: agent.context.artifacts.map(item => savedText(item, 500)) };
+      agent.output = savedOutput(agent.output);
+    }
+    if (JSON.stringify(this.graph.agents) === before) return false;
+    this.emit('graph.redacted', 'A configured key was removed from the graph.'); return true;
+  }
+  // Only the process-wide graph follows the key registry (lib/server/runtime.ts); one built for a file or a test does not.
+  followSecrets() { return onSecretRegistered(() => { this.redactSecrets(); }); }
   // A provider answer replaces the agent's output, bounded; a reset may already have removed the agent that asked.
   recordOutput(id: string, text: string): boolean {
     const agent = this.graph.agents.find(a => a.id === id);

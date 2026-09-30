@@ -1,9 +1,19 @@
 // Shared sanitizer for server logs, errors, serialized responses, summaries and exports.
-const secretState = globalThis as typeof globalThis & { saintpetrusRedactionSecrets?: Set<Buffer> };
+// The keys and their listeners live on globalThis: the custom server and the route bundle load separate copies of this
+// module, and a key configured through one copy must reach the listener the other copy registered.
+const secretState = globalThis as typeof globalThis & { saintpetrusRedactionSecrets?: Set<Buffer>; saintpetrusRedactionListeners?: Set<() => void> };
 const activeSecrets = secretState.saintpetrusRedactionSecrets ??= new Set<Buffer>();
+const listeners = () => secretState.saintpetrusRedactionListeners ??= new Set<() => void>();
 export function registerSecret(secret: Buffer) {
   activeSecrets.add(secret);
+  // Told once the key is in the set, so a listener that redacts removes it; a failing listener never blocks the key.
+  for (const listener of [...listeners()]) { try { listener(); } catch { /* Listener isolation is intentional. */ } }
   return () => { activeSecrets.delete(secret); };
+}
+// The key itself is never passed on: a listener redacts with redactText, which already knows it.
+export function onSecretRegistered(listener: () => void) {
+  listeners().add(listener);
+  return () => { listeners().delete(listener); };
 }
 export function redactText(input: string): string {
   let text = input;

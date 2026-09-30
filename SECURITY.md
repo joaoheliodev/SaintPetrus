@@ -104,6 +104,10 @@ edited outside the app is untrusted input like any other: unknown fields, creden
 providers, oversize files and impossible graphs are refused, and a refused file is set aside, never overwritten.
 When the store cannot write the graph, the local, read-only `GET /api/graph/persistence` and the warning under the
 top bar give only the parser's own sentence (it names a field) or a fixed one, never the refused text or a path.
+A key pasted into the graph before it was configured is taken out of the graph in memory when it is configured, and
+the store saves the redacted copy at once; so the file stops holding it, and a later **Disconnect** or **Forget key**
+cannot write it back. The live event feed redacts again as it sends, so an event retained from before the key was
+configured does not repeat it. Copies the file system keeps of replaced blocks are outside what the app controls.
 
 The accounting journal, `accounting.jsonl`, sits beside it with the same permissions (0700/0600). Each record is one
 JSON line, synced before the change it records can take effect, and holds only IDs, counts, amounts, price versions,

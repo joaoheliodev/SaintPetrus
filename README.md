@@ -99,9 +99,12 @@ The server owns the graph: every tab sees the same one. It is saved to `graph.js
 Token accounting is journaled next to it, in `accounting.jsonl` (see **Budgets** below). The event feed and the
 session budget are not saved: a restart starts them empty.
 
-If the server cannot save the graph, because the document would fail its own restore (text that a key configured
-later now matches, for example) or because the write failed, the last saved copy stays on disk and a warning under
-the top bar says why, until a later change is saved. `GET /api/graph/persistence`, local and read-only, answers
+A key typed into the graph before it was configured leaves the graph as soon as it is configured: every name,
+objective, summary, artifact and output keeps what the redactor leaves of it, which is what the screen already showed,
+and the server saves that at once. Disconnecting or forgetting the key later cannot write it back.
+
+If the server cannot save the graph, because the document would fail its own restore or because the write failed,
+the last saved copy stays on disk and a warning under the top bar says why, until a later change is saved. `GET /api/graph/persistence`, local and read-only, answers
 `{ "saving": true }` or `{ "saving": false, "reason": "…", "since": 1790000000000 }`: `reason` is the parser's own
 sentence, which names a field, or a fixed one for a failed write, never the refused text; `since` is when saving
 stopped, in milliseconds since the epoch.

@@ -4,6 +4,8 @@ const local = globalThis as typeof globalThis & { saintpetrus?: { graph: GraphSe
 export function runtime() {
   if (!local.saintpetrus) {
     const graph = new GraphService();
+    // A key configured later, through either copy of the modules, leaves the graph at once (R4-5).
+    graph.followSecrets();
     local.saintpetrus = { graph, mock: new MockProvider(graph) };
   }
   return local.saintpetrus;

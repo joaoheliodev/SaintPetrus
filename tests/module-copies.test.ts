@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +12,7 @@ import { TokenService, failureBillingVerdict } from '../lib/tokens/service';
 import type { TokenPolicy } from '../lib/tokens/config';
 import { fixedRatioTokenCounter } from '../lib/core/token-estimate';
 import { POST as graphPost } from '../app/api/graph/route';
+import { registerSecret } from '../lib/security/redact';
 
 // The custom server loads lib/ through tsx while Next bundles its own copy, and both reach the same singletons through
 // globalThis. A copy of lib/ under another path is a second module graph in this process, exactly like that pair.
@@ -38,6 +40,8 @@ const isFailureClass = (value: unknown): value is new (code: string, fields?: st
 const isProxyClass = (value: unknown): value is new (timeoutMs?: number) => ProviderProxy => typeof value === 'function';
 const isTimeoutPin = (value: unknown): value is () => number | undefined => typeof value === 'function';
 const isRuntimeFactory = (value: unknown): value is () => { graph: { snapshot(): { agents: { id: string }[] } } } => typeof value === 'function';
+type TypedAgent = { name: string; provider: 'Unconfigured'; context: { objective: string; summary: string; artifacts: string[] } };
+const isGraphRuntime = (value: unknown): value is () => { graph: { add(request: TypedAgent): string; snapshot(): unknown } } => typeof value === 'function';
 
 test('R1 a provider failure built by another copy of the modules keeps its code, fields and verdict', async () => {
   await withForeignCopy(async load => {
@@ -97,5 +101,21 @@ test('R1 a refusal from the graph the server built reaches the browser with its 
       const response = await post(body);
       assert.equal(response.status, 400); assert.deepEqual(await response.json(), { error: message });
     }
+  }));
+});
+
+test('R1 a key configured through the routes\' copy of the modules leaves the graph the server\'s copy built (R4-5)', async () => {
+  await withGlobals(['saintpetrus', 'saintpetrusRedactionListeners'], () => withForeignCopy(async load => {
+    // As at startup: the server's copy builds the graph, which follows the key registry through its own redactor.
+    const { runtime: serverRuntime } = await load('server/runtime.ts');
+    assert.ok(isGraphRuntime(serverRuntime));
+    // Fictitious and generated at runtime.
+    const key = randomBytes(16).toString('hex');
+    serverRuntime().graph.add({ name: 'Keyed', provider: 'Unconfigured', context: { objective: `Use ${key} here.`, summary: '', artifacts: [] } });
+    assert.ok(JSON.stringify(serverRuntime().graph.snapshot()).includes(key), 'typed before the key was configured');
+    // This copy configures it, as the credentials route does.
+    const unregister = registerSecret(Buffer.from(key));
+    try { assert.ok(!JSON.stringify(serverRuntime().graph.snapshot()).includes(key), 'the graph the other copy built no longer holds it'); }
+    finally { unregister(); }
   }));
 });

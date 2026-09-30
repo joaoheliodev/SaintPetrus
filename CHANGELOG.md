@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 4 on `main` (2026-09-29)
 
 Deleting a delegation left a graph the server could no longer save, and nothing on screen said so. No request with a
-real key was made. The test floor rose from 487 to 495.
+real key was made. The test floor rose from 487 to 500.
 
 - A delegation connection is deleted only with its subagent: `POST /api/graph` answers 400 to `disconnect` on a
   `delegation` edge with "A delegation connection cannot be deleted on its own. Remove the subagent instead.", and
@@ -21,6 +21,12 @@ real key was made. The test floor rose from 487 to 495.
   saved again. The new `GET /api/graph/persistence`, local and read-only, answers `{ saving: true }` or
   `{ saving: false, reason, since }`; the reason is the parser's sentence or a fixed one, never the refused text
   (R4-3). The browser check confirms the store keeps saving through the whole flow.
+- A key typed into the graph before it was configured no longer stays in plain text on disk (R4-5). Configuring a key
+  now tells the process graph, which replaces every name, objective, summary, artifact and output the redactor
+  would change with the redacted text, within its limit, as a `graph.redacted` event, and the store saves it at
+  once; a later **Disconnect** or **Forget key** cannot write the key back. The live event feed redacts again as it
+  sends, like the graph stream. Before, the in-memory graph was never redacted: the store wrote a redacted copy only
+  at the next change, without the refusal R-01 had assumed, and wrote the key again once it was forgotten.
 
 ## Unreleased: Round 3 on `night/provider-validation-ready` (2026-09-28)
 
