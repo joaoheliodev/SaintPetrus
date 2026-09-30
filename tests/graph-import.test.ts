@@ -118,7 +118,7 @@ test('A-04 the import route replaces the graph for a local JSON request only, an
     assert.ok(now.revision > before.revision, 'revisions keep moving forward');
     runtime().graph.setRunStatus('running');
     const running = await post(file);
-    assert.equal(running.status, 400); assert.match((await running.json()).error, /mock run/);
+    assert.equal(running.status, 400); assert.match((await running.json()).error, /demo is running or paused: let it finish/); // Names the way out (R5-2).
   } finally { Reflect.set(globalThis, 'saintpetrusTokens', previous); runtime().mock.reset(); }
 });
 

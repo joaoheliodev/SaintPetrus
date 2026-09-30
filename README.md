@@ -185,7 +185,9 @@ a call whose reservation would pass any limit is refused before provider I/O and
 further calls are blocked. Raising a limit does not restart work: use **Resume eligible agents**. The view opens
 with a summary and one sentence saying what is blocked and how to unblock it; the full table is under **Details**.
 The mock's estimated tokens count against the token limits too, so the mock alone can reach a limit.
-**Pause all agents** cancels the active provider request and pauses the mock too.
+**Pause all agents** cancels the active provider request and pauses a running demo too. **Resume eligible agents**
+lets that demo go on; a demo paused with **Pause demo** waits for **Resume demo**, or **Reset graph** ends it. While
+Pause all agents is on, reset, import, adding an agent and the demo are refused with a sentence that names the way out.
 
 Costs are estimates from the dated local price table, not invoices. Preflight counts input approximately and
 assumes the full output allowance at the peak rate with no cache hits; reconciliation uses the reported usage,

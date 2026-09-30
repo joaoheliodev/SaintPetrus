@@ -98,6 +98,18 @@ on `main`.
   When `graph.redacted` arrives, the panel discards the Activity lines, live feed lines and Run exchanges it received
   before it, and the Activity log starts again with "Earlier activity cleared because a key was configured".
 
+## Round 5 on `main` (2026-09-30)
+
+The operator could not un-pause the agents. Reproduced first, entry by exit, on fresh instances (the table is in the
+round's handoff); each fix below answers a cell that did not come back.
+
+- **R5-2** Pause all agents left the graph's run `paused` even with no demo running, so after Resume eligible agents
+  every agent was Ready but Import, Reset, Load demo and Graph limits stayed disabled and the server refused remove
+  and import; in REAL, where there is no Resume demo, only a restart got out. Now Pause all pauses the run only while a
+  demo runs, Resume eligible agents lets that demo go on, and a demo paused with Pause demo says on screen how to
+  finish it (Reset graph now ends a paused demo too). With Pause all on, import is refused like reset and add, and
+  every such refusal says to use Resume eligible agents.
+
 ## Not verified or pending
 
 - No provider has answered a real request. Gemini step 1B and DeepSeek D7 wait for explicit operator approval and follow `docs/reference/first-real-call.md`. `GET /models` is not approved.

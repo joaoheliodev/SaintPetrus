@@ -42,6 +42,12 @@ try {
     await until(() => click('More'), 'More menu');
     return until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('[role=menuitem]')).find(i => i.textContent.trim() === ${JSON.stringify(text)} && !i.hasAttribute('data-disabled')); if (!item) return false; item.click(); return true; })()`), `${text} menu item`);
   };
+  // Each item of the More menu and whether it is disabled, read with the menu open and closed again with Escape.
+  const menuItems = async () => {
+    await until(() => click('More'), 'More menu');
+    const items = await until(() => evaluate(`(() => { const items = Array.from(document.querySelectorAll('[role=menuitem]')); return items.length ? items.map(item => [item.textContent.trim(), item.hasAttribute('data-disabled')]) : false; })()`), 'More menu items');
+    await key('Escape'); return Object.fromEntries(items);
+  };
   // The agent panel has a Run and a Details tab; a person switches before reaching what is on the other one.
   const tab = name => until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('.inspector [role=tab]')).find(t => t.textContent.trim() === ${JSON.stringify(name)}); if (!item) return false; item.click(); return item.getAttribute('aria-selected') === 'true'; })()`), `${name} tab`);
   const click = text => evaluate(`(() => { const target = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === ${JSON.stringify(text)} && !b.disabled); if (!target) return false; target.click(); return true; })()`);
@@ -253,6 +259,25 @@ try {
   await until(() => click('Pause all agents'), 'Pause all agents button'); await until(async () => (await sync()).some(text => text.startsWith('Pause every agent?')), 'pause question');
   await until(() => evaluate(`document.querySelector('.react-flow__node .status')?.textContent.includes('Paused')`), 'agents paused');
   console.log('PASS: pause all asks first and pauses every agent');
+  // Resume eligible agents gives the graph back whole: no agent and not even the run stays paused (Round 5, R5-2).
+  await until(() => click('Budgets'), 'Budgets view'); await until(() => click('Resume eligible agents'), 'Resume eligible agents');
+  await until(() => evaluate(`document.querySelector('.budget-summary')?.textContent.includes('Nothing is paused.')`), 'nothing left paused');
+  await until(() => click('Workspace'), 'Workspace view');
+  await until(() => evaluate(`Array.from(document.querySelectorAll('.react-flow__node .status')).every(badge => badge.textContent.includes('Ready'))`), 'agents Ready again');
+  const usable = await menuItems();
+  assert.deepEqual([usable['Import graph…'], usable['Reset graph…'], ...(mocked ? [usable['Load demo…']] : [])], [false, false, ...(mocked ? [false] : [])], 'nothing in More stays disabled');
+  assert.equal(await evaluate(`Array.from(document.querySelectorAll('.budget-card button')).every(button => !button.disabled)`), true, 'Graph limits can be applied');
+  console.log('PASS: Resume eligible agents after Pause all agents gives the graph back: agents Ready, Import, Reset and Graph limits enabled, "Nothing is paused."');
+  if (mocked) {
+    // A demo paused on purpose says how to get the graph back, and Reset graph ends it (Round 5, R5-2).
+    await menu('Load demo…'); await until(async () => (await sync()).some(text => text.startsWith('Load the demo?')), 'load demo question');
+    await until(() => click('Pause demo'), 'Pause demo button');
+    await until(() => evaluate(`document.body.textContent.includes('The demo is paused. Resume demo finishes it, or Reset graph ends it')`), 'the paused demo explained');
+    assert.equal((await menuItems())['Reset graph…'], false, 'Reset graph ends a paused demo');
+    await menu('Reset graph…'); await until(() => click('Reset graph'), 'Reset graph button'); await until(async () => (await sync()).some(text => text.startsWith('Reset the graph?')), 'reset question');
+    await until(async () => await nodes() === 1 && await evaluate(`!document.body.textContent.includes('The demo is paused.')`), 'the paused demo ended by Reset graph');
+    console.log('PASS: a demo paused with Pause demo says how to finish it, and Reset graph ends it');
+  }
   await new Promise(resolve => setTimeout(resolve, 500));
   assert.deepEqual(await persistence(), { saving: true }, 'the store saved the graph to the end');
   assert.deepEqual(problems, [], 'no CSP violation, uncaught exception or console error');

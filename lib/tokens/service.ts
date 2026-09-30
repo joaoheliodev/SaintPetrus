@@ -15,6 +15,8 @@ import { intervalTouchesPeak, preflightCostUsd, reconciledCostUsd, worstCasePeak
 import { verificationThinking } from '../providers/thinking-policy';
 import { PriceCatalog } from '../prices/catalog';
 export class TokenFailure extends Error {}
+// What a command that Pause all agents refuses answers, with the way out (Round 5, R5-2).
+export const pauseAllRefusal = 'Pause all agents is on, so every agent is paused. Use Resume eligible agents first.';
 // The provider answered, so the call may have been billed, but the model it named has no captured tariff.
 export class UnpricedServedModel extends Error {
   constructor(readonly requestedModel: string, readonly servedModel: string, readonly reservationId: string) { super(`Served model ${servedModel} has no verified price; usage stays unverifiable until reconciled manually.`); }
@@ -25,7 +27,8 @@ export type BillingVerdict = 'unbilled' | 'billed' | 'unverifiable';
 // The USD ceiling reads costAccountedUsd; costUnmeasuredUsd is the part of it charged at reservation expiry and not yet confirmed.
 type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costAccountedUsd: number; costUnmeasuredUsd: number; saved: number; unverifiable: number };
 type Reservation = { id: string; agent: string; model: string; provider: ProviderAdapter['id']; priceVersionId: string; priceVersions: ReturnType<PriceCatalog['capture']>; billingModel?: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[]; reported?: { prompt: number; completion: number; reasoning?: number } };
-type Hooks = { pause: (id: string) => void; pauseAll: () => void; ids: () => string[]; role?: (id: string) => string };
+// resumeAll undoes what pauseAll did outside the agents (the demo it paused) when Resume eligible agents turns Pause all off.
+type Hooks = { pause: (id: string) => void; pauseAll: () => void; resumeAll?: () => void; ids: () => string[]; role?: (id: string) => string };
 type JournalWriter = { append(entry: JournalRecord): void };
 // memory: nothing is journaled (tests, tools). recorded: every durable change is on disk. blocked: the journal could not be
 // read or written, so real calls wait for the operator to start a new budget period; the mock still runs.
@@ -198,6 +201,7 @@ export class TokenService {
   resume(agent?: string): string[] {
     this.expireReservations();
     if ([...this.rows.values()].some(row => row.unverifiable > 0)) throw new TokenFailure('Usage unverifiable; restart only after checking provider billing.');
+    const wasStopped = this.stopped;
     if (!agent) this.stopped = false;
     const resumed: string[] = [];
     // An unpriced served model's estimate is only a floor: its agent waits for manual reconciliation.
@@ -208,6 +212,8 @@ export class TokenService {
       if (!blocked && this.paused.delete(id)) resumed.push(id);
     }
     this.persist();
+    // Like the pause hook, a failing projection must not undo what was just recorded.
+    if (wasStopped && !this.stopped) try { this.hooks.resumeAll?.(); } catch { /* The recorded resume still applies. */ }
     return resumed;
   }
   reconcileReservation(id: string, prompt: unknown, completion: unknown, costUsd: unknown) {

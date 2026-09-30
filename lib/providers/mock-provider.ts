@@ -5,18 +5,22 @@ export class MockProvider {
   private generation = 0;
   private steps: (() => void)[] = [];
   private cursor = 0;
+  // A demo that Pause all agents paused goes on when Resume eligible agents turns it off; one paused with Pause demo
+  // stays paused until Resume demo (Round 5, R5-2).
+  private pausedByPauseAll = false;
   constructor(private readonly service: GraphService) {}
   private stop() { this.generation++; if (this.timer) clearTimeout(this.timer); this.timer = undefined; }
   dispose() { this.stop(); }
-  reset(objective?: string) { this.stop(); this.steps = []; this.cursor = 0; this.service.reset(objective); }
-  pause() {
+  reset(objective?: string) { this.stop(); this.steps = []; this.cursor = 0; this.pausedByPauseAll = false; this.service.reset(objective); }
+  pause(by: 'Pause demo' | 'Pause all agents' = 'Pause demo') {
     if (this.service.snapshot().status !== 'running') return;
-    this.stop(); this.service.setRunStatus('paused');
+    this.stop(); this.pausedByPauseAll = by === 'Pause all agents'; this.service.setRunStatus('paused');
   }
   resume() {
     if (this.service.snapshot().status !== 'paused') return;
-    this.service.setRunStatus('running'); this.tick();
+    this.pausedByPauseAll = false; this.service.setRunStatus('running'); this.tick();
   }
+  resumeAfterPauseAll() { if (this.pausedByPauseAll) this.resume(); }
   start(objective: string) {
     if (['running', 'paused'].includes(this.service.snapshot().status)) return;
     this.reset(objective); this.service.setRunStatus('running');

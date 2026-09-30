@@ -70,9 +70,11 @@ test('R4-2 every GraphService command leaves a graph the app can save, or refuse
   accept('demo output charged until the budget runs out', () => { for (let i = 0; i < 60; i++) graph.appendMockOutput(helper, 'z', true); });
   accept('pause one agent', () => graph.setAgentStatus(helper, 'paused'));
   accept('resume it only while it is still paused', () => graph.compareAndSetAgentStatus(helper, 'paused', 'ready'));
+  // Pause all pauses the run only while a demo runs (Round 5, R5-2), so the demo is running here.
+  accept('a demo run', () => graph.setRunStatus('running'));
   accept('pause all', () => graph.pauseAll());
   const exported = safeStringify(graph.snapshot());
-  refuse('import while paused', () => graph.replace(parseGraphDocument(exported), 'imported'));
+  refuse('import while the demo is paused', () => graph.replace(parseGraphDocument(exported), 'imported'));
   accept('run status', () => graph.setRunStatus('completed'));
   accept('import', () => graph.replace(parseGraphDocument(exported), 'imported'));
   accept('reset', () => graph.reset('Start over.'));
@@ -88,7 +90,9 @@ test('R4-2 a seeded random walk over every command never leaves a graph the app 
   const coordinate = () => pick([0, 360, -360, 99999.6, 100000, -100000, 100001, Math.round((random() * 2 - 1) * 100000)]);
   const text = (max: number) => pick(['Plan.', ' padded ', 'x'.repeat(max), 'x'.repeat(max + 1), '', `Use ${bearer()} here.`]);
   const output = () => pick(['A short answer.', 'o'.repeat(9000), `${'w'.repeat(7980 + Math.floor(random() * 20))} ${bearer()}`, `${keyLike()} ${'k'.repeat(8000)}`]);
-  const other = new GraphService(); other.add(request('Imported lead'), { parentId: 'root' }); other.recordOutput('root', 'Imported answer.');
+  // A standalone peer lets agents connect again after an import. Pause all no longer pauses an idle run (Round 5, R5-2),
+  // so imports land twice as often, and with only a delegation to import no connection could be made or deleted.
+  const other = new GraphService(); other.add(request('Imported lead'), { parentId: 'root' }); other.add(request('Imported peer')); other.recordOutput('root', 'Imported answer.');
   const graph = new GraphService();
   const agents = () => [...graph.snapshot().agents.map(agent => agent.id), 'missing'];
   // Half the deletions aim at context connections, which are rarer than delegations and the only ones deleted.

@@ -534,7 +534,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | --- | --- | --- | --- |
 | R5-1 | Reproduce before changing anything | Every entry (E1 Pause all at rest, E2 Pause all during the demo, E3 a full scope for agent, model, global and session, E4 a restart with pauses and the kill switch journaled, E5 an unverifiable reservation by service test) against every exit (X1 Resume eligible agents, X2 Resume demo, X3 raise the limit then X1, X4 a new budget period then X1, X5 restart, X6 Reset graph), from a fresh MOCK instance, with the screen and both GETs as evidence; the table below; no fix without a failing cell | done |
 | R5-A | A new critical advisory | `npm audit --audit-level=high` turned red during the round (GHSA-vcvr-r3jv-pc5j, remote code execution in `next/og` ImageResponse, `next` 16.2.0 to 16.3.5): take the patch release and a green gate, in its own commit | done |
-| R5-2 | Pause all leaves no dead end (C1) | After Pause all agents and Resume eligible agents, with nothing else holding them, every agent is Ready, the run is not `paused` unless the demo was paused with Pause demo, Import, Reset, Load demo and Graph limits are enabled and the server accepts remove and import, in MOCK and in REAL; a demo that Pause all paused goes on; a demo paused on purpose says on screen how to finish it; with Pause all on, the graph route keeps refusing start, resume, add, reset and preview-mock, and import joins them | pending |
+| R5-2 | Pause all leaves no dead end (C1) | After Pause all agents and Resume eligible agents, with nothing else holding them, every agent is Ready, the run is not `paused` unless the demo was paused with Pause demo, Import, Reset, Load demo and Graph limits are enabled and the server accepts remove and import, in MOCK and in REAL; a demo that Pause all paused goes on; a demo paused on purpose says on screen how to finish it; with Pause all on, the graph route keeps refusing start, resume, add, reset and preview-mock, and import joins them | done |
 | R5-3 | One owner for pauses (C4) | The graph never shows a pause the token service does not hold, nor hides one it holds, after any command: an agent that leaves the graph leaves no pause behind unless it still holds a reservation, and an agent that comes back (reset, import, restore) or that the demo drives shows the token service's pause | pending |
 | R5-4 | Every pause says why (C2) | The token snapshot carries, for each paused agent, what holds it (Pause all, unverifiable usage and until when, an estimate awaiting reconciliation, every full scope with its dimension and whether the mock's usage fills it); resume answers whom it released, and a refusal answers 409 with the server's sentence; Budgets says it by the button, from a pure function in `lib/budget-summary.ts`; contract documented and tested | pending |
 | R5-5 | A visible way back (C3) | Resume eligible agents next to Pause all agents in the top bar while something is paused, and in Ctrl+K, with the same command and text; the panel of a Paused agent says why and opens Budgets; the kill switch refusal names the way | pending |
@@ -608,6 +608,21 @@ there is no Resume demo, so only a restart gets out.
   no telemetry change, actively maintained. `npm audit`: 1 critical before, 0 after; the gate and the browser check
   passed on it (`next dev` did not rewrite the `AGENTS.md` block). There is no line of ours to mutate. The gate ran on
   the working tree, which also held the uncommitted R5-2 change: the tree committed after R5-2 is the one gated.
+- R5-2 (2026-09-30). `GraphService.pauseAll` pauses the run only while it is `running`, so Pause all at rest leaves the
+  run `idle`, `completed` or `blocked` and Resume eligible agents gives the whole graph back. `MockProvider.pause`
+  records who paused the demo (`Pause demo` or `Pause all agents`); the token service's new optional `resumeAll` hook,
+  called when a resume turns Pause all off, runs `mock.resumeAfterPauseAll()`, which lets only a demo Pause all paused
+  go on. The graph route and the import route answer 409 `pauseAllRefusal` ("Pause all agents is on, so every agent
+  is paused. Use Resume eligible agents first.") for reset, start, resume, add, preview-mock and now import, which the
+  old `paused` run status used to refuse by accident. The demo refusals of remove, import and Graph limits name the
+  demo and both ways out. The canvas keeps Reset graph enabled while the demo is paused (the server always accepted
+  it) and says "The demo is paused. Resume demo finishes it, or Reset graph ends it; either gives the graph back for
+  editing." Three tests pinned the old contract and changed with it: A-03 and A-04 matched "mock run" in the demo
+  refusal, and R4-2 relied on Pause all pausing a blocked graph to refuse an import; its random walk also imports a
+  standalone peer now, because imports land twice as often (102 against 58 in 3000 steps) and the walk had covered
+  "delete connection" once only; with the peer it is accepted three times. Tests: `tests/pause-resume.test.ts`
+  (MOCK and REAL, the demo either way, every refusal with its sentence) and the browser check (return path and the
+  paused demo).
 
 #### Questions for João
 
@@ -780,6 +795,14 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R4-6,2 | the list shows hidden lines | survived until the list became `FeedLines`; then killed by "the feed list leaves the hidden lines out…" |
 | R4-6,2 | `EventFeed` never calls `followClearings` | **survived**: the effect runs only in a browser, and no browser check can configure a key; accepted as is by the operator (R4-6) |
 | R4-6,2 | the workspace records an answer at the clearing count of its arrival | **survived**: same reason; `historyWithExchange` itself is killed above; accepted as is by the operator (R4-6) |
+| R5-2 | `pauseAll` pauses any run, as before | killed by both "after Pause all agents and Resume eligible agents the graph can be edited…" (MOCK and REAL); every file restored, sha256 identical |
+| R5-2 | `resumeAll` never called | killed by "a demo that Pause all agents paused goes on…" |
+| R5-2 | every demo pause counts as Pause all | killed by the same, at "paused on purpose, it stays paused" |
+| R5-2 | the Pause all hook pauses the demo as Pause demo | killed by the same |
+| R5-2 | import accepted while Pause all is on | killed by "with Pause all agents on, the graph refuses… and names the way out" |
+| R5-2 | the refusal says "Global kill switch is active." again | killed by the same |
+| R5-2 | Reset graph disabled while the demo is paused | killed by the browser check ("Reset graph ends a paused demo") |
+| R5-2 | the paused demo explains nothing | killed by the browser check ("Timed out: the paused demo explained") |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

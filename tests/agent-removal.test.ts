@@ -30,7 +30,8 @@ test('A-03 the graph removes an agent and its connections, never the coordinator
   const gone: string[] = [a, child];
   assert.equal(after.edges.some(edge => gone.includes(edge.source) || gone.includes(edge.target)), false, 'its connections go with it');
   graph.setRunStatus('running');
-  assert.throws(() => graph.remove(b), /mock run/);
+  // The refusal names the demo and both ways out of it (Round 5, R5-2).
+  assert.throws(() => graph.remove(b), /demo is running or paused: let it finish \(Resume demo if it is paused\) or reset the graph/);
 });
 
 test('A-03 removal is refused while the agent holds a reservation, and allowed once it is settled', async () => {

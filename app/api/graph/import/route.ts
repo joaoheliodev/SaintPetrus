@@ -3,7 +3,8 @@ import { localRequest } from '@/lib/server/http';
 import { readBoundedText } from '@/lib/server/read-json';
 import { safeJson } from '@/lib/security/redact';
 import { tokenService } from '@/lib/tokens/runtime';
-import { GraphError } from '@/lib/server/graph-service';
+import { pauseAllRefusal } from '@/lib/tokens/service';
+import { demoRefusal, GraphError } from '@/lib/server/graph-service';
 import { GRAPH_DOCUMENT_MAX_BYTES, parseGraphDocument } from '@/lib/server/graph-document';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,9 @@ export async function POST(request: Request) {
     const { graph, mock } = getRuntime();
     // Importing replaces every agent, so the removal guard applies to each of them.
     if (graph.snapshot().agents.some(agent => tokenService().holdsReservation(agent.id))) return safeJson({ error: 'An agent has a call in flight, or usage that is unverifiable or awaiting reconciliation. Settle it in Tokens before importing.' }, 409);
-    if (['running', 'paused'].includes(graph.snapshot().status)) throw new GraphError('Reset the mock run before importing a graph.');
+    // Like reset, an import replaces every agent, so Pause all agents refuses it too.
+    if (tokenService().isStopped()) return safeJson({ error: pauseAllRefusal }, 409);
+    if (['running', 'paused'].includes(graph.snapshot().status)) throw new GraphError(demoRefusal('importing a graph'));
     mock.dispose();
     graph.replace(imported, 'imported');
     return safeJson(graph.snapshot());

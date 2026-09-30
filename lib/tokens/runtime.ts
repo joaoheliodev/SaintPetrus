@@ -22,7 +22,8 @@ export function tokenService() {
       role: id => runtime().graph.snapshot().agents.find(a => a.id === id)?.name ?? id,
       ids: () => runtime().graph.snapshot().agents.map(a => a.id),
       pause: id => runtime().graph.setAgentStatus(id, 'paused'),
-      pauseAll: () => { providerProxy().cancel(); runtime().mock.pause(); runtime().graph.pauseAll(); },
+      pauseAll: () => { providerProxy().cancel(); runtime().mock.pause('Pause all agents'); runtime().graph.pauseAll(); },
+      resumeAll: () => runtime().mock.resumeAfterPauseAll(),
     }, undefined, Date.now, new PriceCatalog(prices, join(process.cwd(), 'config/prices.json')));
     const pin = state.saintpetrusAccounting;
     if (pin?.opened) state.saintpetrusTokens.restore(new AccountingJournal(pin.directory), pin.opened);

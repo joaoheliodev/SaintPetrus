@@ -6,8 +6,14 @@ that carried them.
 ## Unreleased: Round 5 on `main` (2026-09-30)
 
 The operator could not un-pause the agents. Every way into a pause was tried against every way out on fresh instances
-before anything changed. No request with a real key was made.
+before anything changed. No request with a real key was made. The test floor rose from 514 to 518.
 
+- After **Pause all agents** and **Resume eligible agents** the graph is usable again: Pause all no longer marks the
+  run paused when no demo is running, so Import, Reset, Load demo and Graph limits are enabled and the server accepts
+  remove and import, in MOCK and in REAL. A demo that Pause all paused goes on; one paused with **Pause demo** says how
+  to finish it, and **Reset graph** now ends it. With Pause all on, `POST /api/graph/import` is refused (409) like
+  reset and add, and every such refusal says "Pause all agents is on, so every agent is paused. Use Resume eligible
+  agents first." instead of "Global kill switch is active." (R5-2).
 - `next` 16.3.8, a patch release, closes GHSA-vcvr-r3jv-pc5j (critical: remote code execution in `next/og`
   ImageResponse, 16.2.0 to 16.3.5), published during the round, which turned `npm audit --audit-level=high` red.
 

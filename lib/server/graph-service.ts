@@ -28,6 +28,8 @@ function savedText(text: string, max: number) {
 const savedOutput = (text: string) => savedText(text, 8000);
 // The saved graph refuses a position outside this square (graph-document.ts), so placement never leaves it.
 const onCanvas = (value: number) => Math.max(-100000, Math.min(100000, value));
+// Only the demo runs or pauses the graph; the refusal names both ways out of it.
+export const demoRefusal = (action: string) => `The demo is running or paused: let it finish (Resume demo if it is paused) or reset the graph before ${action}.`;
 export class GraphService {
   private graph = createGraph();
   constructor() { this.record('agent.created', 'root', 'Coordinator created.'); }
@@ -59,7 +61,7 @@ export class GraphService {
     this.graph.revision = revision; this.emit('graph.reset', 'Graph reset.');
   }
   setBudget(budget: ExecutionBudget) {
-    if (['running', 'paused'].includes(this.graph.status)) throw new GraphError('Reset before changing limits.');
+    if (['running', 'paused'].includes(this.graph.status)) throw new GraphError(demoRefusal('changing the graph limits'));
     if (!Number.isInteger(budget.maxDepth) || budget.maxDepth < 1 || budget.maxDepth > 5 ||
       !Number.isInteger(budget.maxNodes) || budget.maxNodes < this.graph.agents.length || budget.maxNodes > 50 ||
       !Number.isInteger(budget.maxCostCents) || budget.maxCostCents < Math.max(1, this.graph.costCents) || budget.maxCostCents > 10000 ||
@@ -111,7 +113,7 @@ export class GraphService {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) throw new GraphError('Agent not found.');
     if (id === this.graph.agents[0].id) throw new GraphError('The coordinator cannot be removed.');
-    if (this.graph.status === 'running' || this.graph.status === 'paused') throw new GraphError('Reset the mock run before removing an agent.');
+    if (this.graph.status === 'running' || this.graph.status === 'paused') throw new GraphError(demoRefusal('removing an agent'));
     if (this.graph.agents.some(a => a.parentId === id)) throw new GraphError('Remove its subagents first.');
     this.record('agent.removed', id, 'Agent removed.');
     const [root, ...rest] = this.graph.agents;
@@ -121,7 +123,7 @@ export class GraphService {
   }
   // Takes a graph already rebuilt by parseGraphDocument. Accounting refusals are decided before this runs, as for remove.
   replace(graph: Graph, reason: 'imported' | 'restored') {
-    if (this.graph.status === 'running' || this.graph.status === 'paused') throw new GraphError('Reset the mock run before importing a graph.');
+    if (this.graph.status === 'running' || this.graph.status === 'paused') throw new GraphError(demoRefusal('importing a graph'));
     // Revisions only move forward, so a client that saw a later revision still accepts the next event.
     this.graph = { ...structuredClone(graph), revision: Math.max(this.graph.revision, graph.revision) };
     this.record('graph.replaced', 'root', reason === 'imported' ? 'Graph imported from a file.' : 'Saved graph restored.');
@@ -186,7 +188,9 @@ export class GraphService {
     if (!agent || !Number.isFinite(position.x) || !Number.isFinite(position.y) || Math.abs(position.x) > 100000 || Math.abs(position.y) > 100000) throw new GraphError('Invalid position.');
     agent.position = { ...position }; this.emit('agent.moved', 'Agent moved.', { agent });
   }
-  pauseAll() { this.graph.agents.forEach(agent => this.setAgentStatus(agent.id, 'paused')); this.graph.status = 'paused'; this.emit('agents.paused', 'All agents paused by kill switch.'); }
+  // Pause all pauses the agents, and a demo only while it runs: an idle, finished or blocked graph keeps its run status,
+  // or the run would stay paused after the agents resume, with no demo to resume it (Round 5, R5-2).
+  pauseAll() { this.graph.agents.forEach(agent => this.setAgentStatus(agent.id, 'paused')); if (this.graph.status === 'running') this.graph.status = 'paused'; this.emit('agents.paused', 'All agents paused by Pause all agents.'); }
   setRunStatus(status: Graph['status']) { this.graph.status = status; this.emit('run.updated', `Run ${status}.`); }
   setAgentStatus(id: string, status: Agent['status']) {
     const agent = this.graph.agents.find(a => a.id === id);

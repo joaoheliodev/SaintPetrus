@@ -78,6 +78,8 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   // configured key cleared the history is dropped when it arrives.
   const recordRun = (exchange: RunExchange) => recordExchange(selected.id, exchange, clearings);
   const active = graph.status === 'running' || graph.status === 'paused';
+  // Reset ends a paused demo on the server as well, so only a running one keeps it disabled.
+  const running = graph.status === 'running';
   // Reconcile server agents into React Flow's own node state. Nodes that did not change keep their
   // object identity, so React Flow reuses the measured size and handle bounds instead of wiping them.
   useEffect(() => {
@@ -195,7 +197,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
     { id: 'fit', label: 'Fit all', group: 'Canvas', run: () => { setView('workspace'); void flow.fitView({ padding: .2, maxZoom: 1, duration: 300 }); } },
     { id: 'import', label: 'Import graph…', group: 'Graph', disabled: pending || active, run: () => importInput.current?.click() },
     { id: 'export', label: 'Export graph', group: 'Graph', run: () => exportLink.current?.click() },
-    { id: 'reset', label: 'Reset graph…', group: 'Graph', disabled: pending || active, run: () => { setView('workspace'); setResetOpen(true); } },
+    { id: 'reset', label: 'Reset graph…', group: 'Graph', disabled: pending || running, run: () => { setView('workspace'); setResetOpen(true); } },
     ...(mockEnabled ? [{ id: 'demo', label: 'Load demo…', group: 'Graph', disabled: pending || active, run: () => void loadDemo() }] : []),
     ...(mockEnabled && previewPort ? [{ id: 'preview-demo', label: 'Load preview demo…', group: 'Graph', disabled: pending || active, run: () => void loadPreviewDemo() }] : []),
     { id: 'pause-all', label: 'Pause all agents…', group: 'Budgets', disabled: tokens.pending, run: () => void askToPauseAll(tokens.command, confirm) },
@@ -234,12 +236,13 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       <Button variant="outline" disabled={pending || !selected} onClick={() => openDraft({ parentId: selected.id })}><CornerDownRight />Add subagent</Button>
       <Button variant="ghost" onClick={() => flow.fitView({ padding: .2, maxZoom: 1, duration: 300 })}><Maximize />Fit all</Button>
       {mockEnabled && active && <Button variant="outline" disabled={pending} onClick={() => void command({ action: graph.status === 'running' ? 'pause' : 'resume' })}>{graph.status === 'running' ? <Pause /> : <Play />}{graph.status === 'running' ? 'Pause demo' : 'Resume demo'}</Button>}
+      {mockEnabled && graph.status === 'paused' && <span className="helper" role="status">The demo is paused. Resume demo finishes it, or Reset graph ends it; either gives the graph back for editing.</span>}
       {/* Everything that replaces or leaves the canvas sits one menu away, and each replacement asks first. */}
       <Menu><MenuTrigger render={<Button variant="outline" />}><Ellipsis />More</MenuTrigger>
         <MenuContent aria-label="More graph actions">
           <MenuItem disabled={pending || active} onClick={() => importInput.current?.click()}><Upload />Import graph…</MenuItem>
           <MenuItem onClick={() => exportLink.current?.click()}><Download />Export graph</MenuItem>
-          <MenuItem disabled={pending || active} onClick={() => setResetOpen(true)}><RotateCcw />Reset graph…</MenuItem>
+          <MenuItem disabled={pending || running} onClick={() => setResetOpen(true)}><RotateCcw />Reset graph…</MenuItem>
           {mockEnabled && <><MenuSeparator />
             <MenuItem disabled={pending || active} onClick={loadDemo}><Play />Load demo…</MenuItem>
             {previewPort && <MenuItem disabled={pending || active} onClick={loadPreviewDemo}><Play />Load preview demo…</MenuItem>}</>}
@@ -285,9 +288,9 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
     <Dialog open={resetOpen} onOpenChange={setResetOpen}><DialogContent>
       <DialogTitle>Reset graph</DialogTitle>
       <DialogDescription>Removes every agent except the Coordinator, every connection and all output. Token accounting is not touched.</DialogDescription>
-      <label htmlFor="objective">Coordinator objective</label><textarea id="objective" value={objective} maxLength={2000} disabled={active} onChange={e => setObjective(e.target.value)} />
+      <label htmlFor="objective">Coordinator objective</label><textarea id="objective" value={objective} maxLength={2000} disabled={running} onChange={e => setObjective(e.target.value)} />
       <p className="helper">The objective the Coordinator receives when the graph is reset{mockEnabled ? ' or the demo is loaded' : ''}.</p>
-      <Button variant="destructive" disabled={pending || active || !objective.trim()} onClick={() => void resetGraph()}><RotateCcw />Reset graph</Button>
+      <Button variant="destructive" disabled={pending || running || !objective.trim()} onClick={() => void resetGraph()}><RotateCcw />Reset graph</Button>
     </DialogContent></Dialog>
   </main>;
 }
