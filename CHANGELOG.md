@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 4 on `main` (2026-09-29)
 
 Deleting a delegation left a graph the server could no longer save, and nothing on screen said so. No request with a
-real key was made. The test floor rose from 487 to 500.
+real key was made. The test floor rose from 487 to 501.
 
 - A delegation connection is deleted only with its subagent: `POST /api/graph` answers 400 to `disconnect` on a
   `delegation` edge with "A delegation connection cannot be deleted on its own. Remove the subagent instead.", and
@@ -27,6 +27,8 @@ real key was made. The test floor rose from 487 to 500.
   once; a later **Disconnect** or **Forget key** cannot write the key back. The live event feed redacts again as it
   sends, like the graph stream. Before, the in-memory graph was never redacted: the store wrote a redacted copy only
   at the next change, without the refusal R-01 had assumed, and wrote the key again once it was forgotten.
+- The browser checks no longer fail after passing when Chromium writes a temporary file into its disposable profile
+  while it shuts down: the profile removal retries on `ENOTEMPTY`.
 
 ## Unreleased: Round 3 on `night/provider-validation-ready` (2026-09-28)
 

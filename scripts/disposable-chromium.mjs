@@ -7,6 +7,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
 
+// Chromium can still be writing its profile while it shuts down: a temporary file it created in Default/ once raced the
+// removal (ENOTEMPTY) and failed a check that had passed. Node retries a removal that meets such a write.
+const removal = { recursive: true, force: true, maxRetries: 10, retryDelay: 100 };
+/** @param {string} profile @param {(path: string, options: typeof removal) => Promise<void>} [remove] */
+export const removeProfile = (profile, remove = rm) => remove(profile, removal);
+
 export async function launchChromium({ timeoutMs, onEvent = () => {} }) {
   const profile = await mkdtemp(join(tmpdir(), 'saintpetrus-chromium-'));
   // Chromium refuses to start its sandbox as root (containers); this disposable browser only reaches 127.0.0.1.
@@ -17,13 +23,13 @@ export async function launchChromium({ timeoutMs, onEvent = () => {} }) {
   const failPending = error => { for (const request of pending.values()) request.reject(error); pending.clear(); };
   child.on('exit', () => failPending(new Error('Disposable Chromium exited.')));
   const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
-  const interrupt = () => { child.kill('SIGKILL'); rmSync(profile, { recursive: true, force: true }); process.exit(130); };
+  const interrupt = () => { child.kill('SIGKILL'); rmSync(profile, removal); process.exit(130); };
   process.once('SIGINT', interrupt); process.once('SIGTERM', interrupt);
   const close = async () => {
     clearTimeout(timer); process.off('SIGINT', interrupt); process.off('SIGTERM', interrupt);
     socket?.close(); child.kill('SIGTERM');
     await Promise.race([once(child, 'exit'), new Promise(resolve => setTimeout(resolve, 2000))]);
-    await rm(profile, { recursive: true, force: true });
+    await removeProfile(profile);
   };
   const call = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
     if (!socket || socket.readyState !== WebSocket.OPEN) { reject(new Error('Browser connection closed.')); return; }

@@ -437,6 +437,13 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   with no other change, it was gone from the file (`[REDACTED]` in its place); after **Disconnect** and a change it
   stayed gone; `GET /api/graph/persistence` said `saving: true`. This is the real pair of module copies: the route
   bundle configured the key and the graph the custom server built was cleaned.
+- R4-5, the browser check's own cleanup. The round's first `test:e2e` printed all 20 PASS lines and then exited 1 with
+  `ENOTEMPTY: rmdir '…/saintpetrus-chromium-…/Default'`: Chromium wrote a temporary file
+  (`Default/.org.chromium.Chromium.*`, the only thing left in the profile) while `close()` was removing it, and no
+  Chromium process was left. Not a flake to rerun: `scripts/disposable-chromium.mjs` now removes the profile through
+  `removeProfile`, with Node's own retry for that error (`maxRetries: 10`, `retryDelay: 100`), in `close()` and in the
+  interrupt handler. `tests/disposable-chromium.test.ts` checks the options reach the removal and that a profile
+  shaped like the one left behind is removed; the race itself cannot be forced deterministically. Floor 500 → 501.
 
 #### Questions for João
 
@@ -590,6 +597,7 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R4-5 | the redaction not published as an event | killed by the two store tests in `configured-key` |
 | R4-5 | `runtime()` without `followSecrets()` | killed by "the process graph follows the key registry…" and the module-copies test |
 | R4-5 | the feed sends without redacting again | killed by "the feed redacts again when it sends…" |
+| R4-5 | the profile removal without its retry | killed by "the browser checks remove their profile with retries…"; restored, sha256 identical |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
@@ -748,4 +756,5 @@ Everything below is yours; nothing in it needs this conversation.
   Floor 487 → 495, every fix mutation-tested. On fresh instances `test:e2e` passed in development (20 checks) and
   `test:browser` in production; Gitleaks clean on every staged diff, the working directory and the full history.
 - Phase 10, R4-5 (2026-09-30, on `main`): a configured key leaves the graph at once, and the live feed redacts again
-  as it sends. Floor 495 → 500, every change mutation-tested (seven mutations, all killed).
+  as it sends; the browser checks' profile removal retries a late Chromium write. Floor 495 → 501, every change
+  mutation-tested (eight mutations, all killed).
