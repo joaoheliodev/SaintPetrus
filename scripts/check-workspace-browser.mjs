@@ -298,7 +298,7 @@ try {
     await until(() => evaluate(`document.querySelector('.budget-status')?.textContent.startsWith('Blocked: the global budget is full in tokens.')`), 'the global budget full');
     await until(() => click('Connection'), 'Connection view'); await until(() => click('Test connection (1 call)'), 'Test connection');
     await until(() => evaluate(`document.querySelector('.provider-panel [role=status]')?.textContent === 'Stopped by the server: Token or monetary budget exhausted.'`), 'the refused test gives the server reason');
-    const holds = "Coordinator is paused: the global budget is full in tokens, filled by the mock's estimated tokens. Raise its limit in Details or restart the server";
+    const holds = "Coordinator is paused: the global budget is full in tokens, filled by the mock's estimated tokens. Raise its limit in Details, or clear the mock's estimated tokens with Start a new budget period in Details or a server restart";
     await until(() => evaluate(`document.querySelector('.pause-notice')?.textContent.includes(${JSON.stringify(holds)})`), 'the notice names the full scope');
     await until(() => click('Workspace'), 'Workspace view');
     await until(() => evaluate(`(() => { const item = Array.from(document.querySelectorAll('.agent-list-open')).find(b => b.textContent.includes('Coordinator')); item?.click(); return document.querySelector('.inspector h2')?.textContent === 'Coordinator'; })()`), 'coordinator selected');
@@ -316,6 +316,21 @@ try {
     await until(() => click('Workspace'), 'Workspace view');
     await until(() => evaluate(`!document.querySelector('.pause-notice') && !${topResume} && document.querySelector('.react-flow__node .status')?.textContent.includes('Ready')`), 'the Coordinator Ready again');
     console.log('PASS: a full scope holds its agent through Resume eligible agents ("No agent was resumed." and why) until its limit rises; the refused test, the notice and the Paused agent\'s panel say why, and the panel opens Budgets');
+    // The same hold, cleared the other way: a new budget period clears the mock's estimated tokens that filled the scope,
+    // and Resume eligible agents releases the agent (Round 5, R5-11).
+    await until(() => click('Budgets'), 'Budgets view'); await setGlobal(used);
+    await until(() => evaluate(`document.querySelector('.budget-status')?.textContent.startsWith('Blocked: the global budget is full in tokens.')`), 'the global budget full again');
+    await until(() => click('Connection'), 'Connection view'); await until(() => click('Test connection (1 call)'), 'Test connection');
+    await until(() => evaluate(`document.querySelector('.pause-notice')?.textContent.includes(${JSON.stringify(holds)})`), 'paused by the full scope again');
+    await until(() => click('Budgets'), 'Budgets view'); await until(openDetails, 'budget details');
+    await until(() => click('Start a new budget period'), 'Start a new budget period');
+    await until(async () => (await sync()).some(text => text.startsWith('Start a new budget period?') && text.includes("The mock's estimated tokens are cleared everywhere")), 'the period question says what it clears');
+    await until(() => evaluate(`document.querySelector('.pause-reasons')?.textContent.includes('Coordinator is paused, and nothing holds it now: use Resume eligible agents.')`), 'nothing holds it after the period');
+    await until(() => click('Resume eligible agents'), 'Resume eligible agents');
+    await until(() => evaluate(`document.querySelector('.pause-reasons')?.textContent.includes('Resumed Coordinator.') && document.querySelector('.budget-summary')?.textContent.includes('Nothing is paused.')`), 'resumed after the period');
+    await until(() => click('Workspace'), 'Workspace view');
+    await until(() => evaluate(`!document.querySelector('.pause-notice') && document.querySelector('.react-flow__node .status')?.textContent.includes('Ready')`), 'the Coordinator Ready after the period');
+    console.log('PASS: a scope the mock filled holds its agent until Start a new budget period clears the mock\'s estimated tokens; then Resume eligible agents makes it Ready');
   }
   if (mocked) {
     // A demo paused on purpose says how to get the graph back, and Reset graph ends it (Round 5, R5-2).

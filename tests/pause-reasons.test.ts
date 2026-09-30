@@ -105,7 +105,7 @@ test('R5-10 unverifiable usage names no cause it cannot know: lost contact, unre
 test('R5-4 the panel words every hold and the way out, from the server reasons alone', () => {
   const pause = (agent: string, reasons: Parameters<typeof pauseSentence>[0]['reasons'], removed = false) => ({ agent, removed, reasons });
   assert.equal(pauseSentence(pause('a', [{ kind: 'budget', scope: 'global', id: 'all', dimensions: ['tokens'], mock: true }, { kind: 'budget', scope: 'agent', id: 'a', dimensions: ['tokens', 'dollars'], mock: false }]), names),
-    "Writer is paused: the global budget is full in tokens, filled by the mock's estimated tokens and the agent budget for Writer is full in tokens and dollars. Raise their limits in Details or restart the server, which clears the mock's estimated tokens (a new budget period keeps them), then use Resume eligible agents.");
+    "Writer is paused: the global budget is full in tokens, filled by the mock's estimated tokens and the agent budget for Writer is full in tokens and dollars. Raise their limits in Details, or clear the mock's estimated tokens with Start a new budget period in Details or a server restart, then use Resume eligible agents.");
   assert.equal(pauseSentence(pause('a', [{ kind: 'budget', scope: 'session', id: 's', dimensions: ['tokens'], mock: false }]), names), 'Writer is paused: the session budget is full in tokens. Raise its limit in Details or restart the server, which starts a new session budget, then use Resume eligible agents.');
   assert.equal(pauseSentence(pause('a', [{ kind: 'unverifiable', until: Date.UTC(2026, 8, 30, 12, 5) }]), names), "Writer is paused: a call's cost could not be confirmed, so usage is unverifiable until 12:05 UTC. Check the provider billing and wait until then, then use Resume eligible agents.");
   assert.equal(pauseSentence(pause('a', [{ kind: 'reconciliation', reservationId: 'reservation-2' }]), names), 'Writer is paused: its expired estimate reservation-2 waits for the provider-confirmed usage. Apply the confirmed usage to reservation-2 in Details, then use Resume eligible agents.');
@@ -141,7 +141,7 @@ test('R5-4 Budgets says, beside Resume eligible agents, what it did and what sti
   const markup = render({ resumed: [], paused: data.paused });
   const reasons = markup.slice(markup.indexOf('class="pause-reasons"'), markup.indexOf('</section>', markup.indexOf('class="pause-reasons"')));
   assert.match(reasons, /No agent was resumed\./); assert.match(reasons, /1 agent is paused\./);
-  assert.match(reasons, /Writer is paused: the agent budget for Writer is full in tokens, filled by the mock&#x27;s estimated tokens\. Raise its limit in Details or restart the server/);
+  assert.match(reasons, /Writer is paused: the agent budget for Writer is full in tokens, filled by the mock&#x27;s estimated tokens\. Raise its limit in Details, or clear the mock&#x27;s estimated tokens with Start a new budget period in Details or a server restart/);
   assert.doesNotMatch(render({ resumed: ['a'], paused: [] }), /Resumed/, 'an answer about other pauses is not shown');
 });
 

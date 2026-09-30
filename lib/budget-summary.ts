@@ -85,7 +85,7 @@ export function pauseSentence(pause: Pause, agentName: (id: string) => string) {
     else { budgets++; mock ||= reason.mock; session ||= reason.scope === 'session'; holds.push(`${scopeLabel(reason.scope, reason.id, agentName)} is full in ${reason.dimensions.join(' and ')}${reason.mock ? ", filled by the mock's estimated tokens" : ''}`); }
   }
   if (!holds.length) return `${who} is paused, and nothing holds it now: use Resume eligible agents.`;
-  const restart = mock ? " or restart the server, which clears the mock's estimated tokens (a new budget period keeps them)" : session ? ' or restart the server, which starts a new session budget' : '';
+  const restart = mock ? ", or clear the mock's estimated tokens with Start a new budget period in Details or a server restart" : session ? ' or restart the server, which starts a new session budget' : '';
   if (budgets) steps.unshift(`raise ${budgets === 1 ? 'its limit' : 'their limits'} in Details${restart}`);
   if (lost) steps.unshift('check the provider billing and wait until then');
   // A removed agent's pause goes with its settled reservation (Round 5, R5-3); only a present agent needs a resume.
@@ -119,9 +119,9 @@ export function resumeOutcome(reply: unknown, agentName: (id: string) => string)
   return resumed.length ? `Resumed ${listed(resumed.map(agentName))}.` : 'No agent was resumed.';
 }
 
-// What a new budget period clears, as the service does it: the mock's usage and the session scope are the process's own,
-// so only a restart empties them (Round 5, R5-6). The question before it and Details say the same.
-export const periodClears = "Real consumption in the global, agent and model budgets starts again from zero. The mock's estimated tokens from this server run and the session budget stay until the server restarts.";
+// What a new budget period clears, as the service does it (Round 5, R5-6 and R5-Q1): the mock's tokens everywhere, but not
+// the real spend the session budget holds since the server started. The question before it and Details say the same.
+export const periodClears = "Consumption in the global, agent and model budgets starts again from zero. The mock's estimated tokens are cleared everywhere, and the session budget keeps only what real calls spent since the server started.";
 // After a new budget period starts: a period never resumes anyone, so say who is still paused and the way out.
 export function periodNotice(snapshot: { paused: readonly string[]; stopped: boolean }) {
   if (snapshot.stopped) return 'A new budget period has started. Pause all agents is still on, so every agent stays paused: use Resume eligible agents when you want them to run.';

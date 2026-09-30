@@ -36,7 +36,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 539 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 540 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -132,7 +132,9 @@ Graph events name who they concern, as named at that moment (`agent`, or `source
 
 Accounting is journaled (Round 3): `accounting.jsonl` in the user data directory, 0700/0600, one synced record per change, written before the change can take effect, holding only IDs, counts, amounts, price versions, verdicts and times. Start rebuilds the global, agent and model scopes, reservations with their deadlines, `unverifiable` states, pauses and the last 200 receipts; the session scope and the mock's usage stay per process. A reservation in flight when the process stopped returns `unverifiable` with its agent paused, never refunded; its deadline is the latest it could have had without the crash, `createdAt` + `DEFAULT_PROVIDER_TIMEOUT_MS` + `reservationTtlMs`, taken from the journal alone so restarts never move it, and a deadline already past converts on the first read like any other. An unreadable journal is set aside, never overwritten, and blocks real calls until the operator starts a new budget period, itself journaled; nothing restarts from zero on its own. Never rewrite or truncate a complete journal record.
 
-A new budget period zeroes consumption and keeps limits, pauses and Pause all; it is refused while a reservation is open. It never resumes an agent: resuming stays an explicit action, as after raising a limit, and Budgets says which agents are still paused and points to **Resume eligible agents** (Round 3, R3-2).
+A new budget period zeroes consumption in the global, agent and model budgets and keeps limits, pauses and Pause all; it is refused while a reservation is open. It never resumes an agent: resuming stays an explicit action, as after raising a limit, and Budgets says which agents are still paused and points to **Resume eligible agents** (Round 3, R3-2).
+
+Start a new budget period zeroes the mock's estimated tokens in every budget row, the session row's mock part included (Round 5, R5-Q1, 2026-09-30). What real calls spent since the server started stays in the session row. Limits, pauses and Pause all do not change. The mock's tokens are not spend and a restart already clears them; the period gives back only the room they took.
 
 A delegation connection is deleted only with its subagent (Round 4, 2026-09-29). The server refuses `disconnect` on a `delegation` edge with a message that says to remove the subagent; only `context` connections can be deleted. The canvas explains this while a delegation is selected, but the server decides.
 

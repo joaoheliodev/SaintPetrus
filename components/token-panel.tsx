@@ -139,7 +139,7 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
   const outcome = data && resumeReplyCurrent(tokens.resumeReply, data) ? resumeOutcome(tokens.resumeReply, agentName) : undefined;
   return <section className="view token-panel" aria-labelledby="budgets-title">
         <h1 id="budgets-title">Budgets</h1>
-        <p className="helper">Every call reserves its worst case before it leaves: peak price, no cache hits, full output. The mock&apos;s estimated tokens count against the token limits too, so the mock can reach a limit; its dollars are $0.</p>
+        <p className="helper">Every call reserves its worst case before it leaves: peak price, no cache hits, full output. The mock&apos;s estimated tokens count against the token limits too, so the mock can reach a limit; its dollars are $0, and a new budget period or a restart clears them.</p>
         {!data ? <p role="status">Loading server token state… {error}</p> : <>
           <section className="budget-summary" aria-label="Budget summary">
             {journal && <div role="alert" className="journal-warning"><p>{journal.text}</p>{journal.canStartPeriod && <Button disabled={pending} variant="outline" onClick={startPeriod}>Start a new budget period</Button>}</div>}

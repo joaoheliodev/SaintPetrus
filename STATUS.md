@@ -127,11 +127,10 @@ round's handoff); each fix below answers a cell that did not come back.
   beside Pause all agents in the top bar and in Commands (Ctrl+K), with the same command and answer as in Budgets; a
   notice under the top bar says what holds each agent and opens Budgets; the panel of a Paused agent says why and
   opens Budgets.
-- **R5-6** A new budget period says what it clears. It zeroes real consumption in the global, agent and model
-  budgets and leaves the mock's estimated tokens and the session budget to a restart, while its question and Details
-  said that consumption "starts again from zero", so a scope the mock filled stayed full after it. The words now say
-  what the service does; whether a new period should also clear the mock's usage or the session row is the
-  operator's question, since it changes how much can be spent.
+- **R5-6** A new budget period says what it clears. Its question and Details said that consumption "starts again
+  from zero" while the mock's estimated tokens stayed, so a scope the mock filled stayed full after it. Since R5-11
+  the period clears the mock's estimated tokens in every row, the session row's mock part included, and the session
+  row keeps only what real calls spent since the server started; the question and Details say exactly that.
 - **R5-7** `tests/pause-invariant.test.ts` walks Pause all, resume, raised and filled limits, a new period, calls,
   connection tests, quotes, add, remove, Graph limits, reset, export and import through the routes and the process
   token service, 2000 seeded steps in MOCK and 500 more in REAL without a key, and checks after every step that the
@@ -150,6 +149,11 @@ round's handoff); each fix below answers a cell that did not come back.
   with its provider", also for an answer whose usage could not be read and for an unpriced served model (A-10). The
   refused resume, the pause and Budgets now say that a call's cost could not be confirmed; the exact cause stays in
   the Run once result and the Activity feed.
+- **R5-11** Operator decision R5-Q1: Start a new budget period also clears the mock's estimated tokens, in every
+  budget row. In the session row only the mock's part goes; what real calls spent since the server started stays, so
+  a period never grants a second session of real spend. A scope the mock filled is free again after the period, and
+  Resume eligible agents releases its agent; the pause sentence now offers the period next to a higher limit and a
+  restart.
 
 ## Not verified or pending
 

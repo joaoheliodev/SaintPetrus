@@ -99,7 +99,7 @@ export class TokenService {
     if (row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd) dimensions.push('dollars');
     return dimensions;
   }
-  // The mock's usage lives only as long as the process: a restart clears it and a new budget period keeps it.
+  // The mock's usage lives only as long as the process, until a restart or a new budget period clears it.
   private filledByMock(row: Row) {
     const mockCost = this.mockCost.get(row) ?? 0;
     return (row.mock.total > 0 || mockCost > 0) && row.used - row.mock.total + row.reserved < row.limit && row.costAccountedUsd - mockCost + row.costReservedUsd < row.costLimitUsd;
@@ -208,9 +208,12 @@ export class TokenService {
       try { this.journal.append({ v: 1, kind: 'period', at: this.now(), reason: 'operator' }); }
       catch { this.writeFailed(); throw new TokenFailure('The accounting journal could not be written; the budget period was not changed.'); }
     }
+    // The mock's tokens go from every row (Round 5, R5-Q1). The session row is the process's own and is never journaled: it
+    // keeps what real calls spent since the server started, so a period never grants a second session of real spend.
     for (const row of this.rows.values()) {
-      if (row.scope === 'session') continue;
-      Object.assign(row, { used: row.mock.total, estimated: 0, conservativeCachedInput: 0, actual: { prompt: 0, completion: 0, total: 0 }, costAccountedUsd: this.mockCost.get(row) ?? 0, costUnmeasuredUsd: 0 });
+      const mockCost = this.mockCost.get(row) ?? 0; this.mockCost.delete(row);
+      if (row.scope === 'session') Object.assign(row, { used: row.used - row.mock.total, costAccountedUsd: money(row.costAccountedUsd - mockCost), mock: zero() });
+      else Object.assign(row, { used: 0, estimated: 0, conservativeCachedInput: 0, actual: zero(), mock: zero(), costAccountedUsd: 0, costUnmeasuredUsd: 0 });
     }
     this.accounting = { journal: this.journal ? 'recorded' : 'memory' };
     this.written = ''; this.persist();

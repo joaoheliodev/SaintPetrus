@@ -543,6 +543,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-8 | Browser checks | The workspace check goes back from Pause all through the new Resume, and through a full scope that Resume cannot release until the limit rises; no PASS removed; REAL without a key shows Pause all and Resume and no Resume demo | done |
 | R5-9 | Documentation | STATUS, CHANGELOG, README and a one-line guarantee in `AGENTS.md` | done |
 | R5-10 | Unverifiable usage names no cause it cannot know (C2) | Found re-running E5 at the end: the refused resume, the pause and Budgets said "a call lost contact with its provider" for every unverifiable reservation; lost contact, unreadable usage and an unpriced served model now read alike, without a false cause | done |
+| R5-11 | A new budget period clears the mock's tokens everywhere (answer to R5-Q1) | The period zeroes the global, agent and model rows and the mock's tokens in every row; the session row loses only its mock part and keeps what real calls spent; a scope the mock filled is released by the period and the next Resume; limits, pauses, Pause all and the journal format unchanged | done |
 
 #### R5-1 reproduction (2026-09-30, before any change, at `23f3052`)
 
@@ -749,6 +750,18 @@ global and session nobody is paused, yet Budgets ends "then use Resume eligible 
   the timeout sentence) and the Activity feed (`provider.unpriced`) already name the exact one. So the three
   sentences now name none: "a call's cost could not be confirmed", and Budgets lists the three causes. No API change.
   The R5-4 test pinned the old sentence twice and follows it.
+- R5-11 (2026-09-30, operator decision R5-Q1). `startBudgetPeriod` zeroes the global, agent and model rows (`used`,
+  `estimated`, `conservativeCachedInput`, `actual`, `mock`, both costs) and drops their `mockCost`; the session row
+  loses only its mock part (`used` minus `mock.total`, `costAccountedUsd` minus `mockCost` with `money()`, `mock` and
+  `mockCost`) and keeps everything else. The session row is never journaled, so the journal format is unchanged and
+  its replica after a restart shows the durable rows at zero. The operator's answer differs from the written
+  recommendation in one point: the session row is not kept whole, only its real part is. `periodClears` says both
+  halves in the question and in Details; the pause sentence of a scope the mock filled offers the period beside a
+  higher limit and a restart, and a session row full of real spend still offers only those two. README, STATUS
+  (R5-6 rewritten, R5-11 added) and the Budgets help follow. Tests: `tests/budget-period.test.ts` rewritten (every
+  row, the session subtraction with a fictitious mock price, a twin server run with only the real call, the journal
+  replica, the wording) and a route test (new period 200, then resume releases the agent); the browser check adds
+  one PASS (the period then Resume make the agent Ready): 25 lines, none removed. Floor 539 → 540.
 
 #### Questions for João
 
@@ -996,6 +1009,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-10 | the refused resume says lost contact again | killed by "unverifiable usage names no cause it cannot know…" and the R5-4 pin; every file restored, sha256 identical |
 | R5-10 | the pause sentence says lost contact again | killed by the same and the R5-4 wording test |
 | R5-10 | Budgets says lost contact again | killed by the same |
+| R5-11 | the durable rows keep the mock's tokens again (`used: row.mock.total`) | killed by "a new budget period clears the mock's estimated tokens in every row…" ("global all starts again from zero") and by "a scope the mock filled is free after a new budget period…"; every file restored, sha256 identical |
+| R5-11 | the session row loses its real part too | killed by the first ("the session row loses exactly the mock part"). Its swap back matched twice, because the mutated line equalled the other branch; the line was restored by hand to the same sha256 |
+| R5-11 | `used` goes to zero but `mock` and `mockCost` stay | killed by the first ("global all starts again from zero", on `mock.total`) |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

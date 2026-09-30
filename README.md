@@ -188,7 +188,7 @@ The mock's estimated tokens count against the token limits too, so the mock alon
 Beside **Resume eligible agents**, Budgets says what the last resume did and, for every agent still paused, what holds
 it and what releases it: Pause all agents, usage that is unverifiable until a given time, an estimate waiting for the
 provider-confirmed usage, and every full scope with its dimension, including when the mock's estimated tokens fill it
-(a restart clears those; a new budget period keeps them). `GET /api/tokens` carries those holds as `pauses` (one entry
+(a restart or **Start a new budget period** clears those). `GET /api/tokens` carries those holds as `pauses` (one entry
 per paused agent: `agent`, `removed`, `reasons`); a resume answers the same snapshot with `resumed`, the agents it
 released, or 409 with the server's sentence when unverifiable usage refuses it. While anything is paused, the same
 command stands beside **Pause all agents** in the top bar and in **Commands** (Ctrl+K), a notice under the top bar
@@ -217,9 +217,10 @@ empty with each run. A call that was in flight when the server stopped comes bac
 paused, and keeps the deadline it would have had (request time + provider timeout + `reservationTtlMs`); it is never
 refunded. If the journal cannot be read it is set aside as `accounting-rejected-<time>.jsonl`,
 never overwritten, and real calls stay blocked (the mock still runs) until you check the invoice and choose **Start a
-new budget period** in Budgets. That action is journaled, keeps the history and limits, restarts real consumption in
-the global, agent and model budgets from zero (the mock's estimated tokens from this run and the session budget stay
-until a restart, and the question before it says so) and is refused while any reservation is open. It resumes no one: paused agents stay paused until **Resume eligible
+new budget period** in Budgets. That action is journaled, keeps the history and limits, restarts consumption in the
+global, agent and model budgets from zero and clears the mock's estimated tokens everywhere; the session budget keeps
+only what real calls spent since the server started, and the question before it says so. It is refused while any
+reservation is open. It resumes no one: paused agents stay paused until **Resume eligible
 agents**, and Budgets says so. The price file and its journal of reconciled intervals persist too. The response cache is off (`cacheTtlMs` is 0) until a real key has been
 validated; turning it on is an operator decision.
 
