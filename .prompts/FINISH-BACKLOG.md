@@ -538,7 +538,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-3 | One owner for pauses (C4) | The graph never shows a pause the token service does not hold, nor hides one it holds, after any command: an agent that leaves the graph leaves no pause behind unless it still holds a reservation, and an agent that comes back (reset, import, restore) or that the demo drives shows the token service's pause | done |
 | R5-4 | Every pause says why (C2) | The token snapshot carries, for each paused agent, what holds it (Pause all, unverifiable usage and until when, an estimate awaiting reconciliation, every full scope with its dimension and whether the mock's usage fills it); resume answers whom it released, and a refusal answers 409 with the server's sentence; Budgets says it by the button, from a pure function in `lib/budget-summary.ts`; contract documented and tested | done |
 | R5-5 | A visible way back (C3) | Resume eligible agents next to Pause all agents in the top bar while something is paused, and in Ctrl+K, with the same command and text; the panel of a Paused agent says why and opens Budgets; the kill switch refusal names the way | done |
-| R5-6 | A new budget period says what it clears (H5) | The dialog and Details say that the mock's usage and the session budget stay until a restart; the semantics wait for the operator | pending |
+| R5-6 | A new budget period says what it clears (H5) | The dialog and Details say that the mock's usage and the session budget stay until a restart; the semantics wait for the operator | done |
 | R5-7 | Pause and resume invariants | A seeded walk over pause all, resume, raise a limit, new period, reset, import, remove, add and a call refused by a full scope, with the invariants written and justified | pending |
 | R5-8 | Browser checks | The workspace check goes back from Pause all through the new Resume, and through a full scope that Resume cannot release until the limit rises; no PASS removed; REAL without a key shows Pause all and Resume and no Resume demo | pending |
 | R5-9 | Documentation | STATUS, CHANGELOG, README and a one-line guarantee in `AGENTS.md` | pending |
@@ -656,8 +656,39 @@ there is no Resume demo, so only a restart gets out.
   `openBudgets`, and shows both while the agent is Paused. The kill switch refusal already named the way (R5-2). The
   R4-3 test that pinned the save warning right after the top bar now allows the shared row. The browser check goes
   back from Pause all through the top bar, and again through Ctrl+K.
+- R5-6 (2026-09-30). Wording only; the service is unchanged. `startBudgetPeriod` zeroes real consumption in the
+  global, agent and model rows, sets their `used` back to the mock's process-local tokens and skips the session row,
+  as it did; the question before it and the Details line said "Consumption … starts again from zero", which is why
+  E3 × X4 left a scope the mock filled full after a period that claimed to empty it. Both now say `periodClears`
+  from `lib/budget-summary.ts`: "Real consumption in the global, agent and model budgets starts again from zero. The
+  mock's estimated tokens from this server run and the session budget stay until the server restarts." The test
+  ties the words to the behaviour: a period after one mock call and one keyed call (mocked transport) leaves real
+  consumption at zero, the mock's tokens in every non-session row and the session row untouched, and the question
+  and Details carry the same sentence, so a later change of semantics fails it until the words follow. Whether the
+  semantics should change is below.
 
 #### Questions for João
+
+- **R5-Q1 (H5)** A new budget period keeps the mock's estimated tokens of this server run and the session budget;
+  both clear only on a restart. Should a new period also zero either? What it changes in real spend: zeroing the
+  mock's usage gives back the token headroom the fictitious calls took in the global, agent and model rows, so real
+  calls could then use it, but only up to the limits you set, which do not move; zeroing the session row allows a
+  second full session budget of real spend before the next restart, which is exactly what that row exists to
+  prevent. Recommended: zero the mock's usage (it is not spend, and the mock's dollars are $0), keep the session row.
+  Until you answer, nothing changes and the screen says what stays.
+- **R5-Q2** An ordinary reservation that expires into an estimate does not hold its agent: the agent can be resumed
+  and call again while the estimate waits for the provider-confirmed usage. Only an unpriced served model's estimate
+  (A-10) holds it. Should every expired estimate hold its agent until Apply confirmed usage? It changes reservation
+  semantics (and blocks that agent until you reconcile), so it waits for you. Recommended: no; the estimate already
+  counts at its conservative price in every scope, and Budgets names it.
+- **R5-Q3** A call the budget refuses before sending pauses its agent (`execute`: a full scope, or a worst case that
+  does not fit, for example at 225 of 300 tokens). Run once asks for a quote first, which refuses without pausing, so
+  from the panel this pause comes from Test connection (its first agent) or a direct `complete` request (R5-1, S4).
+  When no scope is full, Budgets then says the agent is paused "and nothing holds it now", Resume releases it, and the
+  next such call pauses it again until a limit rises. Should a refusal that finds room in every scope, but not for
+  this call's worst case, stop pausing the agent (the call is refused either way and nothing is sent)? Or keep
+  pausing, with the scope and the worst case named? Either changes when an agent is paused, so it waits for you.
+  Recommended: pause only when a scope is full, which Resume already refuses to release.
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -863,6 +894,11 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-5 | the notice forgets the last answer | killed by the same |
 | R5-5 | a Paused agent's panel says nothing | killed by "the panel of a Paused agent says why and opens Budgets…" |
 | R5-5 | Commands has no Resume eligible agents | killed by the browser check ("Timed out: the palette offers Resume eligible agents") |
+| R5-6 | the question back to "Consumption … starts again from zero" | killed by "a new budget period clears real consumption only…" (the question does not start with `periodClears`); every file restored, sha256 identical |
+| R5-6 | the Details line back to the old words | killed by the same ("Details says the same") |
+| R5-6 | `periodClears` back to the old claim | killed by the same (the sentence no longer says real consumption) |
+| R5-6 | a new period also zeroes the mock's usage | killed by the same ("global all: the mock's estimated tokens stay"): the words and the behaviour move together |
+| R5-6 | a new period also zeroes the session row | killed by the same ("the session budget stays as it was") |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

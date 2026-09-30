@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { PricePanel } from './price-panel';
 import { useConfirm } from './confirm-dialog';
 import { CirclePause, Gauge } from 'lucide-react';
-import { budgetMeter, budgetStatus, callCount, idle, journalWarning, pauseSummary, percent, periodNotice, resumable, resumeOutcome, resumeReplyCurrent, rowUsage, scopes, usd, type BudgetRow } from '../lib/budget-summary';
+import { budgetMeter, budgetStatus, callCount, idle, journalWarning, pauseSummary, percent, periodClears, periodNotice, resumable, resumeOutcome, resumeReplyCurrent, rowUsage, scopes, usd, type BudgetRow } from '../lib/budget-summary';
 import { cn } from '../lib/utils';
 // The one GET reader for accounting evidence: the token snapshot and the receipts behind it.
 export function readAccounting(path: '/api/tokens', signal?: AbortSignal): Promise<TokenSnapshot>;
@@ -116,7 +116,7 @@ function ScopeRow({ row, name }: { row: BudgetRow; name: string }) {
 }
 // Resolves true only when the server started the period.
 export async function askToStartBudgetPeriod(command: TokenSource['command'], confirm: ReturnType<typeof useConfirm>) {
-  if (!await confirm({ message: 'Start a new budget period? Consumption in the global, agent and model budgets starts again from zero. The journal keeps everything recorded before, and limits and pauses stay as they are. Do this only after checking the provider invoice.', confirmLabel: 'Start a new budget period', destructive: true })) return false;
+  if (!await confirm({ message: `Start a new budget period? ${periodClears} The journal keeps everything recorded before, and limits and pauses stay as they are. Do this only after checking the provider invoice.`, confirmLabel: 'Start a new budget period', destructive: true })) return false;
   return command({ action: 'new-period' });
 }
 export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agents?: readonly { id: string; name: string }[] }) {
@@ -164,7 +164,7 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
         <p>Actual provider tokens: {total?.actual.total ?? 0} · Mock estimated tokens: {total?.mock.total ?? 0} · Saved tokens: {total?.saved ?? 0}</p>
         <p>Accounted cost (USD): {(total?.costAccountedUsd ?? 0).toFixed(9)} · Reserved worst-case cost: {(total?.costReservedUsd ?? 0).toFixed(9)} · Local price table date: {data?.priceDate ?? 'Unavailable'}</p>
         <p>Global, agent and model consumption, limits changed here, pauses and held reservations are journaled in the user data directory and survive a restart. The session budget and the mock&apos;s usage start empty with each server run. A call in flight when the server stops comes back unverifiable, with its agent paused.</p>
-        {data?.accounting.journal === 'recorded' && <p><Button disabled={pending} variant="outline" onClick={startPeriod}>Start a new budget period</Button> <span className="helper">Consumption starts again from zero; the journal keeps the history. Refused while a reservation is open.</span></p>}
+        {data?.accounting.journal === 'recorded' && <p><Button disabled={pending} variant="outline" onClick={startPeriod}>Start a new budget period</Button> <span className="helper">{periodClears} The journal keeps the history. Refused while a reservation is open.</span></p>}
         <p>Rows overlap: global, agent, model and session describe the same calls. Do not add rows together. Either dimension warns at 80% and pauses at 100%. Increase a limit, then resume explicitly.</p>
         <div className="token-table"><table><caption>Budgets and consumption</caption><thead><tr><th>Scope / ID</th><th>Token limit</th><th>USD limit</th><th>Actual input / output / total</th><th>Mock estimated input / output / total</th><th>Reserved / unverifiable / expired estimate</th><th>USD used / reserved / expired estimate</th><th>Budget status</th></tr></thead><tbody>
           {data?.rows.map(row => { const key = `${row.scope}:${row.id}`; const gone = 'removed' in row && !!row.removed; const why = gone ? 'A removed agent makes no calls; its row stays as history and has no limit to change.' : undefined; return <tr key={key}>

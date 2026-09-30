@@ -217,8 +217,9 @@ empty with each run. A call that was in flight when the server stopped comes bac
 paused, and keeps the deadline it would have had (request time + provider timeout + `reservationTtlMs`); it is never
 refunded. If the journal cannot be read it is set aside as `accounting-rejected-<time>.jsonl`,
 never overwritten, and real calls stay blocked (the mock still runs) until you check the invoice and choose **Start a
-new budget period** in Budgets. That action is journaled, keeps the history and limits, restarts consumption from zero
-and is refused while any reservation is open. It resumes no one: paused agents stay paused until **Resume eligible
+new budget period** in Budgets. That action is journaled, keeps the history and limits, restarts real consumption in
+the global, agent and model budgets from zero (the mock's estimated tokens from this run and the session budget stay
+until a restart, and the question before it says so) and is refused while any reservation is open. It resumes no one: paused agents stay paused until **Resume eligible
 agents**, and Budgets says so. The price file and its journal of reconciled intervals persist too. The response cache is off (`cacheTtlMs` is 0) until a real key has been
 validated; turning it on is an operator decision.
 

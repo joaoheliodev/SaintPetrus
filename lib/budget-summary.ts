@@ -119,6 +119,9 @@ export function resumeOutcome(reply: unknown, agentName: (id: string) => string)
   return resumed.length ? `Resumed ${listed(resumed.map(agentName))}.` : 'No agent was resumed.';
 }
 
+// What a new budget period clears, as the service does it: the mock's usage and the session scope are the process's own,
+// so only a restart empties them (Round 5, R5-6). The question before it and Details say the same.
+export const periodClears = "Real consumption in the global, agent and model budgets starts again from zero. The mock's estimated tokens from this server run and the session budget stay until the server restarts.";
 // After a new budget period starts: a period never resumes anyone, so say who is still paused and the way out.
 export function periodNotice(snapshot: { paused: readonly string[]; stopped: boolean }) {
   if (snapshot.stopped) return 'A new budget period has started. Pause all agents is still on, so every agent stays paused: use Resume eligible agents when you want them to run.';

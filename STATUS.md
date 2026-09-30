@@ -127,6 +127,11 @@ round's handoff); each fix below answers a cell that did not come back.
   beside Pause all agents in the top bar and in Commands (Ctrl+K), with the same command and answer as in Budgets; a
   notice under the top bar says what holds each agent and opens Budgets; the panel of a Paused agent says why and
   opens Budgets.
+- **R5-6** A new budget period says what it clears. It zeroes real consumption in the global, agent and model
+  budgets and leaves the mock's estimated tokens and the session budget to a restart, while its question and Details
+  said that consumption "starts again from zero", so a scope the mock filled stayed full after it. The words now say
+  what the service does; whether a new period should also clear the mock's usage or the session row is the
+  operator's question, since it changes how much can be spent.
 
 ## Not verified or pending
 

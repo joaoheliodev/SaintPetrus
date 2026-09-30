@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 5 on `main` (2026-09-30)
 
 The operator could not un-pause the agents. Every way into a pause was tried against every way out on fresh instances
-before anything changed. No request with a real key was made. The test floor rose from 514 to 534.
+before anything changed. No request with a real key was made. The test floor rose from 514 to 535.
 
 - After **Pause all agents** and **Resume eligible agents** the graph is usable again: Pause all no longer marks the
   run paused when no demo is running, so Import, Reset, Load demo and Graph limits are enabled and the server accepts
@@ -30,6 +30,9 @@ before anything changed. No request with a real key was made. The test floor ros
 - While anything is paused, **Resume eligible agents** stands beside **Pause all agents** in the top bar and in
   **Commands** (Ctrl+K), a notice under the top bar says what holds each agent and opens Budgets, and the panel of a
   Paused agent says why (R5-5).
+- **Start a new budget period** says what it clears: real consumption in the global, agent and model budgets. The
+  mock's estimated tokens from this server run and the session budget stay until a restart, as they always did; the
+  question and Details used to say that consumption "starts again from zero" (R5-6).
 
 ## Unreleased: Round 4 on `main` (2026-09-29)
 
