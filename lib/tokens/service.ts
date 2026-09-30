@@ -28,6 +28,16 @@ export type BillingVerdict = 'unbilled' | 'billed' | 'unverifiable';
 type Row = { scope: Scope; id: string; limit: number; used: number; reserved: number; estimated: number; conservativeCachedInput: number; actual: Totals; mock: Totals; costLimitUsd: number; costReservedUsd: number; costAccountedUsd: number; costUnmeasuredUsd: number; saved: number; unverifiable: number };
 type Reservation = { id: string; agent: string; model: string; provider: ProviderAdapter['id']; priceVersionId: string; priceVersions: ReturnType<PriceCatalog['capture']>; billingModel?: string; tokens: number; costUsd: number; inputTokens: number; maxOutputTokens: number; createdAt: number; expiresAt: number | null; status: 'inflight' | 'unverifiable' | 'estimated'; rows: Row[]; reported?: { prompt: number; completion: number; reasoning?: number } };
 // resumeAll undoes what pauseAll did outside the agents (the demo it paused) when Resume eligible agents turns Pause all off.
+type Dimension = 'tokens' | 'dollars';
+// What holds a paused agent, in the terms the server enforces (Round 5, R5-4): the panel words these, it never guesses them.
+export type PauseReason =
+  | { kind: 'pause_all' }
+  | { kind: 'unverifiable'; until: number | null }
+  | { kind: 'reconciliation'; reservationId: string }
+  | { kind: 'budget'; scope: Scope; id: string; dimensions: Dimension[]; mock: boolean }
+  | { kind: 'reservation'; reservationId: string; status: Reservation['status'] };
+// A resume refused because usage is unverifiable says until when, and what to do meanwhile.
+const unverifiableRefusal = (until: number | null) => `Usage unverifiable: a call lost contact with its provider, so no agent can be resumed ${until === null ? 'until its reservation expires' : `until ${new Date(until).toISOString()}, when its reservation becomes an estimate`}. Check the provider billing meanwhile.`;
 type Hooks = { pause: (id: string) => void; pauseAll: () => void; resumeAll?: () => void; ids: () => string[]; role?: (id: string) => string };
 type JournalWriter = { append(entry: JournalRecord): void };
 // memory: nothing is journaled (tests, tools). recorded: every durable change is on disk. blocked: the journal could not be
@@ -80,6 +90,41 @@ export class TokenService {
   private scopes(agent: string, model: string) { return [this.budgetRow('global', 'all'), this.budgetRow('agent', agent), this.budgetRow('model', model), this.budgetRow('session', this.sessionId)]; }
   private blocked(row: Row) { return row.used + row.reserved >= row.limit || row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd; }
   private warning(row: Row) { return row.used + row.reserved >= row.limit * .8 || row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd * .8; }
+  // The scopes a call of this agent is checked against: the shared ones, its own, and those of the models it has called.
+  private appliesTo(row: Row, id: string) { return row.scope === 'global' || row.scope === 'session' || (row.scope === 'agent' && row.id === id) || (row.scope === 'model' && !!this.agentModels.get(id)?.has(row.id)); }
+  private fullIn(row: Row) {
+    const dimensions: Dimension[] = [];
+    if (row.used + row.reserved >= row.limit) dimensions.push('tokens');
+    if (row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd) dimensions.push('dollars');
+    return dimensions;
+  }
+  // The mock's usage lives only as long as the process: a restart clears it and a new budget period keeps it.
+  private filledByMock(row: Row) {
+    const mockCost = this.mockCost.get(row) ?? 0;
+    return (row.mock.total > 0 || mockCost > 0) && row.used - row.mock.total + row.reserved < row.limit && row.costAccountedUsd - mockCost + row.costReservedUsd < row.costLimitUsd;
+  }
+  // While any usage is unverifiable no agent resumes; until is when the last such reservation becomes an estimate.
+  private unverifiable() {
+    if (![...this.rows.values()].some(row => row.unverifiable > 0)) return undefined;
+    const deadlines: number[] = []; let open = false;
+    for (const item of this.reservations.values()) if (item.status === 'unverifiable') { if (item.expiresAt === null) open = true; else deadlines.push(item.expiresAt); }
+    return { until: open || !deadlines.length ? null : Math.max(...deadlines) };
+  }
+  // Every hold on an agent's pause. resume() releases an agent only when nothing but Pause all is left.
+  private holds(id: string): PauseReason[] {
+    const reasons: PauseReason[] = [];
+    if (this.stopped) reasons.push({ kind: 'pause_all' });
+    const lost = this.unverifiable(); if (lost) reasons.push({ kind: 'unverifiable', until: lost.until });
+    const present = this.hooks.ids().includes(id);
+    for (const item of this.reservations.values()) {
+      if (item.agent !== id) continue;
+      // A removed agent keeps its pause only for a reservation (prunePauses), so that reservation is its reason.
+      if (!present) reasons.push({ kind: 'reservation', reservationId: item.id, status: item.status });
+      else if (item.status === 'estimated' && item.reported) reasons.push({ kind: 'reconciliation', reservationId: item.id });
+    }
+    if (present) for (const row of this.rows.values()) if (this.appliesTo(row, id) && this.blocked(row)) reasons.push({ kind: 'budget', scope: row.scope, id: row.id, dimensions: this.fullIn(row), mock: this.filledByMock(row) });
+    return reasons;
+  }
   // A reset can drop the agent from the graph mid-call; a failing projection hook must not undo settled accounting.
   private pause(id: string) { this.paused.add(id); try { this.hooks.pause(id); } catch { /* The recorded pause still applies. */ } this.persist(); }
   // The graph shows exactly the pauses held here (docs/reference/state-ownership.md).
@@ -209,17 +254,14 @@ export class TokenService {
   holdsReservation(agent: string) { this.expireReservations(); return [...this.reservations.values()].some(item => item.agent === agent); }
   resume(agent?: string): string[] {
     this.expireReservations(); this.prunePauses();
-    if ([...this.rows.values()].some(row => row.unverifiable > 0)) throw new TokenFailure('Usage unverifiable; restart only after checking provider billing.');
+    const lost = this.unverifiable();
+    if (lost) throw new TokenFailure(unverifiableRefusal(lost.until));
     const wasStopped = this.stopped;
     if (!agent) this.stopped = false;
     const resumed: string[] = [];
-    // An unpriced served model's estimate is only a floor: its agent waits for manual reconciliation.
-    const awaiting = new Set([...this.reservations.values()].filter(item => item.status === 'estimated' && item.reported).map(item => item.agent));
-    for (const id of agent ? [agent] : this.hooks.ids()) {
-      if (awaiting.has(id)) continue;
-      const blocked = [...this.rows.values()].some(row => (row.scope === 'global' || row.scope === 'session' || (row.scope === 'agent' && row.id === id) || (row.scope === 'model' && this.agentModels.get(id)?.has(row.id))) && this.blocked(row));
-      if (!blocked && this.paused.delete(id)) resumed.push(id);
-    }
+    // The holds the snapshot reports are the ones that keep an agent here: a full scope, and an unpriced served model's
+    // estimate, which is only a floor until it is reconciled by hand. Pause all is turned off above, or left to plan().
+    for (const id of agent ? [agent] : this.hooks.ids()) if (!this.holds(id).some(reason => reason.kind !== 'pause_all') && this.paused.delete(id)) resumed.push(id);
     this.persist();
     // Like the pause hook, a failing projection must not undo what was just recorded.
     if (wasStopped && !this.stopped) try { this.hooks.resumeAll?.(); } catch { /* The recorded resume still applies. */ }
@@ -271,7 +313,8 @@ export class TokenService {
     for (const id of Object.keys(this.policy.models)) this.row('model', id, this.policy.perModel, this.policy.costLimitsUsd.perModel);
     const reservations = [...this.reservations.values()].filter(item => item.status !== 'inflight').map(item => ({ id: item.id, agent: item.agent, model: item.model, ...(item.billingModel ? { servedModel: item.billingModel } : {}), priceVersionId: item.priceVersionId, tokens: item.tokens, costUsd: item.costUsd, createdAt: item.createdAt, expiresAt: item.expiresAt, status: item.status }));
     const prices = Object.fromEntries(Object.entries(this.catalog.capture(this.now())).map(([model, version]) => [model, version.price]));
-    return { sessionId: this.sessionId, accounting: this.accountingStatus(), stopped: this.stopped, paused: [...this.paused], priceDate: this.prices.date, prices, catalog: this.catalog.snapshot(), models: this.policy.models, cacheTtlMs: this.policy.cacheTtlMs, reservationTtlMs: this.policy.reservationTtlMs, reservations, rows: [...this.rows.values()].map(row => ({ ...structuredClone(row), state: this.blocked(row) ? 'stopped' : this.warning(row) ? 'warning' : 'available', ...(row.scope === 'agent' && !ids.includes(row.id) ? { removed: true } : {}) })) };
+    const pauses = [...this.paused].map(id => ({ agent: id, removed: !ids.includes(id), reasons: this.holds(id) }));
+    return { sessionId: this.sessionId, accounting: this.accountingStatus(), stopped: this.stopped, paused: [...this.paused], pauses, priceDate: this.prices.date, prices, catalog: this.catalog.snapshot(), models: this.policy.models, cacheTtlMs: this.policy.cacheTtlMs, reservationTtlMs: this.policy.reservationTtlMs, reservations, rows: [...this.rows.values()].map(row => ({ ...structuredClone(row), state: this.blocked(row) ? 'stopped' : this.warning(row) ? 'warning' : 'available', ...(row.scope === 'agent' && !ids.includes(row.id) ? { removed: true } : {}) })) };
   }
   private refuse(agent: string, message: string): never {
     eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'budget.refused', severity: 'warning', payload: message });

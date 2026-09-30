@@ -23,12 +23,15 @@ export async function POST(request: Request) {
     else if (data.action === 'new-period') service.startBudgetPeriod();
     else if (data.action === 'reconcile') service.reconcileReservation(String(data.reservationId), data.prompt, data.completion, data.costUsd);
     else if (data.action === 'resume') {
-      for (const id of service.resume()) graphRuntime().graph.compareAndSetAgentStatus(id, 'paused', 'ready');
+      const resumed = service.resume();
+      for (const id of resumed) graphRuntime().graph.compareAndSetAgentStatus(id, 'paused', 'ready');
+      // Whom it released, beside the snapshot's pauses, which say why the others stay paused (Round 5, R5-4).
+      return safeJson({ ...service.snapshot(), resumed });
     } else throw new Error();
     return safeJson(service.snapshot());
   } catch (error) {
-    // Only a new budget period explains its refusal: its reasons are the server's own sentences, never input.
-    if (action === 'new-period' && error instanceof TokenFailure) return safeJson({ error: error.message }, 409);
+    // A new budget period and a resume explain their refusal: the reasons are the server's own sentences, never input.
+    if ((action === 'new-period' || action === 'resume') && error instanceof TokenFailure) return safeJson({ error: error.message }, 409);
     return safeJson({ error: 'Token control rejected. Check scope, limits and unverifiable usage.' }, 400);
   }
 }

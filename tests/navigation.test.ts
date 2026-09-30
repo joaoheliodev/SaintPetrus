@@ -9,7 +9,7 @@ import type { ProviderStatusSnapshot } from '../lib/providers/runtime';
 
 const status: ProviderStatusSnapshot = { provider: 'mock', model: 'mock-v1', connected: true, mocked: true, mockAvailable: true, verified: true, state: 'verified', mode: 'mock' };
 const source = { status, unavailable: false, refresh: async () => {} };
-const tokens: TokenSource = { data: undefined, error: '', pending: false, priceError: '', command: async () => true };
+const tokens: TokenSource = { data: undefined, error: '', pending: false, priceError: '', command: async () => true, resume: async () => true, resumeReply: undefined };
 
 test('U4 the sidebar reaches every view, and Budgets, Prices and Connection are views rather than dialogs', async () => {
   const workspace = await readFile('components/workspace.tsx', 'utf8');

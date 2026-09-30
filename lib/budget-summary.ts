@@ -37,12 +37,16 @@ export const idle = (row: BudgetRow) => row.used + row.reserved + row.estimated 
 export const usd = (value: number) => value === 0 ? '$0.00' : Math.abs(value) < 0.01 ? `$${value.toFixed(6)}` : `$${value.toFixed(2)}`;
 
 export type BudgetStatus = { tone: 'green' | 'amber' | 'red'; text: string };
+const listed = (items: readonly string[]) => items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+// The dimensions in which a row is at its limit, as the server enforces them.
+const fullIn = (row: BudgetRow) => [...(row.used + row.reserved >= row.limit ? ['tokens'] : []), ...(row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd ? ['dollars'] : [])].join(' and ') || rowUsage(row).dimension;
 // One sentence: what is wrong, if anything, and the way out. Names come from the graph; a removed agent keeps its id.
 export function budgetStatus(snapshot: { rows: readonly BudgetRow[]; stopped: boolean; reservations: readonly { status: string }[]; accounting?: JournalState }, name: (row: BudgetRow) => string): BudgetStatus {
   const label = (row: BudgetRow) => row.scope === 'global' || row.scope === 'session' ? `the ${row.scope} budget` : `the ${row.scope} budget for ${name(row)}`;
   if (snapshot.rows.some(row => row.unverifiable > 0)) return { tone: 'red', text: 'A call lost contact with its provider, so its usage is unverifiable. Its reservation stays held until it expires into an estimate; check the provider billing, then apply the confirmed usage in Details.' };
-  const stopped = snapshot.rows.find(row => row.state === 'stopped');
-  if (stopped) return { tone: 'red', text: `Blocked: ${label(stopped)} is full in ${rowUsage(stopped).dimension}. Raise its limit in Details, then use Resume eligible agents.` };
+  // Every full scope, since raising one limit may not be enough; a removed agent's row blocks no call and cannot be raised.
+  const stopped = snapshot.rows.filter(row => row.state === 'stopped' && !('removed' in row && row.removed));
+  if (stopped.length) return { tone: 'red', text: `Blocked: ${listed(stopped.map(row => `${label(row)} is full in ${fullIn(row)}`))}. Raise ${stopped.length === 1 ? 'its limit' : 'their limits'} in Details, then use Resume eligible agents.` };
   if (snapshot.stopped) return { tone: 'red', text: 'Every agent is paused by Pause all agents. Use Resume eligible agents when you want them to run again.' };
   const estimated = snapshot.reservations.filter(item => item.status === 'estimated').length;
   if (estimated) return { tone: 'amber', text: `${estimated} expired ${estimated === 1 ? 'reservation is' : 'reservations are'} counted as an estimate until you apply the provider-confirmed usage in Details.` };
@@ -60,6 +64,59 @@ export function journalWarning(accounting: JournalState) {
   if (accounting.reason === 'journal_unopenable') return { text: 'Real calls are blocked: the accounting journal cannot be opened. Fix access to it in the user data directory, then restart the server. The mock still runs.', canStartPeriod: false };
   if (accounting.reason === 'journal_write_failed') return { text: 'Real calls are blocked: the accounting journal could not be written, so the file lags what this screen shows. Check the disk, then start a new budget period. The mock still runs.', canStartPeriod: true };
   return { text: `Real calls are blocked: the accounting journal could not be read${accounting.rejectedAs ? ` and was set aside as ${accounting.rejectedAs}` : ' and was set aside'}. Nothing restarted from zero on its own. Check the provider invoice, then start a new budget period. The mock still runs.`, canStartPeriod: true };
+}
+
+// Why paused agents stay paused, worded from the holds the server reports in its snapshot (Round 5, R5-4): the panel
+// never infers a reason of its own.
+type Pause = TokenSnapshot['pauses'][number];
+const reservationStates: Record<TokenSnapshot['reservations'][number]['status'], string> = { inflight: 'still in flight', unverifiable: 'unverifiable', estimated: 'an expired estimate' };
+const scopeLabel = (scope: BudgetRow['scope'], id: string, agentName: (id: string) => string) => scope === 'global' || scope === 'session' ? `the ${scope} budget` : `the ${scope} budget for ${scope === 'agent' ? agentName(id) : id}`;
+const clockTime = (at: number) => `${new Date(at).toISOString().slice(11, 16)} UTC`;
+const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+// One paused agent: everything that holds it, then what releases it.
+export function pauseSentence(pause: Pause, agentName: (id: string) => string) {
+  const who = pause.removed ? `A removed agent (${pause.agent.slice(0, 8)})` : agentName(pause.agent);
+  const holds: string[] = []; const steps: string[] = []; let mock = false; let session = false; let lost = false; let budgets = 0;
+  for (const reason of pause.reasons) {
+    if (reason.kind === 'pause_all') holds.push('Pause all agents is on');
+    else if (reason.kind === 'unverifiable') { lost = true; holds.push(`a call lost contact with its provider, so usage is unverifiable ${reason.until === null ? 'until its reservation expires' : `until ${clockTime(reason.until)}`}`); }
+    else if (reason.kind === 'reconciliation') { holds.push(`its expired estimate ${reason.reservationId} waits for the provider-confirmed usage`); steps.push(`apply the confirmed usage to ${reason.reservationId} in Details`); }
+    else if (reason.kind === 'reservation') { holds.push(`its reservation ${reason.reservationId} is ${reservationStates[reason.status]}`); steps.push(`settle ${reason.reservationId} in Details`); }
+    else { budgets++; mock ||= reason.mock; session ||= reason.scope === 'session'; holds.push(`${scopeLabel(reason.scope, reason.id, agentName)} is full in ${reason.dimensions.join(' and ')}${reason.mock ? ", filled by the mock's estimated tokens" : ''}`); }
+  }
+  if (!holds.length) return `${who} is paused, and nothing holds it now: use Resume eligible agents.`;
+  const restart = mock ? " or restart the server, which clears the mock's estimated tokens (a new budget period keeps them)" : session ? ' or restart the server, which starts a new session budget' : '';
+  if (budgets) steps.unshift(`raise ${budgets === 1 ? 'its limit' : 'their limits'} in Details${restart}`);
+  if (lost) steps.unshift('check the provider billing and wait until then');
+  // A removed agent's pause goes with its settled reservation (Round 5, R5-3); only a present agent needs a resume.
+  if (!pause.removed) steps.push('use Resume eligible agents');
+  return `${who} is paused: ${listed(holds)}. ${sentence(steps.join(', then '))}${pause.removed ? '; the pause goes with it then' : ''}.`;
+}
+// Everything paused, as one headline and a line per agent that something other than Pause all still holds.
+export function pauseSummary(snapshot: { stopped: boolean; pauses: readonly Pause[] }, agentName: (id: string) => string) {
+  if (snapshot.stopped) {
+    const held = snapshot.pauses.map(pause => ({ ...pause, reasons: pause.reasons.filter(reason => reason.kind !== 'pause_all') })).filter(pause => pause.reasons.length);
+    return { headline: 'Pause all agents is on, so every agent is paused. Use Resume eligible agents to run them again.', details: held.length ? ['These stay paused after that:', ...held.map(pause => pauseSentence(pause, agentName))] : [] };
+  }
+  if (!snapshot.pauses.length) return undefined;
+  const count = snapshot.pauses.length;
+  return { headline: `${count} ${count === 1 ? 'agent is' : 'agents are'} paused.`, details: snapshot.pauses.map(pause => pauseSentence(pause, agentName)) };
+}
+export const resumable = (snapshot: { stopped: boolean; pauses: readonly unknown[] } | undefined) => !!snapshot && (snapshot.stopped || snapshot.pauses.length > 0);
+// A resume's answer stays true until the pauses change; then it is dropped rather than shown beside a newer state.
+export function resumeReplyCurrent(reply: unknown, snapshot: { paused: readonly string[] }) {
+  const body = reply !== null && typeof reply === 'object' ? reply : {};
+  if (typeof Reflect.get(body, 'error') === 'string') return snapshot.paused.length > 0;
+  const paused = Reflect.get(body, 'paused');
+  return Array.isArray(paused) && paused.length === snapshot.paused.length && paused.every(id => snapshot.paused.includes(id));
+}
+// What the last Resume eligible agents answered: whom it released, or the server's refusal. undefined when unreadable.
+export function resumeOutcome(reply: unknown, agentName: (id: string) => string) {
+  const body = reply !== null && typeof reply === 'object' ? reply : {};
+  const error = Reflect.get(body, 'error'); const resumed = Reflect.get(body, 'resumed');
+  if (typeof error === 'string') return error;
+  if (!Array.isArray(resumed) || !resumed.every(id => typeof id === 'string')) return undefined;
+  return resumed.length ? `Resumed ${listed(resumed.map(agentName))}.` : 'No agent was resumed.';
 }
 
 // After a new budget period starts: a period never resumes anyone, so say who is still paused and the way out.

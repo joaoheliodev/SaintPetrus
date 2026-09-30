@@ -75,7 +75,7 @@ test('R-02 Budgets warns when the journal blocks real calls, and offers the way 
   assert.match(journalWarning({ journal: 'blocked', reason: 'journal_unreadable', rejectedAs: 'accounting-rejected-x.jsonl' })?.text ?? '', /set aside as accounting-rejected-x\.jsonl\. Nothing restarted from zero/);
   assert.match(journalWarning({ journal: 'blocked', reason: 'journal_write_failed' })?.text ?? '', /could not be written/);
   const service = new TokenService(policy, prices, { ids: () => ['a'], pause: () => {}, pauseAll: () => {} });
-  const render = () => renderToStaticMarkup(React.createElement(BudgetsView, { tokens: { data: service.snapshot(), error: '', pending: false, priceError: '', command: async () => true }, agents: [] }));
+  const render = () => renderToStaticMarkup(React.createElement(BudgetsView, { tokens: { data: service.snapshot(), error: '', pending: false, priceError: '', command: async () => true, resume: async () => true, resumeReply: undefined }, agents: [] }));
   assert.doesNotMatch(render(), /Start a new budget period|role="alert"/, 'nothing to offer without a journal');
   service.journalUnopenable();
   assert.match(render(), /role="alert" class="journal-warning"><p>Real calls are blocked: the accounting journal cannot be opened/);
@@ -90,7 +90,7 @@ test('R-02 a journaled service offers a new period in Details, and a recovered c
   await new Promise(resolve => setImmediate(resolve));
   const second = new TokenService(policy, prices, { ids: () => ['a'], pause: () => {}, pauseAll: () => {} });
   second.restore(new AccountingJournal(directory));
-  const markup = renderToStaticMarkup(React.createElement(BudgetsView, { tokens: { data: second.snapshot(), error: '', pending: false, priceError: '', command: async () => true }, agents: [] }));
+  const markup = renderToStaticMarkup(React.createElement(BudgetsView, { tokens: { data: second.snapshot(), error: '', pending: false, priceError: '', command: async () => true, resume: async () => true, resumeReply: undefined }, agents: [] }));
   assert.match(markup, /1 provider call was in flight when the server stopped\. It came back unverifiable and its agent is paused\./);
   assert.match(markup.slice(markup.indexOf('<details')), />Start a new budget period</);
   assert.doesNotMatch(markup, /role="alert"/);

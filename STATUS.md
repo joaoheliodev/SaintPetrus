@@ -115,6 +115,13 @@ round's handoff); each fix below answers a cell that did not come back.
   Coordinator a Ready card while Run once still answered "Agent paused.". Now such a pause goes with its agent
   (unless the agent still holds a reservation, so that it comes back paused), a reset, an import or a restore shows
   the pauses still held, and the demo never overwrites one.
+- **R5-4** Every pause says why. A resume that released nobody answered 200 with nothing on screen, a resume refused
+  by unverifiable usage answered the generic "Token control rejected…", and the summary named only the first full
+  scope. Now the token snapshot carries, for every paused agent, what holds it (Pause all agents, unverifiable usage
+  and until when, an estimate awaiting reconciliation, every full scope with its dimension and whether the mock's
+  usage fills it, or a removed agent's reservation); a resume answers whom it released, a refusal answers 409 with the
+  server's sentence, and Budgets words both beside the button. The summary names every full scope, leaves out a
+  removed agent's row (it blocks nothing), and Details offers no limit for one (the server refuses it).
 
 ## Not verified or pending
 

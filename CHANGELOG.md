@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 5 on `main` (2026-09-30)
 
 The operator could not un-pause the agents. Every way into a pause was tried against every way out on fresh instances
-before anything changed. No request with a real key was made. The test floor rose from 514 to 524.
+before anything changed. No request with a real key was made. The test floor rose from 514 to 531.
 
 - After **Pause all agents** and **Resume eligible agents** the graph is usable again: Pause all no longer marks the
   run paused when no demo is running, so Import, Reset, Load demo and Graph limits are enabled and the server accepts
@@ -20,6 +20,13 @@ before anything changed. No request with a real key was made. The test floor ros
   **Resume eligible agents** enabled forever (unless it still holds a reservation); after a reset, an import or a
   restart an agent the token service holds shows Paused instead of a Ready card that Run once refuses, and the demo
   no longer overwrites a pause (R5-3).
+- Every pause says why. `GET /api/tokens` gains `pauses`: for each paused agent, `agent`, `removed` and `reasons`
+  (Pause all agents, unverifiable usage with the time it ends, an estimate awaiting reconciliation, each full scope
+  with its dimensions and whether the mock's usage fills it, or a removed agent's reservation). `POST /api/tokens`
+  `{ action: 'resume' }` adds `resumed`, and a refusal for unverifiable usage answers 409 with the server's sentence
+  instead of the generic 400. Budgets words the answer and every hold beside **Resume eligible agents**; its summary
+  names every full scope, not only the first, and leaves out a removed agent's row, whose limits Details no longer
+  offers (R5-4).
 
 ## Unreleased: Round 4 on `main` (2026-09-29)
 

@@ -536,7 +536,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-A | A new critical advisory | `npm audit --audit-level=high` turned red during the round (GHSA-vcvr-r3jv-pc5j, remote code execution in `next/og` ImageResponse, `next` 16.2.0 to 16.3.5): take the patch release and a green gate, in its own commit | done |
 | R5-2 | Pause all leaves no dead end (C1) | After Pause all agents and Resume eligible agents, with nothing else holding them, every agent is Ready, the run is not `paused` unless the demo was paused with Pause demo, Import, Reset, Load demo and Graph limits are enabled and the server accepts remove and import, in MOCK and in REAL; a demo that Pause all paused goes on; a demo paused on purpose says on screen how to finish it; with Pause all on, the graph route keeps refusing start, resume, add, reset and preview-mock, and import joins them | done |
 | R5-3 | One owner for pauses (C4) | The graph never shows a pause the token service does not hold, nor hides one it holds, after any command: an agent that leaves the graph leaves no pause behind unless it still holds a reservation, and an agent that comes back (reset, import, restore) or that the demo drives shows the token service's pause | done |
-| R5-4 | Every pause says why (C2) | The token snapshot carries, for each paused agent, what holds it (Pause all, unverifiable usage and until when, an estimate awaiting reconciliation, every full scope with its dimension and whether the mock's usage fills it); resume answers whom it released, and a refusal answers 409 with the server's sentence; Budgets says it by the button, from a pure function in `lib/budget-summary.ts`; contract documented and tested | pending |
+| R5-4 | Every pause says why (C2) | The token snapshot carries, for each paused agent, what holds it (Pause all, unverifiable usage and until when, an estimate awaiting reconciliation, every full scope with its dimension and whether the mock's usage fills it); resume answers whom it released, and a refusal answers 409 with the server's sentence; Budgets says it by the button, from a pure function in `lib/budget-summary.ts`; contract documented and tested | done |
 | R5-5 | A visible way back (C3) | Resume eligible agents next to Pause all agents in the top bar while something is paused, and in Ctrl+K, with the same command and text; the panel of a Paused agent says why and opens Budgets; the kill switch refusal names the way | pending |
 | R5-6 | A new budget period says what it clears (H5) | The dialog and Details say that the mock's usage and the session budget stay until a restart; the semantics wait for the operator | pending |
 | R5-7 | Pause and resume invariants | A seeded walk over pause all, resume, raise a limit, new period, reset, import, remove, add and a call refused by a full scope, with the invariants written and justified | pending |
@@ -633,6 +633,21 @@ there is no Resume demo, so only a restart gets out.
   ready, and `setAgentStatus` and the demo's exhausted budget never replace a held pause; only the token service's
   release (`compareAndSetAgentStatus` after `resume`) does. Graphs built for tests and files follow no one.
   `docs/reference/state-ownership.md` says the token service owns every pause.
+- R5-4 (2026-09-30). `TokenService.holds(id)` lists what holds an agent, in the server's terms: `pause_all`,
+  `unverifiable` (with `until`, the latest deadline of an unverifiable reservation), `reconciliation` (an unpriced
+  served model's estimate), `budget` for every full scope the agent's calls are checked against (the same scopes
+  `resume` checked before: global, session, its agent row and the models it called), with `dimensions` and `mock`
+  (the row would have room without the mock's process-local usage), and `reservation` for a removed agent that keeps
+  its pause. `resume` releases an agent only when nothing but Pause all holds it, the rule it had, now on one code
+  path with the snapshot's `pauses`; a refusal names until when ("Usage unverifiable: … until <ISO time>, when its
+  reservation becomes an estimate. Check the provider billing meanwhile."; the accounting-restore test's
+  `/Usage unverifiable/` still holds). The route adds `resumed` and answers a refused resume with 409 and that
+  sentence, as a new period already did. `lib/budget-summary.ts` words it: `pauseSentence` (one agent, every hold and
+  what releases it), `pauseSummary` (Pause all as one headline, then only what else holds someone), `resumeOutcome`
+  and `resumeReplyCurrent` (a resume's answer is dropped once the pauses change). `useTokenSnapshot.resume` goes
+  through `command`, which can hand its reply to a caller; no new `fetch` (the ratchet allows none). `budgetStatus`
+  names every full scope and skips a removed agent's row; Details disables its limits, which the server refuses. Five
+  test fixtures that build a `TokenSource` by hand gained `resume` and `resumeReply`.
 
 #### Questions for João
 
@@ -821,6 +836,20 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-3 | an import forgets held pauses | killed by "an import shows the pause the token service holds…" |
 | R5-3 | the demo's exhausted budget overwrites a held pause | killed by "a held pause survives the demo running out of its budget" |
 | R5-3 | the process graph is never told (`followPauses` not wired) | killed by the reset and the import tests |
+| R5-4 | no budget reason is reported | killed by "the snapshot says what holds each paused agent…", "resume answers whom it released…", "Budgets says…" and RF-06 "resume cannot erase exhaustion"; every file restored, sha256 identical |
+| R5-4 | the dollar dimension is never named | killed by "the snapshot says what holds each paused agent…" |
+| R5-4 | the mock is never named | killed by the same, "resume answers…" and "Budgets says…" |
+| R5-4 | `until` dropped | killed by "unverifiable usage says until when…" and "resume answers…, and a refusal is the server sentence" |
+| R5-4 | resume releases what a reconciliation holds | killed by "unverifiable usage says until when…" and A-10 "the agent stays paused until the estimate is reconciled by hand" |
+| R5-4 | a removed agent names no reservation | killed by "unverifiable usage says until when…" |
+| R5-4 | resume answers no `resumed` | killed by "resume answers whom it released…" |
+| R5-4 | a refused resume is the generic 400 again | killed by the same |
+| R5-4 | the sentence forgets the mock | killed by "the panel words every hold…" and "Budgets says…" |
+| R5-4 | the status names the first full scope only | killed by "the status names every full scope…" |
+| R5-4 | a removed agent's row blocks again | killed by the same |
+| R5-4 | an outdated resume answer is shown | killed by "the panel words every hold…" and "Budgets says…" |
+| R5-4 | Budgets hides the holds | killed by "Budgets says…" |
+| R5-4 | a removed agent row offers limits again | killed by "a removed agent row offers no limit to change…" |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

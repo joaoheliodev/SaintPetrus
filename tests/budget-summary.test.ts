@@ -62,14 +62,14 @@ test('U5 Budgets opens with the summary and the used scopes, and keeps every fie
   const prices: Prices = { date: '2026-09-27', currency: 'USD', models: { 'test-model': { effectiveAt: '1970-01-01', verifiedAt: '1970-01-01', peakWindowsUtc: [], offPeak: band, peak: band }, 'other-model': { effectiveAt: '1970-01-01', verifiedAt: '1970-01-01', peakWindowsUtc: [], offPeak: band, peak: band } } };
   const service = new TokenService(policy, prices, { ids: () => ['a1', 'a2'], pause: () => {}, pauseAll: () => {} });
   service.setLimit('agent', 'a1', 10);
-  const markup = renderToStaticMarkup(React.createElement(BudgetsView, { tokens: { data: service.snapshot(), error: '', pending: false, priceError: '', command: async () => true }, agents: [{ id: 'a1', name: 'Writer' }, { id: 'a2', name: 'Critic' }] }));
+  const markup = renderToStaticMarkup(React.createElement(BudgetsView, { tokens: { data: service.snapshot(), error: '', pending: false, priceError: '', command: async () => true, resume: async () => true, resumeReply: undefined }, agents: [{ id: 'a1', name: 'Writer' }, { id: 'a2', name: 'Critic' }] }));
   const summary = markup.slice(markup.indexOf('aria-label="Budget summary"'), markup.indexOf('<details'));
   assert.match(summary, /All budgets have room\./); assert.match(summary, /0 of 1,000 tokens/); assert.match(summary, /0 held or expired reservations/);
   assert.match(markup, /The mock&#x27;s estimated tokens count against the token limits too/);
   assert.equal(markup.match(/>Resume eligible agents</g)?.length, 1, 'one Resume, in the summary');
   assert.match(summary, /<button[^>]*disabled=""[^>]*>Resume eligible agents<\/button><span class="helper">Nothing is paused\.<\/span>/, 'nothing to resume, and it says so');
   service.kill();
-  const paused = renderToStaticMarkup(React.createElement(BudgetsView, { tokens: { data: service.snapshot(), error: '', pending: false, priceError: '', command: async () => true }, agents: [] }));
+  const paused = renderToStaticMarkup(React.createElement(BudgetsView, { tokens: { data: service.snapshot(), error: '', pending: false, priceError: '', command: async () => true, resume: async () => true, resumeReply: undefined }, agents: [] }));
   assert.doesNotMatch(paused, /Nothing is paused/); assert.match(paused, /Every agent is paused by Pause all agents/);
   const priceMarkup = renderToStaticMarkup(React.createElement(PricePanel, { catalog: service.snapshot().catalog, allowlisted: ['test-model'], pending: false, error: '', onAppend: async () => true }));
   assert.equal(priceMarkup.match(/Not in the model allowlist/g)?.length, 1, 'only the priced model outside the allowlist is marked');

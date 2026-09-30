@@ -185,6 +185,12 @@ a call whose reservation would pass any limit is refused before provider I/O and
 further calls are blocked. Raising a limit does not restart work: use **Resume eligible agents**. The view opens
 with a summary and one sentence saying what is blocked and how to unblock it; the full table is under **Details**.
 The mock's estimated tokens count against the token limits too, so the mock alone can reach a limit.
+Beside **Resume eligible agents**, Budgets says what the last resume did and, for every agent still paused, what holds
+it and what releases it: Pause all agents, usage that is unverifiable until a given time, an estimate waiting for the
+provider-confirmed usage, and every full scope with its dimension, including when the mock's estimated tokens fill it
+(a restart clears those; a new budget period keeps them). `GET /api/tokens` carries those holds as `pauses` (one entry
+per paused agent: `agent`, `removed`, `reasons`); a resume answers the same snapshot with `resumed`, the agents it
+released, or 409 with the server's sentence when unverifiable usage refuses it.
 **Pause all agents** cancels the active provider request and pauses a running demo too. **Resume eligible agents**
 lets that demo go on; a demo paused with **Pause demo** waits for **Resume demo**, or **Reset graph** ends it. While
 Pause all agents is on, reset, import, adding an agent and the demo are refused with a sentence that names the way out.

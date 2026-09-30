@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { PricePanel } from './price-panel';
 import { useConfirm } from './confirm-dialog';
 import { Gauge } from 'lucide-react';
-import { budgetMeter, budgetStatus, callCount, idle, journalWarning, percent, periodNotice, rowUsage, scopes, usd, type BudgetRow } from '../lib/budget-summary';
+import { budgetMeter, budgetStatus, callCount, idle, journalWarning, pauseSummary, percent, periodNotice, resumable, resumeOutcome, resumeReplyCurrent, rowUsage, scopes, usd, type BudgetRow } from '../lib/budget-summary';
 import { cn } from '../lib/utils';
 // The one GET reader for accounting evidence: the token snapshot and the receipts behind it.
 export function readAccounting(path: '/api/tokens', signal?: AbortSignal): Promise<TokenSnapshot>;
@@ -37,18 +37,20 @@ export function useTokenSnapshot() {
     void poll();
     return () => { mounted.current = false; clearTimeout(timer); refreshController.current?.abort(); };
   }, [refresh]);
-  async function command(body: object, endpoint: '/api/tokens' | '/api/prices' = '/api/tokens') {
+  // onReply hears the server's answer, accepted or refused, for a control that shows it (Resume eligible agents).
+  async function command(body: object, endpoint: '/api/tokens' | '/api/prices' = '/api/tokens', onReply?: (reply: unknown) => void) {
     setPending(true); setError(''); let rejection: string | undefined;
     if (endpoint === '/api/prices') setPriceError('');
     try {
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const reply: unknown = response.ok ? undefined : await response.json();
+      const reply: unknown = response.ok && !onReply ? undefined : await response.json();
       const message = reply && typeof reply === 'object' && 'error' in reply && typeof reply.error === 'string' ? reply.error : undefined;
+      onReply?.(reply);
       if (!response.ok && endpoint === '/api/prices') {
         setPriceError(message ?? 'Price request failed.');
         return false;
       }
-      // The server's reason, when it gives one (a refused new budget period), replaces the generic sentence.
+      // The server's reason, when it gives one (a refused new budget period or resume), replaces the generic sentence.
       rejection = message;
       if (!response.ok) throw new Error(); await refresh();
       return true;
@@ -60,7 +62,10 @@ export function useTokenSnapshot() {
     }
     finally { setPending(false); }
   }
-  return { data, error, pending, priceError, command };
+  // The last answer to Resume eligible agents, shared by every place that offers it; presentation state only.
+  const [resumeReply, setResumeReply] = useState<unknown>();
+  const resume = () => command({ action: 'resume' }, '/api/tokens', setResumeReply);
+  return { data, error, pending, priceError, command, resume, resumeReply };
 }
 export type TokenSource = ReturnType<typeof useTokenSnapshot>;
 // The kill switch, shared by the top-bar button and the command palette.
@@ -111,7 +116,10 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
   useEffect(() => { let live = true; readAccounting('/api/receipts').then(value => { if (live) setCalls(callCount(value)); }).catch(() => {}); return () => { live = false; }; }, [moved]);
   const status = data ? budgetStatus(data, name) : undefined;
   const journal = data ? journalWarning(data.accounting) : undefined;
-  const resumable = !!data && (data.stopped || data.paused.length > 0);
+  const canResume = resumable(data);
+  const agentName = (id: string) => agents.find(agent => agent.id === id)?.name ?? id;
+  const pauses = data ? pauseSummary(data, agentName) : undefined;
+  const outcome = data && resumeReplyCurrent(tokens.resumeReply, data) ? resumeOutcome(tokens.resumeReply, agentName) : undefined;
   return <section className="view token-panel" aria-labelledby="budgets-title">
         <h1 id="budgets-title">Budgets</h1>
         <p className="helper">Every call reserves its worst case before it leaves: peak price, no cache hits, full output. The mock&apos;s estimated tokens count against the token limits too, so the mock can reach a limit; its dollars are $0.</p>
@@ -125,8 +133,9 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
               <UsageBar label="Dollars" value={usd(total.costAccountedUsd + total.costReservedUsd)} limit={usd(total.costLimitUsd)} share={rowUsage(total).dollars} unit="" /></>}
             <p className="helper">{calls ? `${calls.truncated ? 'At least ' : ''}${calls.calls} ${calls.calls === 1 ? 'call' : 'calls'}` : 'Counting calls…'} · {data.reservations.length} held or expired {data.reservations.length === 1 ? 'reservation' : 'reservations'}{total && total.reserved > 0 ? ' · a call in flight' : ''}</p>
             <p className="helper">Limits are changed under Details, below.</p>
-            {/* Resume only has something to do after a pause or the kill switch. */}
-            <div className="project-actions"><Button disabled={pending || !resumable} variant="outline" onClick={() => command({ action: 'resume' })}>Resume eligible agents</Button>{!resumable && <span className="helper">Nothing is paused.</span>}</div>
+            {/* Resume only has something to do after a pause or the kill switch; beside it, what it did and what still holds. */}
+            <div className="project-actions"><Button disabled={pending || !canResume} variant="outline" onClick={() => void tokens.resume()}>Resume eligible agents</Button>{!canResume && <span className="helper">Nothing is paused.</span>}</div>
+            {(outcome || pauses) && <div className="pause-reasons" role="status">{outcome && <p>{outcome}</p>}{pauses && <><p>{pauses.headline}</p>{pauses.details.length > 0 && <ul>{pauses.details.map(line => <li key={line}>{line}</li>)}</ul>}</>}</div>}
           </section>
           {scopes.map(({ scope, title, meaning }) => { const rows = data.rows.filter(row => row.scope === scope && (allScopes || !idle(row) || scope === 'global')); return rows.length ? <section key={scope} className="scope-block" aria-label={`${title} budgets`}>
             <h2>{title}</h2><p className="helper">{meaning}</p>{rows.map(row => <ScopeRow key={`${row.scope}:${row.id}`} row={row} name={name(row)} />)}
@@ -141,10 +150,10 @@ export function BudgetsView({ tokens, agents = [] }: { tokens: TokenSource; agen
         {data?.accounting.journal === 'recorded' && <p><Button disabled={pending} variant="outline" onClick={startPeriod}>Start a new budget period</Button> <span className="helper">Consumption starts again from zero; the journal keeps the history. Refused while a reservation is open.</span></p>}
         <p>Rows overlap: global, agent, model and session describe the same calls. Do not add rows together. Either dimension warns at 80% and pauses at 100%. Increase a limit, then resume explicitly.</p>
         <div className="token-table"><table><caption>Budgets and consumption</caption><thead><tr><th>Scope / ID</th><th>Token limit</th><th>USD limit</th><th>Actual input / output / total</th><th>Mock estimated input / output / total</th><th>Reserved / unverifiable / expired estimate</th><th>USD used / reserved / expired estimate</th><th>Budget status</th></tr></thead><tbody>
-          {data?.rows.map(row => { const key = `${row.scope}:${row.id}`; return <tr key={key}>
-            <th>{row.scope}<small>{row.id}{'removed' in row && row.removed ? ' · removed agent' : ''}</small></th>
-            <td><input aria-label={`Budget ${key}`} type="number" min={0} value={drafts[key] ?? row.limit} onChange={event => setDrafts({ ...drafts, [key]: event.target.value })} /><Button disabled={pending} variant="outline" onClick={() => command({ action: 'limit', scope: row.scope, id: row.id, limit: Number(drafts[key] ?? row.limit) })}>Apply {row.scope}</Button></td>
-            <td><input aria-label={`USD budget ${key}`} type="number" min={0} step="any" value={costDrafts[key] ?? row.costLimitUsd} onChange={event => setCostDrafts({ ...costDrafts, [key]: event.target.value })} /><Button disabled={pending} variant="outline" onClick={() => command({ action: 'cost-limit', scope: row.scope, id: row.id, limit: Number(costDrafts[key] ?? row.costLimitUsd) })}>Apply USD</Button></td>
+          {data?.rows.map(row => { const key = `${row.scope}:${row.id}`; const gone = 'removed' in row && !!row.removed; const why = gone ? 'A removed agent makes no calls; its row stays as history and has no limit to change.' : undefined; return <tr key={key}>
+            <th>{row.scope}<small>{row.id}{gone ? ' · removed agent' : ''}</small></th>
+            <td><input aria-label={`Budget ${key}`} type="number" min={0} disabled={gone} title={why} value={drafts[key] ?? row.limit} onChange={event => setDrafts({ ...drafts, [key]: event.target.value })} /><Button disabled={pending || gone} title={why} variant="outline" onClick={() => command({ action: 'limit', scope: row.scope, id: row.id, limit: Number(drafts[key] ?? row.limit) })}>Apply {row.scope}</Button></td>
+            <td><input aria-label={`USD budget ${key}`} type="number" min={0} step="any" disabled={gone} title={why} value={costDrafts[key] ?? row.costLimitUsd} onChange={event => setCostDrafts({ ...costDrafts, [key]: event.target.value })} /><Button disabled={pending || gone} title={why} variant="outline" onClick={() => command({ action: 'cost-limit', scope: row.scope, id: row.id, limit: Number(costDrafts[key] ?? row.costLimitUsd) })}>Apply USD</Button></td>
             <td>{row.actual.prompt} / {row.actual.completion} / {row.actual.total}{row.conservativeCachedInput > 0 && <small>{row.conservativeCachedInput} cached input tokens reported</small>}</td><td>{row.mock.prompt} / {row.mock.completion} / {row.mock.total}</td><td>{row.reserved} / {row.unverifiable} / {row.estimated}</td><td>{row.costAccountedUsd.toFixed(9)} / {row.costReservedUsd.toFixed(9)} / {row.costUnmeasuredUsd.toFixed(9)}</td><td>{row.state === 'warning' ? '⚠ Warning ≥80%' : row.state === 'stopped' ? '■ Hard stop' : '● Available'}</td>
           </tr>; })}
         </tbody></table></div>
