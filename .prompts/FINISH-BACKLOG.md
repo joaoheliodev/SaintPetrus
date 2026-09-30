@@ -349,7 +349,7 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
 | R4-3 | Warning while the graph is not saved | While `GraphStore` refuses or fails to write, for any reason (R-01's key configured after the text included), a persistent warning shows the reason, never the refused text, until it saves again; a local read-only route exposes the state; documentation and tests in the same commit | done |
 | R4-4 | Browser check | Deletes a context connection (refused, then confirmed) and checks that deleting the delegation is refused; no check removed | done |
 | R4-5 | A configured key leaves the graph | Registering a key tells the graph through `lib/security/redact.ts` (listeners on `globalThis`, credentials not coupled to the store); the graph replaces every text the redactor would change with the redacted text, as its own event, and the store saves it at once; the command joins the invariant test; the live feed redacts again as it sends; tests with a key generated at runtime; recorded in `AGENTS.md` | done |
-| R4-6 | The operator's answers to the R4-5 questions | (1) `npm run gate` runs CI's blocking steps in CI's order, CI calls it after `npm ci`, `AGENTS.md` requires it before every commit, an audit the registry does not answer is reported and never skipped; (2) the panel discards the Activity lines, the feed lines and the Run exchanges it received before `graph.redacted` and says why, tested through the function that decides it; (3) the preview stream redacts as it sends, and `AGENTS.md` says every stream does | in progress |
+| R4-6 | The operator's answers to the R4-5 questions | (1) `npm run gate` runs CI's blocking steps in CI's order, CI calls it after `npm ci`, `AGENTS.md` requires it before every commit, an audit the registry does not answer is reported and never skipped; (2) the panel discards the Activity lines, the feed lines and the Run exchanges it received before `graph.redacted` and says why, tested through the function that decides it; (3) the preview stream redacts as it sends, and `AGENTS.md` says every stream does | done |
 
 #### Decisions taken
 
@@ -843,3 +843,9 @@ Everything below is yours; nothing in it needs this conversation.
 - Phase 10, R4-5 (2026-09-30, on `main`): a configured key leaves the graph at once, and the live feed redacts again
   as it sends; the browser checks' profile removal retries a late Chromium write. Floor 495 → 501, every change
   mutation-tested (eight mutations, all killed).
+- Phase 10, R4-6 (2026-09-30, on `main`): `npm run gate` runs CI's blocking steps in CI's order and CI runs it; the
+  artifact preview redacts as it sends and a ratchet holds every stream to it; the panel discards what it received
+  before `graph.redacted`. Floor 501 → 514. Twenty-three mutations: twenty-one killed, two wiring lines survived (see
+  the mutation log). On fresh instances `test:e2e` passed in development, with the feed off and on (20 checks each),
+  and `test:browser` passed on the production build with the preview on. Gitleaks: no findings in the tree, the
+  history or any staged diff.
