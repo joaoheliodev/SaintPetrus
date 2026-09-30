@@ -541,7 +541,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-6 | A new budget period says what it clears (H5) | The dialog and Details say that the mock's usage and the session budget stay until a restart; the semantics wait for the operator | done |
 | R5-7 | Pause and resume invariants | A seeded walk over pause all, resume, raise a limit, new period, reset, import, remove, add and a call refused by a full scope, with the invariants written and justified | done |
 | R5-8 | Browser checks | The workspace check goes back from Pause all through the new Resume, and through a full scope that Resume cannot release until the limit rises; no PASS removed; REAL without a key shows Pause all and Resume and no Resume demo | done |
-| R5-9 | Documentation | STATUS, CHANGELOG, README and a one-line guarantee in `AGENTS.md` | pending |
+| R5-9 | Documentation | STATUS, CHANGELOG, README and a one-line guarantee in `AGENTS.md` | done |
 
 #### R5-1 reproduction (2026-09-30, before any change, at `23f3052`)
 
@@ -705,6 +705,15 @@ there is no Resume demo, so only a restart gets out.
   substitution. Directories are now printed first and removed by their literal paths; the probe no longer deletes its
   own. Three data directories left by an earlier run (05:14 to 05:16, mock graph and accounting files only) were
   looked at and removed.
+- R5-9 (2026-09-30). `AGENTS.md` gains one paragraph, marked Round 5: every pause says why and has a way out on
+  screen, with `tests/pause-invariant.test.ts` holding it and a new way to pause or resume joining that test in the
+  change that adds it. STATUS lists the three open questions under what is pending. The route guides in
+  `node_modules/next/dist/docs/` (`01-app/01-getting-started/15-route-handlers.md`,
+  `01-app/03-api-reference/03-file-conventions/route.md` and the route segment config) were read only now, after
+  the route edits of R5-2 and R5-4, which the round's rules asked to read before. Nothing conflicts: those edits
+  changed handler bodies only (a refusal's sentence and status, `resumed` in the answer), no segment config moved
+  since `23f3052`, POST handlers are never cached, `runtime = 'nodejs'` is the default and `dynamic` stays valid
+  because `cacheComponents` is off.
 
 #### Questions for João
 
@@ -1118,3 +1127,9 @@ Everything below is yours; nothing in it needs this conversation.
 - Phase 10, R4-6 residue (2026-09-30, on `main`): the operator accepted the panel's in-tab residue; `SECURITY.md`
   lists it with the advice to reload open tabs after configuring a key, and `AGENTS.md` records the rule that such a
   residue is an accepted risk that opens no new round. Documentation only, floor unchanged at 514.
+- Phase 11, Round 5 (2026-09-30, on `main`): agents could not be un-paused. Reproduced entry by exit on fresh
+  instances before any change (R5-1), then R5-A `aa64b2f` (next 16.3.8 for a critical advisory), R5-2 `d09ccba`,
+  R5-3 `4d3f6fe`, R5-4 `b629d9f`, R5-5 `2496768`, R5-6 `804f58f`, R5-7 `70dc0e0`, R5-8 `eba4b40`, and R5-9 in the
+  commit that carries this entry. Floor 514 → 538. Fifty-one mutations, all killed. `test:e2e` passed on fresh MOCK
+  instances (24 checks); REAL without a key was checked on screen only. Gitleaks clean on every staged diff. No
+  request reached a provider. Three questions wait for the operator (R5-Q1 to R5-Q3).
