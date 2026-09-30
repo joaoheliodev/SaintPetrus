@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 5 on `main` (2026-09-30)
 
 The operator could not un-pause the agents. Every way into a pause was tried against every way out on fresh instances
-before anything changed. No request with a real key was made. The test floor rose from 514 to 535.
+before anything changed. No request with a real key was made. The test floor rose from 514 to 537.
 
 - After **Pause all agents** and **Resume eligible agents** the graph is usable again: Pause all no longer marks the
   run paused when no demo is running, so Import, Reset, Load demo and Graph limits are enabled and the server accepts
@@ -33,6 +33,10 @@ before anything changed. No request with a real key was made. The test floor ros
 - **Start a new budget period** says what it clears: real consumption in the global, agent and model budgets. The
   mock's estimated tokens from this server run and the session budget stay until a restart, as they always did; the
   question and Details used to say that consumption "starts again from zero" (R5-6).
+- A seeded walk drives pauses and every way out through the routes, in MOCK and in REAL without a key, and after each
+  step holds the round's guarantees: the graph shows exactly the pauses the token service holds, a way back is offered
+  whenever anything is paused, every pause says what releases it, a resume releases exactly the agents nothing but
+  Pause all holds, every refusal says why, and the run is never left paused without a demo (R5-7).
 
 ## Unreleased: Round 4 on `main` (2026-09-29)
 

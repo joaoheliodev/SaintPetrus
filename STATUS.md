@@ -132,6 +132,13 @@ round's handoff); each fix below answers a cell that did not come back.
   said that consumption "starts again from zero", so a scope the mock filled stayed full after it. The words now say
   what the service does; whether a new period should also clear the mock's usage or the session row is the
   operator's question, since it changes how much can be spent.
+- **R5-7** `tests/pause-invariant.test.ts` walks Pause all, resume, raised and filled limits, a new period, calls,
+  connection tests, quotes, add, remove, Graph limits, reset, export and import through the routes and the process
+  token service, 2000 seeded steps in MOCK and 500 more in REAL without a key, and checks after every step that the
+  graph and the token service agree on every pause, that a way back and a reason are always there, that a resume
+  releases exactly who nothing but Pause all holds, and that every refusal says why and changes nothing. It kills the
+  regressions of R5-2 to R5-5 it was tried against. No demo runs in it: its timers would make the walk
+  irreproducible, and `tests/pause-resume.test.ts` covers the demo.
 
 ## Not verified or pending
 

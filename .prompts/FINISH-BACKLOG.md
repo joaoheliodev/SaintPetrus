@@ -539,7 +539,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-4 | Every pause says why (C2) | The token snapshot carries, for each paused agent, what holds it (Pause all, unverifiable usage and until when, an estimate awaiting reconciliation, every full scope with its dimension and whether the mock's usage fills it); resume answers whom it released, and a refusal answers 409 with the server's sentence; Budgets says it by the button, from a pure function in `lib/budget-summary.ts`; contract documented and tested | done |
 | R5-5 | A visible way back (C3) | Resume eligible agents next to Pause all agents in the top bar while something is paused, and in Ctrl+K, with the same command and text; the panel of a Paused agent says why and opens Budgets; the kill switch refusal names the way | done |
 | R5-6 | A new budget period says what it clears (H5) | The dialog and Details say that the mock's usage and the session budget stay until a restart; the semantics wait for the operator | done |
-| R5-7 | Pause and resume invariants | A seeded walk over pause all, resume, raise a limit, new period, reset, import, remove, add and a call refused by a full scope, with the invariants written and justified | pending |
+| R5-7 | Pause and resume invariants | A seeded walk over pause all, resume, raise a limit, new period, reset, import, remove, add and a call refused by a full scope, with the invariants written and justified | done |
 | R5-8 | Browser checks | The workspace check goes back from Pause all through the new Resume, and through a full scope that Resume cannot release until the limit rises; no PASS removed; REAL without a key shows Pause all and Resume and no Resume demo | pending |
 | R5-9 | Documentation | STATUS, CHANGELOG, README and a one-line guarantee in `AGENTS.md` | pending |
 
@@ -666,6 +666,28 @@ there is no Resume demo, so only a restart gets out.
   consumption at zero, the mock's tokens in every non-session row and the session row untouched, and the question
   and Details carry the same sentence, so a later change of semantics fails it until the words follow. Whether the
   semantics should change is below.
+- R5-7 (2026-09-30). `tests/pause-invariant.test.ts`: the routes (`/api/tokens`, `/api/graph`, `/api/graph/import`,
+  `/api/provider`) and the process token service as `lib/tokens/runtime.ts` wires it, in memory (no journal pinned),
+  with the configured policy and limits the walk sets itself. Seeded commands: Pause all, resume (twice as often, so
+  calls meet budgets and not only Pause all), raise a limit (mostly a row without room for a call's worst case, by
+  150 or 5000 tokens), fill a scope (the limit set to what is used, or 1 when nothing is; now and then a removed or
+  missing row), new period, Run once calls, the connection test, quotes, add, remove, Graph limits, reset, export and
+  import of an earlier export. After every step: (1) the graph shows Paused exactly for the agents the token service
+  holds, and `paused` and `pauses` agree (one owner, R5-3); (2) a removed agent keeps a pause only with a reservation
+  of its own (R5-3); (3) with Pause all on, every agent names it as a hold (R5-2, R5-4); (4) whenever anything is
+  paused, `resumable` and `pauseSummary` offer the way back (R5-5), every present agent's sentence ends on Resume
+  eligible agents and a full scope's names Details (R5-4); (5) the run is never `paused`, since no demo runs (R5-2);
+  (6) every refusal carries a sentence or a code, a refused graph or budget command changes neither the graph nor the
+  pauses, and with Pause all on add, reset and import answer `pauseAllRefusal` (C2, C3); (7) a quote never pauses,
+  a call pauses at most its own agent and the connection test only the Coordinator; (8) a resume releases exactly
+  the agents nothing but Pause all holds, answers them in `resumed`, turns Pause all off and keeps every other hold.
+  The MOCK walk (2000 steps) must accept every command and reach a resume that releases someone, one that releases no
+  one, one that leaves a full scope holding an agent, Pause all turned off with other holds left, a pause nothing
+  holds (S4), and calls refused as exhausted, at preflight and as paused; REAL (500 steps, from where MOCK left the
+  server, holds included) must see every call answer `unconfigured` or `invalid_request` and nothing else. No demo
+  runs: its timers would make the walk irreproducible, and `tests/pause-resume.test.ts` covers it; for the same
+  reason the walk does not try the demo's own status changes (the R5-3 guard in `setAgentStatus` is covered there).
+  The file runs in about 9 s.
 
 #### Questions for João
 
@@ -899,6 +921,14 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-6 | `periodClears` back to the old claim | killed by the same (the sentence no longer says real consumption) |
 | R5-6 | a new period also zeroes the mock's usage | killed by the same ("global all: the mock's estimated tokens stay"): the words and the behaviour move together |
 | R5-6 | a new period also zeroes the session row | killed by the same ("the session budget stays as it was") |
+| R5-7 | Pause all pauses an idle run (R5-2 reverted) | killed by the walk ("mock step 2 (pause all): the run is paused without a demo"); every file restored, sha256 identical |
+| R5-7 | the snapshot no longer prunes stale pauses (R5-3) | killed ("mock step 152 (remove): a removed agent keeps a pause with nothing to settle") |
+| R5-7 | reset forgets the Coordinator's held pause (R5-3) | killed ("mock step 325 (reset): Coordinator is ready, and the token service holds pause for it"). The first try swapped the line for a bare newline, which could not be swapped back; the file was restored by hand to its sha256 and the mutation rerun with unique anchors |
+| R5-7 | an import shows held agents Ready (R5-3) | killed ("mock step 167 (import): Coordinator is ready…"); same incident and restore as above |
+| R5-7 | resume releases every agent whatever holds it (R5-4) | killed ("mock step 174 (resume): resumed") |
+| R5-7 | Pause all holds no pause in the token service | killed ("mock step 2 (pause all): Coordinator is paused, and the token service holds no pause for it") |
+| R5-7 | import accepted while Pause all is on (R5-2) | killed ("mock step 776 (import): Pause all is on and Agent 31 does not say so") |
+| R5-7 | `resumable` ignores Pause all and a single pause (R5-5) | killed ("mock step 2 (pause all): something is paused and no Resume eligible agents is offered") |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
