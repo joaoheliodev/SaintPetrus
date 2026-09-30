@@ -86,6 +86,8 @@ Do not weaken these guarantees: loopback binding; exact Origin and JSON checks o
 
 Every stream redacts as it sends. The graph stream, the live event feed and the artifact preview serialize each frame with `safeStringify`, even when what they hold was redacted as it was stored: a key configured later is redacted only from then on, so a record kept from before would repeat it. A new stream does the same, and `tests/repository-ratchets.test.ts` lists the streams and holds every frame to it (Round 4, R4-6).
 
+A residue that stays only in the memory of an open panel tab, and never reaches disk, the export or a stream, is documented as an accepted risk under residual risk in `SECURITY.md` and does not open a new round (Round 4, R4-6): it is shown only in that tab, and a reload clears it.
+
 A provider error body is never read, echoed, logged or returned. Adapters translate HTTP status into the shared `ProviderFailure` code vocabulary and nothing else crosses the boundary.
 
 Status-to-code translation belongs to each adapter, not to a shared helper. A generic `upstreamCode` was written with one provider in hand and the second provider contradicted it: Gemini's 400 is an invalid key, DeepSeek's 400 is a malformed request of ours. The code set stays shared; the translation stays per adapter.

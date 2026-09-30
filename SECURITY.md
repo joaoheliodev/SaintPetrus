@@ -42,6 +42,13 @@ content of the graph (objectives, model answers, events, exports), which can hol
   SaintPetrus on a shared account or expose its port through a tunnel or proxy.
 - JavaScript cannot erase strings. The request header built for each provider call holds the key until
   garbage collection; application buffers are zeroed.
+- **An open panel tab can keep showing a key typed before it was configured.** The panel never knows the key; it
+  discards what it received (Activity lines, live feed lines, Run exchanges) when the graph announces the key with
+  `graph.redacted`. No announcement reaches a tab when the graph did not hold the key, for example a key typed only
+  into a Run once message, or when that tab's graph stream was down while the key was configured. What the tab
+  still shows is the operator's own text, or an answer that echoes it, in that tab's memory only: it never reaches
+  disk, the export or a stream, and a reload clears it. This is an accepted risk (Round 4, R4-6). After configuring
+  a key, reload every open tab of the panel.
 - Remembered keys are ciphertext in the operator's user data directory, readable by that OS account; anyone with
   the account and its keyring can decrypt them.
 - The content security policy allows inline scripts because Next.js hydrates with them; a nonce-based policy
@@ -109,8 +116,9 @@ the store saves the redacted copy at once; so the file stops holding it, and a l
 cannot write it back. Every stream redacts again as it sends (the graph stream, the live event feed and the artifact
 preview, which also receives Run once answers), so a record retained from before the key was configured does not
 repeat it. The open panel never knows the key: when the graph announces it with `graph.redacted`, the panel discards
-the Activity lines, live feed lines and Run exchanges it received before. A key the graph does not hold announces
-nothing, so the panel keeps what it showed until the page reloads. Copies the file system keeps of replaced blocks are outside what the app controls.
+the Activity lines, live feed lines and Run exchanges it received before. A tab that is not told keeps what it showed
+until it reloads, an accepted risk listed under residual risk above. Copies the file system keeps of replaced blocks
+are outside what the app controls.
 
 The accounting journal, `accounting.jsonl`, sits beside it with the same permissions (0700/0600). Each record is one
 JSON line, synced before the change it records can take effect, and holds only IDs, counts, amounts, price versions,

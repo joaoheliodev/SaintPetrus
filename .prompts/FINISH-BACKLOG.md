@@ -491,6 +491,14 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   key was configured." while nothing newer has arrived. `docs/reference/state-ownership.md` names both as
   presentation state. Not reachable from a browser check: MOCK mode refuses to store a key, and REAL mode is not
   started for a check.
+- R4-6, residue (2026-09-30). The operator accepted what a tab keeps when nothing tells it of a key: the operator's own
+  text, shown only in that tab, never on disk, in the export or a stream, gone on reload. No new event and no clearing
+  on reconnection. `SECURITY.md` lists it under residual risk, with the case of a graph stream that was down while the
+  key was configured and the advice to reload every open tab of the panel after configuring a key; its key lifecycle
+  and `STATUS.md` point to it. `AGENTS.md` (Safety locks) records the rule: a residue that stays only in the memory of
+  an open panel tab, and never reaches disk, the export or a stream, is documented as an accepted risk in `SECURITY.md`
+  and opens no new round. The two wiring lines whose mutations survived stay as they are, also by the operator's
+  decision. Documentation only: there is no line to mutate.
 
 #### Questions for João
 
@@ -506,13 +514,14 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
 - Answered (R4-6, 3): the preview stream redacts as it sends too. Was (R4-5): should it, although only demo text
   reached it? That premise was wrong: `TokenService` calls `observeArtifact` with Run once answers when the preview is
   on (`lib/tokens/service.ts`), so a version stored before a key was configured could go out unredacted.
-- Open (R4-6, 2): the panel learns of a key only from `graph.redacted`, which the graph publishes only when it held
-  the key. A key typed only into a Run once message, or a panel whose graph stream was down when the key was
-  configured, keeps what it showed until the page reloads. Should configuring any key publish its own event for the
-  panel (it would name no key), or a reconnection clear the history too?
-- Open (R4-6, 2): two wiring lines have no test that dies with them (`EventFeed` following clearings, the workspace
-  binding an answer to its render's count): only a browser runs them, and no browser check can configure a key.
-  Should the browser check get a way to register a fictitious key in MOCK mode, or is this accepted?
+- Answered (R4-6, 2): neither; the residue is an accepted risk, documented in `SECURITY.md`, and `AGENTS.md` says such
+  a residue opens no new round. Was: the panel learns of a key only from `graph.redacted`, which the graph publishes
+  only when it held the key; a key typed only into a Run once message, or a panel whose graph stream was down when
+  the key was configured, keeps what it showed until the page reloads. Should configuring any key publish its own
+  event for the panel, or a reconnection clear the history too?
+- Answered (R4-6, 2): accepted as is. Was: two wiring lines have no test that dies with them (`EventFeed` following
+  clearings, the workspace binding an answer to its render's count), because only a browser runs them and no browser
+  check can configure a key. Should the browser check get a way to register a fictitious key in MOCK mode?
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -681,8 +690,8 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R4-6,2 | a clearing hides nothing new (`hiddenThrough` kept) | killed by "the live feed follows the projection…" |
 | R4-6,2 | a new window forgets the mark | killed by "the live feed follows the projection…" (the sed that restored it also touched the initial state; restored by hand, sha256 identical) |
 | R4-6,2 | the list shows hidden lines | survived until the list became `FeedLines`; then killed by "the feed list leaves the hidden lines out…" |
-| R4-6,2 | `EventFeed` never calls `followClearings` | **survived**: the effect runs only in a browser, and no browser check can configure a key |
-| R4-6,2 | the workspace records an answer at the clearing count of its arrival | **survived**: same reason; `historyWithExchange` itself is killed above |
+| R4-6,2 | `EventFeed` never calls `followClearings` | **survived**: the effect runs only in a browser, and no browser check can configure a key; accepted as is by the operator (R4-6) |
+| R4-6,2 | the workspace records an answer at the clearing count of its arrival | **survived**: same reason; `historyWithExchange` itself is killed above; accepted as is by the operator (R4-6) |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
@@ -849,3 +858,6 @@ Everything below is yours; nothing in it needs this conversation.
   the mutation log). On fresh instances `test:e2e` passed in development, with the feed off and on (20 checks each),
   and `test:browser` passed on the production build with the preview on. Gitleaks: no findings in the tree, the
   history or any staged diff.
+- Phase 10, R4-6 residue (2026-09-30, on `main`): the operator accepted the panel's in-tab residue; `SECURITY.md`
+  lists it with the advice to reload open tabs after configuring a key, and `AGENTS.md` records the rule that such a
+  residue is an accepted risk that opens no new round. Documentation only, floor unchanged at 514.
