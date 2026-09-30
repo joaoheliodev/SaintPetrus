@@ -598,6 +598,33 @@ saw: H1 with H2. Pause all agents leaves the run `paused`, so the canvas offers 
 stays paused, so Import, Reset, Load demo and Graph limits stay off and the server refuses remove and import. In REAL
 there is no Resume demo, so only a restart gets out.
 
+#### After the fixes (2026-09-30, at `79ab1d7`)
+
+The same probe and the same 48 cells on fresh MOCK instances, now also reading the notice under the top bar and the
+reasons beside Resume eligible agents. "normal" as before; "held" means something still holds an agent and the screen
+says what and the way out; a dead end (paused or blocked with nothing on screen to say why) was never found. 15
+normal, 33 held, 0 dead ends. Every hold below is by design; three of them are the operator's questions.
+
+| Entry | X1 Resume eligible agents | X2 Resume demo | X3 raise, then X1 | X4 new period, then X1 | X5 restart | X6 Reset graph |
+| --- | --- | --- | --- | --- | --- | --- |
+| E1 Pause all at rest | normal | held: no Resume demo exists; the notice and Budgets name Resume eligible agents | normal | normal | held: Pause all is journaled; the notice names the way | held: Reset is refused with "Pause all agents is on, so every agent is paused. Use Resume eligible agents first." |
+| E2 Pause all during the demo | the demo goes on, agents Ready; Import and Reset wait for it with the demo sentence | held: Resume demo is refused with the same Pause all sentence | as X1 | as X1 | held, as E1 | held, as E1 |
+| E3 agent scope full | held: "No agent was resumed." and Writer's sentence names the full scope, filled by the mock's estimated tokens, and the way | held: no Resume demo; the notice names the scope | normal | held: the period keeps the mock's usage, as its question now says (R5-Q1) | held: the mock's usage is gone and the notice says "nothing holds it now: use Resume eligible agents" | normal |
+| E3 model scope full | held, as agent | held, as agent | normal | held, as agent | held, as agent | nobody paused; Budgets says the scope is full and to raise its limit; a quote is refused as exhausted |
+| E3 global scope full | held, as agent | held, as agent | normal | held, as agent | held, as agent | as model |
+| E3 session scope full | held, as agent | held, as agent | normal | held: the period leaves the session row, as it says (R5-Q1) | held, as agent | as model |
+| E4 restart after Pause all | normal | held, as E1 | normal | normal | held, as E1 | held, as E1 |
+| E4 restart after a full agent scope | normal | held: "nothing holds it now: use Resume eligible agents" | normal | normal | held, as X2 | normal |
+
+E5, by service test on the final code: while usage is unverifiable, resume answers 409 "Usage unverifiable: a call's
+cost could not be confirmed, so no agent can be resumed until <time>, when its reservation becomes an estimate.
+Check the provider billing meanwhile." (Pause all stays on after the refusal, and Reset is refused with the Pause all
+sentence); after expiry, lost contact releases the agent, and an unpriced served model keeps it with "its expired
+estimate reservation-1 waits for the provider-confirmed usage. Apply the confirmed usage to reservation-1 in
+Details, then use Resume eligible agents." S4 stays as R5-Q3 describes. One nit left: in the X6 cells of E3 model,
+global and session nobody is paused, yet Budgets ends "then use Resume eligible agents", whose button then says
+"Nothing is paused.".
+
 #### Decisions taken
 
 - R5-A (2026-09-30). The gate of R5-2 stopped at `npm audit --audit-level=high` on an advisory published after CI's
