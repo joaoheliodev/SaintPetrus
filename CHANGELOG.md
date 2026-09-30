@@ -29,6 +29,8 @@ real key was made. The test floor rose from 487 to 501.
   at the next change, without the refusal R-01 had assumed, and wrote the key again once it was forgotten.
 - The browser checks no longer fail after passing when Chromium writes a temporary file into its disposable profile
   while it shuts down: the profile removal retries on `ENOTEMPTY`.
+- Patch releases of three transitive development dependencies close advisories published on 2026-09-30 that turned
+  `npm audit --audit-level=high` red: `brace-expansion` 5.0.12 and 1.1.21, `fast-uri` 3.1.8, `ip-address` 10.7.2.
 
 ## Unreleased: Round 3 on `night/provider-validation-ready` (2026-09-28)
 

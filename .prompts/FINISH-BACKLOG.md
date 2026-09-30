@@ -444,6 +444,17 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   `removeProfile`, with Node's own retry for that error (`maxRetries: 10`, `retryDelay: 100`), in `close()` and in the
   interrupt handler. `tests/disposable-chromium.test.ts` checks the options reach the removal and that a profile
   shaped like the one left behind is removed; the race itself cannot be forced deterministically. Floor 500 → 501.
+- R4-5, CI red after the push (run 90, `7c1724c`): `npm audit --audit-level=high` failed before lint, on advisories
+  published since the green run 89 with the same lockfile (GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7 and
+  GHSA-6j4f-fj2g-mc7p for `brace-expansion`, high; GHSA-hrr3-gc8f-f4qj for `fast-uri` and GHSA-j6r3-76f7-8jcv,
+  GHSA-h3mg-xc3c-68pw for `ip-address`, moderate; all transitive, all development tooling). Not a change of this
+  round, but it left `main` red, so it was fixed within the dependency rule: patch releases only (`brace-expansion`
+  5.0.9 → 5.0.12 and 1.1.18 → 1.1.21, `fast-uri` 3.1.7 → 3.1.8, `ip-address` 10.7.0 → 10.7.2), `package.json`
+  untouched. `npm audit fix` from this container's npm 10 also dropped every `libc` field the operator's newer npm
+  writes, so the lockfile was regenerated with npm 11 (`npx npm@11 audit fix`, 15 lines changed, no `libc` lost) and
+  installed with `npm ci` on npm 10, as CI does. `npm audit` found 3 before and 0 after; the gate and both browser
+  checks passed on it. There is no line of ours to mutate: the audit is the check that fails without it. This round
+  ran the gate but not `npm audit` before pushing; see the question below.
 
 #### Questions for João
 
@@ -451,6 +462,9 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   credentials stay uncoupled from the store. Was (R4-3): should configuring a key make the store try to write at
   once, so a key that matches text already in the graph brings up the warning immediately instead of at the next
   change? Not done then: it would tie the credential path to the graph store.
+- R4-5: should the local gate in `AGENTS.md` also run what CI runs before it, `node scripts/check-staged.mjs --tracked`
+  and `npm audit --audit-level=high`? A push of this round passed the gate and still turned CI red on an advisory
+  published the same day. Not added: the gate is the operator's rule.
 
 ## V0 review of Part 2 (`1445177`)
 
