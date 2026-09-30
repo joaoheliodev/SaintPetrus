@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 4 on `main` (2026-09-29)
 
 Deleting a delegation left a graph the server could no longer save, and nothing on screen said so. No request with a
-real key was made. The test floor rose from 487 to 507.
+real key was made. The test floor rose from 487 to 514.
 
 - A delegation connection is deleted only with its subagent: `POST /api/graph` answers 400 to `disconnect` on a
   `delegation` edge with "A delegation connection cannot be deleted on its own. Remove the subagent instead.", and
@@ -37,6 +37,10 @@ real key was made. The test floor rose from 487 to 507.
 - The artifact preview redacts again as it sends, like the graph stream and the feed, so a version stored before a
   key was configured does not repeat it; Run once answers reach the preview when it is on (R4-6). A ratchet holds
   every stream the server sends to the same rule.
+- When a configured key leaves the graph, the open panel discards what it received before: the Activity lines, the
+  live feed lines and the Run exchanges. The Activity log starts again with "Earlier activity cleared because a key was
+  configured", and the feed says "No events since a key was configured." until a newer event arrives (R4-6). The
+  panel never knows the key and does not redact on its own.
 
 ## Unreleased: Round 3 on `night/provider-validation-ready` (2026-09-28)
 

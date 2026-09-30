@@ -95,6 +95,8 @@ on `main`.
 - **R4-6** `npm run gate` is the one gate: CI's blocking steps in CI's order (tracked-path check, `npm audit
   --audit-level=high`, lint, typecheck, tests held to the floor, build). CI runs `npm ci` and then the gate. The
   artifact preview redacts again as it sends, like the graph stream and the feed: Run once answers reach it too.
+  When `graph.redacted` arrives, the panel discards the Activity lines, live feed lines and Run exchanges it received
+  before it, and the Activity log starts again with "Earlier activity cleared because a key was configured".
 
 ## Not verified or pending
 
@@ -115,7 +117,7 @@ on `main`.
 
 ## Open debts and limits
 
-- A configured key leaves the graph, its saved file and the live feed (R4-5). Activity lines the open panel received before the key was configured keep the names they showed until the page reloads, and copies the file system keeps of replaced blocks are outside what the app controls.
+- A configured key leaves the graph, its saved file and every stream (R4-5, R4-6), and the open panel discards the Activity lines, feed lines and Run exchanges it received before `graph.redacted` (R4-6). The panel learns of a key only through that event: a key the graph does not hold publishes none, and a panel whose stream was down when the key was configured misses it; both keep what they showed until the page reloads. Copies the file system keeps of replaced blocks are outside what the app controls.
 - The graph and the global, agent and model accounting survive a restart. The session budget, the mock's usage, events, artifacts and the dispatch ledger are process-local. The journal is a checkpoint log, not an invoice: the input counter is still approximate.
 - An unresolved reservation converts after `reservationTtlMs` (300000 ms in the shipped policy) at the greater of the hold and the dearest eligible captured model at peak with no cache hits, using P3's provider rule, and stays marked as an expired estimate until manual reconciliation.
 - The input counter is approximate. The monetary ceiling is a guard, not a proof of the invoice.

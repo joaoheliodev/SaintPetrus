@@ -108,7 +108,9 @@ A key pasted into the graph before it was configured is taken out of the graph i
 the store saves the redacted copy at once; so the file stops holding it, and a later **Disconnect** or **Forget key**
 cannot write it back. Every stream redacts again as it sends (the graph stream, the live event feed and the artifact
 preview, which also receives Run once answers), so a record retained from before the key was configured does not
-repeat it. Copies the file system keeps of replaced blocks are outside what the app controls.
+repeat it. The open panel never knows the key: when the graph announces it with `graph.redacted`, the panel discards
+the Activity lines, live feed lines and Run exchanges it received before. A key the graph does not hold announces
+nothing, so the panel keeps what it showed until the page reloads. Copies the file system keeps of replaced blocks are outside what the app controls.
 
 The accounting journal, `accounting.jsonl`, sits beside it with the same permissions (0700/0600). Each record is one
 JSON line, synced before the change it records can take effect, and holds only IDs, counts, amounts, price versions,

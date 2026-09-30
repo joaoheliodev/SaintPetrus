@@ -54,7 +54,7 @@ type View = 'workspace' | 'activity' | 'budgets' | 'prices' | 'connection';
 type Draft = { parentId: string | null; position?: { x: number; y: number } };
 type Props = { initialGraph: Graph; mockEnabled: boolean; feedEnabled?: boolean; previewPort?: number };
 function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previewPort }: Props) {
-  const { graph, selectedId, notice, events, select } = useProjection();
+  const { graph, selectedId, notice, events, select, exchanges, clearings, recordExchange } = useProjection();
   const { command, importGraph, pending, persistence } = useGraphTransport(initialGraph);
   const connection = useProviderStatus(); const tokens = useTokenSnapshot(); const confirm = useConfirm();
   // Which view fills the main column; presentation state in memory only.
@@ -63,8 +63,6 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   const [stepsDismissed, setStepsDismissed] = useState(false); const [paletteOpen, setPaletteOpen] = useState(false);
   const importInput = useRef<HTMLInputElement>(null); const exportLink = useRef<HTMLAnchorElement>(null);
   const [resetOpen, setResetOpen] = useState(false);
-  // Each agent's last Run once, in memory only: never sent back, saved or put in browser storage.
-  const [exchanges, setExchanges] = useState<Record<string, RunExchange>>({});
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentNodeType>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AgentEdgeType>([]);
   const [objective, setObjective] = useState(initialGraph.agents[0].context.objective);
@@ -76,6 +74,9 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   // Positions the server has not confirmed yet. Without this the 300 ms poll fights an active drag.
   const unconfirmed = useRef(new Map<string, { x: number; y: number }>());
   const selected = graph.agents.find(a => a.id === selectedId) || graph.agents[0];
+  // Bound to this render's clearing count, which the inspector's call keeps: an answer to a message sent before a
+  // configured key cleared the history is dropped when it arrives.
+  const recordRun = (exchange: RunExchange) => recordExchange(selected.id, exchange, clearings);
   const active = graph.status === 'running' || graph.status === 'paused';
   // Reconcile server agents into React Flow's own node state. Nodes that did not change keep their
   // object identity, so React Flow reuses the measured size and handle bounds instead of wiping them.
@@ -260,7 +261,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         <TabsContent value="activity" keepMounted><GraphActivity events={events} revision={graph.revision} /></TabsContent>
         {previewPort && <TabsContent value="preview" keepMounted><ArtifactPreview port={previewPort} /></TabsContent>}
       </Tabs>
-      </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={exchange => setExchanges(current => ({ ...current, [selected.id]: exchange }))} openConnection={() => setView('connection')} /></div>
+      </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={recordRun} openConnection={() => setView('connection')} /></div>
       {view === 'activity' && <section className="view activity-view" aria-labelledby="activity-title"><h1 id="activity-title">Activity</h1>
         <p className="helper">What changed on the canvas, newest first, as the server published it. Card moves and demo output are hidden unless you ask for them.</p>
         <GraphActivity events={events} revision={graph.revision} />

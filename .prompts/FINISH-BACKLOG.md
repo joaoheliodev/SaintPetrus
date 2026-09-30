@@ -478,6 +478,19 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   the stream, as the feed test does; a ratchet in `tests/repository-ratchets.test.ts` lists the server's three
   streams (graph, feed, preview) and requires every `data:` frame to go through `safeStringify`, so a new stream joins
   the list. `AGENTS.md` records the rule, every stream redacts as it sends, and the ratchet file's description.
+- R4-6, 2 (2026-09-30). `lib/cleared-history.ts` decides what the panel keeps: `historyAfter` turns a
+  `graph.redacted` event into a log holding only that event, no Run exchanges and one more clearing; a reset still
+  restarts only the log, and any other event keeps everything. The Run exchanges moved from the workspace's React
+  state into the projection store, still in memory only, so the same function drops them; `historyWithExchange` drops
+  an answer to a message sent before the latest clearing (the workspace binds each call to its render's count). The
+  revision guard still keeps the graph from a stale event, but a stale `graph.redacted` (a command's response
+  arrived first) clears the history all the same. The feed keeps the server's window as delivered and hides, by id,
+  every line it had received when the projection counted a clearing (`followClearings`, `FeedLines`); a window whose
+  cursor falls behind that mark comes from a restarted server and hides nothing. The Activity title of
+  `graph.redacted` is now "Earlier activity cleared because a key was configured"; the feed says "No events since a
+  key was configured." while nothing newer has arrived. `docs/reference/state-ownership.md` names both as
+  presentation state. Not reachable from a browser check: MOCK mode refuses to store a key, and REAL mode is not
+  started for a check.
 
 #### Questions for João
 
@@ -493,6 +506,13 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
 - Answered (R4-6, 3): the preview stream redacts as it sends too. Was (R4-5): should it, although only demo text
   reached it? That premise was wrong: `TokenService` calls `observeArtifact` with Run once answers when the preview is
   on (`lib/tokens/service.ts`), so a version stored before a key was configured could go out unredacted.
+- Open (R4-6, 2): the panel learns of a key only from `graph.redacted`, which the graph publishes only when it held
+  the key. A key typed only into a Run once message, or a panel whose graph stream was down when the key was
+  configured, keeps what it showed until the page reloads. Should configuring any key publish its own event for the
+  panel (it would name no key), or a reconnection clear the history too?
+- Open (R4-6, 2): two wiring lines have no test that dies with them (`EventFeed` following clearings, the workspace
+  binding an answer to its render's count): only a browser runs them, and no browser check can configure a key.
+  Should the browser check get a way to register a fictitious key in MOCK mode, or is this accepted?
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -649,6 +669,20 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R4-6,1 | a command that cannot start passes | killed by "a gate command reports its exit code…" |
 | R4-6,3 | the preview sends `JSON.stringify` again | killed by "the preview redacts again when it sends…" and "every stream the server sends redacts each frame…"; restored, sha256 identical |
 | R4-6,3 | the graph stream sends `JSON.stringify` | killed by "every stream the server sends redacts each frame…"; restored, sha256 identical |
+| R4-6,2 | `graph.redacted` not recognized | killed by "a configured key discards every Activity line…", "the panel discards what it holds…" and "the live feed follows the projection…"; every file restored, sha256 identical |
+| R4-6,2 | the Run exchanges kept on a clearing | killed by "a configured key discards…" and "the panel discards what it holds…" |
+| R4-6,2 | the clearing not counted | killed by the same three as the first |
+| R4-6,2 | an answer sent before the clearing kept | killed by "an answer to a message sent before the clearing is dropped…" |
+| R4-6,2 | the feed hides nothing | killed by "the feed hides the lines it had received…" and "the live feed follows the projection…" |
+| R4-6,2 | a restarted server's window keeps the lines hidden | killed by "the feed hides the lines it had received…" |
+| R4-6,2 | a stale `graph.redacted` ignored | killed by "the panel discards what it holds…, even behind the revision guard" |
+| R4-6,2 | the old Activity title | killed by "a configured key discards…" |
+| R4-6,2 | the feed ignores clearings (`followClearings`) | killed by "the live feed follows the projection…" |
+| R4-6,2 | a clearing hides nothing new (`hiddenThrough` kept) | killed by "the live feed follows the projection…" |
+| R4-6,2 | a new window forgets the mark | killed by "the live feed follows the projection…" (the sed that restored it also touched the initial state; restored by hand, sha256 identical) |
+| R4-6,2 | the list shows hidden lines | survived until the list became `FeedLines`; then killed by "the feed list leaves the hidden lines out…" |
+| R4-6,2 | `EventFeed` never calls `followClearings` | **survived**: the effect runs only in a browser, and no browser check can configure a key |
+| R4-6,2 | the workspace records an answer at the clearing count of its arrival | **survived**: same reason; `historyWithExchange` itself is killed above |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
