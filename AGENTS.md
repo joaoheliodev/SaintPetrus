@@ -20,19 +20,23 @@ Language: all code, comments, commits and documentation are written in English.
 
 Start from a clean tree: if `git status` is dirty before you begin, stop and report. Work one task at a time with a green gate between tasks, and record each closed task at once in the round's handoff under `.prompts/`. That directory is ignored by Git and vanishes in a fresh clone, so a permanent rule never lives only there.
 
-One gate, run in full, for every task:
+One gate, run in full before every commit:
 
 ```
-npm run lint && npm run typecheck && npm test && npm run build
+npm run gate
 ```
+
+`scripts/gate.mjs` runs CI's blocking steps in CI's order and stops at the first that fails: `node scripts/check-staged.mjs --tracked`, `npm audit --audit-level=high`, lint, typecheck, the tests held to the floor by `scripts/check-test-floor.mjs` on their own output, and the build. CI installs with `npm ci` and runs the same script, so the steps live in one place; its Gitleaks job stays apart, and so does Gitleaks on the staged diff before every commit (Safety locks). A commit once passed an older subset of these steps and turned CI red on an advisory published that day (Round 4, R4-6). The gate needs installed dependencies: after a change to them, run `npm ci` first, as CI does.
+
+`npm audit` asks the registry. If the registry does not answer, the gate fails: report it and never skip the step. How a new advisory is fixed is under Dependencies.
 
 If a build fails with an error the code does not explain, run `rm -rf node_modules .next && npm ci` before investigating further. An inconsistent dependency installation once consumed four diagnostic rounds.
 
-The Codex sandbox is the exception. There `npm run build` fails with `Could not parse output from TypeScript's --showConfig` because the sandbox refuses nested Node processes (`spawnSync /usr/bin/node EPERM`). That is the environment, not a defect in the repository: run lint, typecheck and tests, report, and leave the build to the operator. Do not reinstall, add a shim or change configuration to get past it. It has already cost two investigations from scratch.
+The Codex sandbox is the exception. There `npm run build` fails with `Could not parse output from TypeScript's --showConfig` because the sandbox refuses nested Node processes (`spawnSync /usr/bin/node EPERM`). That is the environment, not a defect in the repository: the build is the gate's last step, so report the gate as passed up to the build and leave the build to the operator. Do not reinstall, add a shim or change configuration to get past it. It has already cost two investigations from scratch.
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 501 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 505 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -157,6 +161,8 @@ The §5.4 detectors and the RF-07 handoff come from `lib/core`. They are pure, d
 ## Dependencies
 
 Prefer what is already installed. A new dependency needs its justification in the commit message and the handoff, a permissive license (MIT, Apache-2.0, BSD or ISC), no telemetry and active maintenance. Updates stay within patch and minor versions, and only with a green gate.
+
+A new advisory that turns `npm audit` red is fixed the same way: a patch or minor release and a green gate. With no fix available, stop and report. Regenerate `package-lock.json` with a current npm: npm 10 drops the `libc` fields newer npm writes for platform packages, so use npm 11 (`npx npm@11 audit fix`) and then install with `npm ci`, as CI does (Round 4, R4-5).
 
 ## State ownership
 

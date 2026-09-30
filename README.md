@@ -245,11 +245,14 @@ DeepSeek update it when the answer completes.
 ## Checks
 
 ```sh
-npm run lint && npm run typecheck && npm test && npm run build
+npm run gate
 gitleaks dir . --no-banner --redact=100
 gitleaks git --no-banner --redact=100 --log-opts=--all
 ```
 
+`npm run gate` runs what CI runs after `npm ci`, in the same order, and stops at the first failure: the check that
+no credential or data path is tracked, `npm audit --audit-level=high` (it needs the registry, and is never skipped),
+lint, typecheck, the tests held to the floor in `AGENTS.md` with nothing skipped, and the build.
 `npm run typecheck` runs twice on purpose: once for the app and once for the dependency-free `lib/core`.
 Two browser checks need Chromium (`CHROMIUM_PATH` overrides `/usr/bin/chromium`) and a running instance. Each uses a
 throwaway profile in the OS temporary directory, reaches only `127.0.0.1` and removes the profile even when Chromium

@@ -7,12 +7,12 @@ asked for are kept in Portuguese.
 
 ## How to resume
 
-1. `git fetch origin night/provider-validation-ready && git status` must be clean and level with origin.
+1. `git fetch origin main && git status` must be clean and level with origin (the work moved to `main` in Round 4).
 2. Read `AGENTS.md`, then this file, then `git log --oneline 1445177..HEAD`.
 3. Continue from the first backlog item whose status is not `done` or `blocked`. Never redo a `done` item.
-4. Gate for every commit: `npm run lint && npm run typecheck && npm test && npm run build`, then the
-   pre-commit hook runs Gitleaks on the staged diff (`npm run setup:hooks` once per clone; install the
-   official Gitleaks release binary if missing, verified against its published checksum).
+4. Gate for every commit: `npm run gate` (Round 4, R4-6), then the pre-commit hook runs Gitleaks on the staged diff
+   (`npm run setup:hooks` once per clone; install the official Gitleaks release binary if missing, verified against
+   its published checksum, or build it from `proxy.golang.org` with the hash checked against `sum.golang.org`).
 5. After each item: mutation check (break the fixed line, confirm a new test fails, restore), update this
    file in the same commit, push.
 
@@ -349,6 +349,7 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
 | R4-3 | Warning while the graph is not saved | While `GraphStore` refuses or fails to write, for any reason (R-01's key configured after the text included), a persistent warning shows the reason, never the refused text, until it saves again; a local read-only route exposes the state; documentation and tests in the same commit | done |
 | R4-4 | Browser check | Deletes a context connection (refused, then confirmed) and checks that deleting the delegation is refused; no check removed | done |
 | R4-5 | A configured key leaves the graph | Registering a key tells the graph through `lib/security/redact.ts` (listeners on `globalThis`, credentials not coupled to the store); the graph replaces every text the redactor would change with the redacted text, as its own event, and the store saves it at once; the command joins the invariant test; the live feed redacts again as it sends; tests with a key generated at runtime; recorded in `AGENTS.md` | done |
+| R4-6 | The operator's answers to the R4-5 questions | (1) `npm run gate` runs CI's blocking steps in CI's order, CI calls it after `npm ci`, `AGENTS.md` requires it before every commit, an audit the registry does not answer is reported and never skipped; (2) the panel discards the Activity lines, the feed lines and the Run exchanges it received before `graph.redacted` and says why, tested through the function that decides it; (3) the preview stream redacts as it sends, and `AGENTS.md` says every stream does | in progress |
 
 #### Decisions taken
 
@@ -455,6 +456,19 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   installed with `npm ci` on npm 10, as CI does. `npm audit` found 3 before and 0 after; the gate and both browser
   checks passed on it. There is no line of ours to mutate: the audit is the check that fails without it. This round
   ran the gate but not `npm audit` before pushing; see the question below.
+- R4-6, 1 (2026-09-30). `scripts/gate.mjs`, run as `npm run gate`, executes in CI's order `node
+  scripts/check-staged.mjs --tracked`, `npm audit --audit-level=high`, `npm run lint`, `npm run typecheck`, `npm test`
+  and `npm run build`, and stops at the first failure, naming it. The audit's failure line says to fix an advisory
+  with a patch or minor release, to stop and report when there is no fix or the registry did not answer, and that the
+  step is never skipped; the build's failure line repeats the Codex exception. npm runs through `npm_execpath`, so no
+  shell is needed on any platform. The test step keeps printing its output, captures it into a temporary file outside
+  the checkout and runs `scripts/check-test-floor.mjs` on it; it fails on the floor or on `npm test`'s own exit code,
+  as CI's bash with pipefail did. CI now runs `npm ci` and then `npm run gate`; the Gitleaks job is unchanged, and
+  check-staged moved after `npm ci`, which changes nothing it checks (tracked paths only). The D5 test that pinned
+  CI's `tee` pipeline now pins that CI runs only `npm ci` and `npm run gate`; `tests/gate.test.ts` pins the steps and
+  their order, the stop at the first failure, the floor checked by the real script and the exit code. `AGENTS.md`:
+  the gate paragraph, the audit rule, the advisory rule and the lockfile note under Dependencies, and the Codex
+  exception reworded for a gate whose last step is the build. README and the resume steps above point to it.
 
 #### Questions for João
 
@@ -462,9 +476,14 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   credentials stay uncoupled from the store. Was (R4-3): should configuring a key make the store try to write at
   once, so a key that matches text already in the graph brings up the warning immediately instead of at the next
   change? Not done then: it would tie the credential path to the graph store.
-- R4-5: should the local gate in `AGENTS.md` also run what CI runs before it, `node scripts/check-staged.mjs --tracked`
-  and `npm audit --audit-level=high`? A push of this round passed the gate and still turned CI red on an advisory
-  published the same day. Not added: the gate is the operator's rule.
+- Answered (R4-6, 1): one gate, `npm run gate`, with exactly CI's blocking steps in CI's order, which CI runs after
+  `npm ci`. Was (R4-5): should the local gate also run `check-staged --tracked` and `npm audit --audit-level=high`, as
+  CI does? A push of R4-5 passed the old gate and still turned CI red on an advisory published the same day.
+- Answered (R4-6, 2): the panel discards what it received before `graph.redacted` (Activity, feed, Run exchanges) and
+  says why. Was (R4-5): Activity lines received before a key was configured kept their names until a reload.
+- Answered (R4-6, 3): the preview stream redacts as it sends too. Was (R4-5): should it, although only demo text
+  reached it? That premise was wrong: `TokenService` calls `observeArtifact` with Run once answers when the preview is
+  on (`lib/tokens/service.ts`), so a version stored before a key was configured could go out unredacted.
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -612,6 +631,13 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R4-5 | `runtime()` without `followSecrets()` | killed by "the process graph follows the key registry…" and the module-copies test |
 | R4-5 | the feed sends without redacting again | killed by "the feed redacts again when it sends…" |
 | R4-5 | the profile removal without its retry | killed by "the browser checks remove their profile with retries…"; restored, sha256 identical |
+| R4-6,1 | the audit step removed from the gate | killed by "the gate is CI's blocking steps…" and "the gate stops at the first step that fails…"; restored, sha256 identical (gate, CI workflow) |
+| R4-6,1 | the gate goes on after a failed step | killed by "the gate stops at the first step…" and "the test step fails on its own exit code and on the floor…" |
+| R4-6,1 | the floor check dropped from the test step | killed by "the test step fails on its own exit code and on the floor…" |
+| R4-6,1 | a step's exit code ignored | killed by the same two |
+| R4-6,1 | the lint step runs typecheck | killed by "the gate is CI's blocking steps…" |
+| R4-6,1 | CI runs `npm test` instead of the gate | killed by "the gate is CI's blocking steps…" and "D5 CI holds every run to the floor…, through the gate" |
+| R4-6,1 | a command that cannot start passes | killed by "a gate command reports its exit code…" |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

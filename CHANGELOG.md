@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 4 on `main` (2026-09-29)
 
 Deleting a delegation left a graph the server could no longer save, and nothing on screen said so. No request with a
-real key was made. The test floor rose from 487 to 501.
+real key was made. The test floor rose from 487 to 505.
 
 - A delegation connection is deleted only with its subagent: `POST /api/graph` answers 400 to `disconnect` on a
   `delegation` edge with "A delegation connection cannot be deleted on its own. Remove the subagent instead.", and
@@ -31,6 +31,9 @@ real key was made. The test floor rose from 487 to 501.
   while it shuts down: the profile removal retries on `ENOTEMPTY`.
 - Patch releases of three transitive development dependencies close advisories published on 2026-09-30 that turned
   `npm audit --audit-level=high` red: `brace-expansion` 5.0.12 and 1.1.21, `fast-uri` 3.1.8, `ip-address` 10.7.2.
+- One gate, `npm run gate`, runs CI's blocking steps in CI's order: the tracked-path check, `npm audit
+  --audit-level=high`, lint, typecheck, the tests held to the floor, and the build. CI runs `npm ci` and then the
+  gate; `AGENTS.md` requires it before every commit (R4-6).
 
 ## Unreleased: Round 3 on `night/provider-validation-ready` (2026-09-28)
 

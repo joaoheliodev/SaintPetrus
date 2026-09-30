@@ -19,9 +19,10 @@ test('D5 a shrinking, skipping, failing or unreadable run is refused', () => {
   assert.match(testFloorProblems(summary(10).replace('# skipped 0\n', ''), agents).join(), /skipped: missing/);
 });
 
-test('D5 CI holds every run to the floor in AGENTS.md', () => {
+test('D5 CI holds every run to the floor in AGENTS.md, through the gate', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
-  assert.match(ci, /shell: bash\n\s+run: \|\n\s+npm test 2>&1 \| tee test-output\.txt\n\s+node scripts\/check-test-floor\.mjs test-output\.txt/, 'the run keeps pipefail and checks the same output');
+  // The gate runs the tests and scripts/check-test-floor.mjs on the same output (tests/gate.test.ts).
+  assert.deepEqual([...ci.matchAll(/^\s*- run: (.+)$/gm)].map(match => match[1]), ['npm ci', 'npm run gate'], 'CI installs and runs the gate, and nothing else');
   assert.equal(testFloorProblems(`# tests ${readFileSync('AGENTS.md', 'utf8').match(/It stands at (\d+) today\./)?.[1]}\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0`, readFileSync('AGENTS.md', 'utf8')).length, 0, 'the repository floor is readable');
 });
 

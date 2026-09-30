@@ -92,6 +92,8 @@ on `main`.
   once the key was disconnected or forgotten the next change wrote it back in plain text. Now configuring a key tells
   the process graph, which replaces every text the redactor would change with the redacted text, within its limit,
   as its own event, and the store saves that at once. The live event feed redacts again as it sends.
+- **R4-6** `npm run gate` is the one gate: CI's blocking steps in CI's order (tracked-path check, `npm audit
+  --audit-level=high`, lint, typecheck, tests held to the floor, build). CI runs `npm ci` and then the gate.
 
 ## Not verified or pending
 

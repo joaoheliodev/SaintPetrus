@@ -22,14 +22,6 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: node scripts/check-staged.mjs --tracked
       - run: npm ci
-      - run: npm audit --audit-level=high
-      - run: npm run lint
-      - run: npm run typecheck
-      - name: Tests, at or above the floor in AGENTS.md, none skipped
-        shell: bash
-        run: |
-          npm test 2>&1 | tee test-output.txt
-          node scripts/check-test-floor.mjs test-output.txt
-      - run: npm run build
+      # The blocking steps live in one place, the gate AGENTS.md requires before every commit (scripts/gate.mjs).
+      - run: npm run gate

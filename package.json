@@ -13,6 +13,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.core.json",
     "test": "node --import tsx --test tests/*.test.ts tests/core/*.test.ts",
+    "gate": "node scripts/gate.mjs",
     "setup:hooks": "git config core.hooksPath .githooks",
     "key": "node scripts/key.mjs",
     "test:browser": "node scripts/check-preview-browser.mjs",
