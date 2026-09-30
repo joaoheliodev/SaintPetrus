@@ -523,6 +523,94 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   clearings, the workspace binding an answer to its render's count), because only a browser runs them and no browser
   check can configure a key. Should the browser check get a way to register a fictitious key in MOCK mode?
 
+### Phase 11 — Round 5: agents cannot be un-paused (2026-09-30)
+
+On `main` from `23f3052`. The operator reported that the panel offers no way to un-pause the agents, without knowing
+which path fails, which button or message shows, or whether it happens in MOCK, in REAL or in both. A state with no
+way out: after any pause the operator needs a visible, explained and tested way back to a usable graph, or a sentence
+that says why not yet and what to do. No request with a real key is made in this round.
+
+| ID | Item | Acceptance criterion | Status |
+| --- | --- | --- | --- |
+| R5-1 | Reproduce before changing anything | Every entry (E1 Pause all at rest, E2 Pause all during the demo, E3 a full scope for agent, model, global and session, E4 a restart with pauses and the kill switch journaled, E5 an unverifiable reservation by service test) against every exit (X1 Resume eligible agents, X2 Resume demo, X3 raise the limit then X1, X4 a new budget period then X1, X5 restart, X6 Reset graph), from a fresh MOCK instance, with the screen and both GETs as evidence; the table below; no fix without a failing cell | done |
+| R5-A | A new critical advisory | `npm audit --audit-level=high` turned red during the round (GHSA-vcvr-r3jv-pc5j, remote code execution in `next/og` ImageResponse, `next` 16.2.0 to 16.3.5): take the patch release and a green gate, in its own commit | done |
+| R5-2 | Pause all leaves no dead end (C1) | After Pause all agents and Resume eligible agents, with nothing else holding them, every agent is Ready, the run is not `paused` unless the demo was paused with Pause demo, Import, Reset, Load demo and Graph limits are enabled and the server accepts remove and import, in MOCK and in REAL; a demo that Pause all paused goes on; a demo paused on purpose says on screen how to finish it; with Pause all on, the graph route keeps refusing start, resume, add, reset and preview-mock, and import joins them | pending |
+| R5-3 | One owner for pauses (C4) | The graph never shows a pause the token service does not hold, nor hides one it holds, after any command: an agent that leaves the graph leaves no pause behind unless it still holds a reservation, and an agent that comes back (reset, import, restore) or that the demo drives shows the token service's pause | pending |
+| R5-4 | Every pause says why (C2) | The token snapshot carries, for each paused agent, what holds it (Pause all, unverifiable usage and until when, an estimate awaiting reconciliation, every full scope with its dimension and whether the mock's usage fills it); resume answers whom it released, and a refusal answers 409 with the server's sentence; Budgets says it by the button, from a pure function in `lib/budget-summary.ts`; contract documented and tested | pending |
+| R5-5 | A visible way back (C3) | Resume eligible agents next to Pause all agents in the top bar while something is paused, and in Ctrl+K, with the same command and text; the panel of a Paused agent says why and opens Budgets; the kill switch refusal names the way | pending |
+| R5-6 | A new budget period says what it clears (H5) | The dialog and Details say that the mock's usage and the session budget stay until a restart; the semantics wait for the operator | pending |
+| R5-7 | Pause and resume invariants | A seeded walk over pause all, resume, raise a limit, new period, reset, import, remove, add and a call refused by a full scope, with the invariants written and justified | pending |
+| R5-8 | Browser checks | The workspace check goes back from Pause all through the new Resume, and through a full scope that Resume cannot release until the limit rises; no PASS removed; REAL without a key shows Pause all and Resume and no Resume demo | pending |
+| R5-9 | Documentation | STATUS, CHANGELOG, README and a one-line guarantee in `AGENTS.md` | pending |
+
+#### R5-1 reproduction (2026-09-30, before any change, at `23f3052`)
+
+A throwaway probe outside the checkout started a fresh `npm run dev` in MOCK with its own temporary
+`SAINTPETRUS_DATA_DIR` for every cell, seeded Writer with a subagent Helper through `POST /api/graph`, applied the
+entry and the exit through the panel in a disposable Chromium (buttons, menu and confirmations as a person uses them),
+and read both GETs and the screen after each. Probes at the end asked the server itself: a Run once quote for every
+agent, an export imported back, and removing a leaf agent. E3 lowered one scope's limit to 300 tokens, sent Run once
+until the server refused (always "Preflight reservation exceeds token or monetary budget." at 225/300), then set the
+limit to what was used (100%). E4 is E1 or E3-agent followed by a restart on the same data directory. No provider was
+called; REAL ran once without a key and without the provider route.
+
+"normal": every agent Ready, the run not `paused`, Import, Reset, Load demo and Graph limits enabled, import and
+remove accepted, Run once quotes accepted, Budgets says "Nothing is paused.". "partial": some of that. "no": every
+agent still Paused.
+
+| Entry | X1 Resume eligible agents | X2 Resume demo | X3 raise, then X1 | X4 new period, then X1 | X5 restart | X6 Reset graph |
+| --- | --- | --- | --- | --- | --- | --- |
+| E1 Pause all at rest | partial: agents Ready and "Nothing is paused.", but the run stays `paused`, so Import, Reset, Load demo and Graph limits stay disabled and the server refuses import and remove ("Reset the mock run before …"); "Resume demo" stays on the toolbar | no: "Resume demo" is on the toolbar right after Pause all, with no demo, and answers only "Global kill switch is active." | partial, as X1 (nothing to raise) | partial, as X1 | no: still paused, but Budgets says why; the run comes back `idle`, so X1 after it is normal | no: Reset graph disabled; the route answers 409 "Global kill switch is active." |
+| E2 Pause all during the demo | partial, as E1 (here the demo really is paused) | no, as E1 | partial, as X1 | partial, as X1 | no, as E1 | no, as E1 |
+| E3 agent scope full | partial: Resume answers 200 and nothing changes, with no word near the button; Budgets names the scope | partial: no Resume demo (run idle) | normal | partial: the new period keeps the mock's usage, so the scope stays full, although the dialog says consumption "starts again from zero" | partial: the restart clears the mock's usage, but the agent stays Paused and Budgets says "All budgets have room." | partial: the paused agent is gone, its id stays in `paused`, Resume stays enabled, and Budgets asks to raise the limit of a raw id the server refuses to raise |
+| E3 model scope full | partial, as agent; other agents' calls are refused too | partial, as agent | normal | partial, as agent | partial, as agent | partial, as agent |
+| E3 global scope full | partial, as agent | partial, as agent | normal | partial, as agent | partial, as agent | partial, as agent |
+| E3 session scope full | partial, as agent | partial, as agent | normal | partial: a new period leaves the session row alone | partial, as agent | partial, as agent |
+| E4 restart after Pause all | normal (the run came back `idle`) | no: no Resume demo | normal | normal | no: every agent still Paused, Budgets says why | no: Reset enabled (run idle) but refused with "Global kill switch is active." and no way named |
+| E4 restart after a full agent scope | normal | partial: Paused with "All budgets have room." | normal | normal | partial: Paused with "All budgets have room." | partial: stale id, Resume enabled with nothing to resume |
+
+E5, by service test (fictitious model and tariff, an adapter that times out, injected clock, no network): while the
+reservation is `unverifiable`, `POST /api/tokens` resume answers 400 "Token control rejected. Check scope, limits and
+unverifiable usage." (with Pause all on, too; it stays on), and the graph route refuses reset with "Global kill switch
+is active."; after expiry resume works and releases the agent, but a run paused by Pause all stays `paused`. With an
+unpriced served model (A-10), resume after expiry answers 200 and leaves the agent paused without a word; Budgets
+speaks only of "1 expired reservation … counted as an estimate".
+
+Extra sequences: (S1b) a leaf agent paused by its full scope and removed stays in `TokenService.paused` for good:
+resume answers 200 and keeps it, raising its limit is refused ("Unknown budget scope" behind the generic 400), and it
+survives a restart through the journal; Budgets says "All budgets have room." with Resume enabled. (S2) the Coordinator
+paused by a refused call, then Reset graph: the new Coordinator is Ready on the canvas while Run once answers "Agent
+paused.". (S3) Pause all during the demo, Resume eligible agents, then Resume demo: the demo finishes and the graph is
+usable, but nothing on screen names the second step. (S4) a call refused by preflight at 75% pauses its agent while
+Budgets says "All budgets have room."; Resume releases it and the next call pauses it again. (S5) REAL without a key:
+Pause all, then Resume eligible agents: agents Ready, the run stays `paused`, no Resume demo exists, Import, Reset and
+Graph limits stay disabled and the server refuses import and remove: only a restart gets out.
+
+Hypotheses: H1 confirmed (E1, E2 × X1, X3, X4; S5 in REAL has no way back but a restart). H2 confirmed (E1, E2 × X2;
+the way back is only in Budgets). H3 confirmed (E3 × X1; `budgetStatus` names one row by construction). H4 confirmed
+(E5). H5 confirmed (E3 × X4). H6: (a) as stated, a graph Paused that the token service does not hold, was not
+produced by any sequence tried and is refuted; the reverse divergence is real (S2, and an import accepted while Pause
+all was on after a restart, E1 × X5); (b) confirmed (S1b, E3 and E4 × X6). H7 confirmed by reading. Also found: S4, and
+a pause the journal restored with nothing to explain it (E3, E4 × X5). The most likely account of what the operator
+saw: H1 with H2. Pause all agents leaves the run `paused`, so the canvas offers "Resume demo", which answers only
+"Global kill switch is active."; the real way out, Resume eligible agents, sits in Budgets; and even after it the run
+stays paused, so Import, Reset, Load demo and Graph limits stay off and the server refuses remove and import. In REAL
+there is no Resume demo, so only a restart gets out.
+
+#### Decisions taken
+
+- R5-A (2026-09-30). The gate of R5-2 stopped at `npm audit --audit-level=high` on an advisory published after CI's
+  last green run on `23f3052`: GHSA-vcvr-r3jv-pc5j, critical, remote code execution in `next/og` ImageResponse,
+  `next` 16.2.0 to 16.3.5. `next` was pinned at 16.3.4; the fix is a patch release, 16.3.8 (the latest). Only `next`
+  moved: `package.json` pins 16.3.8, the lockfile was regenerated with npm 11 (`npx npm@11 install --package-lock-only`,
+  80 lines, only `next`, `@next/env` and the eight `@next/swc-*` packages; the 38 `libc` fields kept) and installed
+  with `npm ci` on npm 10, as CI does. `eslint-config-next` stays at 16.3.4: the advisory does not concern it. MIT,
+  no telemetry change, actively maintained. `npm audit`: 1 critical before, 0 after; the gate and the browser check
+  passed on it (`next dev` did not rewrite the `AGENTS.md` block). There is no line of ours to mutate. The gate ran on
+  the working tree, which also held the uncommitted R5-2 change: the tree committed after R5-2 is the one gated.
+
+#### Questions for João
+
 ## V0 review of Part 2 (`1445177`)
 
 Checked every section of `docs/provider-validation.md` and the `STATUS.md` change against the code.

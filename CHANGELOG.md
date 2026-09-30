@@ -3,6 +3,14 @@
 Notable changes, newest first. Dates are UTC. No release has been tagged; entries are grouped by the branch
 that carried them.
 
+## Unreleased: Round 5 on `main` (2026-09-30)
+
+The operator could not un-pause the agents. Every way into a pause was tried against every way out on fresh instances
+before anything changed. No request with a real key was made.
+
+- `next` 16.3.8, a patch release, closes GHSA-vcvr-r3jv-pc5j (critical: remote code execution in `next/og`
+  ImageResponse, 16.2.0 to 16.3.5), published during the round, which turned `npm audit --audit-level=high` red.
+
 ## Unreleased: Round 4 on `main` (2026-09-29)
 
 Deleting a delegation left a graph the server could no longer save, and nothing on screen said so. No request with a
