@@ -110,6 +110,7 @@ test('R4-3 the panel takes only the route shape and warns with its reason, persi
   assert.equal(renderToStaticMarkup(React.createElement(GraphSaveWarning, { state: undefined })), '');
   // Wired: the workspace shows the transport's state under the top bar, and the transport reads the route.
   const [workspace, transport] = await Promise.all(['components/workspace.tsx', 'lib/use-graph-transport.ts'].map(path => readFile(path, 'utf8')));
-  assert.match(workspace, /<\/header>\s*<GraphSaveWarning state=\{persistence\} \/>/);
+  // First under the top bar, in the row it now shares with the pause notice (Round 5, R5-5).
+  assert.match(workspace, /<\/header>\s*(?:\{\/\*[^*]*\*\/\}\s*)?<div className="topbar-notices"><GraphSaveWarning state=\{persistence\} \/>/);
   assert.match(transport, /readGraphRoute\('\/api\/graph\/persistence', controller\.signal\)/);
 });

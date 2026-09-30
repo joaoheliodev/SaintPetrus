@@ -122,6 +122,11 @@ round's handoff); each fix below answers a cell that did not come back.
   usage fills it, or a removed agent's reservation); a resume answers whom it released, a refusal answers 409 with the
   server's sentence, and Budgets words both beside the button. The summary names every full scope, leaves out a
   removed agent's row (it blocks nothing), and Details offers no limit for one (the server refuses it).
+- **R5-5** The way back is where the pause is made. After Pause all agents the canvas used to offer only "Resume
+  demo", and Resume eligible agents sat in Budgets alone. Now, while anything is paused, Resume eligible agents stands
+  beside Pause all agents in the top bar and in Commands (Ctrl+K), with the same command and answer as in Budgets; a
+  notice under the top bar says what holds each agent and opens Budgets; the panel of a Paused agent says why and
+  opens Budgets.
 
 ## Not verified or pending
 

@@ -120,6 +120,11 @@ h1, h2, h3, p { margin: 0; } h1 { font-size: 18px; } h2 { font-size: 15px; } h3 
 .main-column > .workspace-view, .main-column > .view { grid-row: 3; grid-column: 1; }
 .save-warning { grid-row: 2; grid-column: 1; display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--destructive); background: var(--card); color: var(--foreground); font-size: 13px; line-height: 1.5; }
 .save-warning svg { flex-shrink: 0; color: var(--destructive); } .save-warning p { margin: 0; }
+.topbar-notices { grid-row: 2; grid-column: 1; }
+.pause-notice { display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--card); color: var(--foreground); font-size: 13px; line-height: 1.5; }
+.pause-notice > svg { flex-shrink: 0; margin-top: 2px; } .pause-notice > div { flex: 1; } .pause-notice p, .pause-notice ul { margin: 0; } .pause-notice ul { padding-left: 18px; }
+.inspector-pause { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; } .inspector-pause p { margin: 0; }
+.pause-reasons p, .pause-reasons ul { margin: 4px 0 0; } .pause-reasons ul { padding-left: 18px; }
 .workspace-view.is-away { visibility: hidden; }
 .main-column > .view { z-index: 1; background: var(--background); }
 .topbar { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--card); }

@@ -25,11 +25,13 @@ type RunPhase = 'idle' | 'quoting' | 'asking' | 'sending';
 export const runLabels: Record<RunPhase, string> = { idle: 'Send (1 call)', quoting: 'Checking the cost…', asking: 'Waiting for your answer…', sending: 'Running…' };
 type Props = { agent: Agent; agents: readonly Pick<Agent, 'id' | 'name'>[]; pending: boolean; command: (input: Record<string, unknown>) => Promise<Graph | null>; connect: (source: string, target: string) => Promise<void>;
   // The global connection Run once uses, and this agent's last exchange, kept in the workspace's memory only.
-  connection?: ProviderStatusSnapshot; exchange?: RunExchange; onExchange?: (exchange: RunExchange) => void; openConnection?: () => void };
+  connection?: ProviderStatusSnapshot; exchange?: RunExchange; onExchange?: (exchange: RunExchange) => void; openConnection?: () => void;
+  // Why a Paused agent is paused, in the server's reasons as Budgets words them, and the way there (Round 5, R5-5).
+  pause?: string; openBudgets?: () => void };
 // What Run once will use, in the words of the connection chip and the mode badge.
 export const runsWith = (connection: ProviderStatusSnapshot | undefined) => !connection ? 'Connection loading' : `${connection.state === 'disconnected' ? 'No connection' : connectionTarget(connection)} · ${connection.mode === 'real' ? 'REAL' : 'MOCK'}`;
 // Mount with `key={agent.id}` so drafts never carry over from another agent.
-export function AgentInspector({ agent, agents, pending, command, connect, connection, exchange, onExchange, openConnection }: Props) {
+export function AgentInspector({ agent, agents, pending, command, connect, connection, exchange, onExchange, openConnection, pause, openBudgets }: Props) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(agent.name);
   const [objective, setObjective] = useState(agent.context.objective);
@@ -74,6 +76,7 @@ export function AgentInspector({ agent, agents, pending, command, connect, conne
     <header className="inspector-head">
       <div className="inspector-profile"><Bot aria-hidden="true" /><h2>{agent.name}</h2><AgentStatusBadge status={agent.status} /></div>
       <p className="inspector-meta">{openConnection ? <button type="button" className="runs-with" title="The connection Run once uses. Open Connection to change it." onClick={openConnection}>{runsWith(connection)}</button> : <span>{runsWith(connection)}</span>}<span>{agentPlacement(agent)}</span></p>
+      {agent.status === 'paused' && <div className="inspector-pause" role="status"><p>{pause ?? 'Paused. Budgets says why.'}</p>{openBudgets && <Button variant="outline" size="sm" onClick={openBudgets}>Open Budgets</Button>}</div>}
     </header>
     {/* Both panels stay mounted, so an unsaved edit or message survives a tab switch. */}
     <Tabs defaultValue="run"><TabsList aria-label="Agent panel"><TabsTrigger value="run">Run</TabsTrigger><TabsTrigger value="details">Details</TabsTrigger></TabsList>

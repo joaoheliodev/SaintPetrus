@@ -190,7 +190,9 @@ it and what releases it: Pause all agents, usage that is unverifiable until a gi
 provider-confirmed usage, and every full scope with its dimension, including when the mock's estimated tokens fill it
 (a restart clears those; a new budget period keeps them). `GET /api/tokens` carries those holds as `pauses` (one entry
 per paused agent: `agent`, `removed`, `reasons`); a resume answers the same snapshot with `resumed`, the agents it
-released, or 409 with the server's sentence when unverifiable usage refuses it.
+released, or 409 with the server's sentence when unverifiable usage refuses it. While anything is paused, the same
+command stands beside **Pause all agents** in the top bar and in **Commands** (Ctrl+K), a notice under the top bar
+says the same, and the panel of a Paused agent says why and opens Budgets.
 **Pause all agents** cancels the active provider request and pauses a running demo too. **Resume eligible agents**
 lets that demo go on; a demo paused with **Pause demo** waits for **Resume demo**, or **Reset graph** ends it. While
 Pause all agents is on, reset, import, adding an agent and the demo are refused with a sentence that names the way out.

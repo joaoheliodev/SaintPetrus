@@ -12,7 +12,8 @@ import { connectionFeedback, type Agent, type Graph } from '@/lib/orchestrator';
 import { useProjection } from '@/lib/store';
 import { useGraphTransport } from '@/lib/use-graph-transport';
 import { AgentInspector } from './agent-inspector';
-import { BudgetMeter, BudgetsView, PauseAllButton, PricesView, askToPauseAll, useTokenSnapshot } from './token-panel';
+import { BudgetMeter, BudgetsView, PauseAllButton, PauseNotice, PricesView, ResumeEligibleButton, askToPauseAll, useTokenSnapshot } from './token-panel';
+import { pauseSentence, resumable } from '@/lib/budget-summary';
 import { CommandPalette } from './command-palette';
 import type { Command } from '@/lib/command-search';
 import { AgentStatusBadge } from './agent-status-badge';
@@ -77,6 +78,9 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
   // Bound to this render's clearing count, which the inspector's call keeps: an answer to a message sent before a
   // configured key cleared the history is dropped when it arrives.
   const recordRun = (exchange: RunExchange) => recordExchange(selected.id, exchange, clearings);
+  // The selected agent's pause, in the words Budgets uses for it; the reasons are the server's.
+  const selectedHolds = tokens.data?.pauses.find(pause => pause.agent === selected.id);
+  const selectedPause = selectedHolds ? pauseSentence(selectedHolds, id => graph.agents.find(agent => agent.id === id)?.name ?? id) : undefined;
   const active = graph.status === 'running' || graph.status === 'paused';
   // Reset ends a paused demo on the server as well, so only a running one keeps it disabled.
   const running = graph.status === 'running';
@@ -201,6 +205,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
     ...(mockEnabled ? [{ id: 'demo', label: 'Load demo…', group: 'Graph', disabled: pending || active, run: () => void loadDemo() }] : []),
     ...(mockEnabled && previewPort ? [{ id: 'preview-demo', label: 'Load preview demo…', group: 'Graph', disabled: pending || active, run: () => void loadPreviewDemo() }] : []),
     { id: 'pause-all', label: 'Pause all agents…', group: 'Budgets', disabled: tokens.pending, run: () => void askToPauseAll(tokens.command, confirm) },
+    { id: 'resume', label: 'Resume eligible agents', group: 'Budgets', disabled: tokens.pending || !resumable(tokens.data), run: () => void tokens.resume() },
     ...graph.agents.map(agent => ({ id: `agent-${agent.id}`, label: `Open ${agent.name}`, group: 'Agent', run: () => openAgent(agent) })),
   ];
   function openAgent(agent: Agent) { setView('workspace'); select(agent.id); void flow.setCenter(agent.position.x + 145, agent.position.y + 100, { zoom: .9, duration: 300 }); }
@@ -227,8 +232,9 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
       </div>
     </aside>
     <div className="main-column">
-      <header className="topbar"><ConnectionChip source={connection} open={() => setView('connection')} /><BudgetMeter snapshot={tokens.data} open={() => setView('budgets')} /><div className="topbar-actions"><Button variant="ghost" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Control+K"><Search />Commands<kbd>Ctrl K</kbd></Button><PauseAllButton tokens={tokens} /></div></header>
-      <GraphSaveWarning state={persistence} />
+      <header className="topbar"><ConnectionChip source={connection} open={() => setView('connection')} /><BudgetMeter snapshot={tokens.data} open={() => setView('budgets')} /><div className="topbar-actions"><Button variant="ghost" onClick={() => setPaletteOpen(true)} aria-keyshortcuts="Control+K"><Search />Commands<kbd>Ctrl K</kbd></Button><PauseAllButton tokens={tokens} /><ResumeEligibleButton tokens={tokens} /></div></header>
+      {/* Budgets says the same beside its own Resume, so the notice leaves that view to it. */}
+      <div className="topbar-notices"><GraphSaveWarning state={persistence} />{view !== 'budgets' && <PauseNotice tokens={tokens} agents={graph.agents} open={() => setView('budgets')} />}</div>
       <CommandPalette commands={commands} open={paletteOpen} onOpenChange={setPaletteOpen} />
       {/* The canvas stays laid out under the other views: React Flow measures nodes and draws its background from its own size. */}
       <div className={cn('workspace-view', view !== 'workspace' && 'is-away')} inert={view !== 'workspace'}><div className="center-panel"><div className="canvas-toolbar"><span>Canvas · {graph.agents.length} {graph.agents.length === 1 ? 'agent' : 'agents'} · {graph.edges.length} {graph.edges.length === 1 ? 'connection' : 'connections'}</span><div className="project-actions">
@@ -264,7 +270,7 @@ function CanvasWorkspace({ initialGraph, mockEnabled, feedEnabled = false, previ
         <TabsContent value="activity" keepMounted><GraphActivity events={events} revision={graph.revision} /></TabsContent>
         {previewPort && <TabsContent value="preview" keepMounted><ArtifactPreview port={previewPort} /></TabsContent>}
       </Tabs>
-      </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={recordRun} openConnection={() => setView('connection')} /></div>
+      </div><AgentInspector key={selected.id} agent={selected} agents={graph.agents} pending={pending} command={command} connect={connect} connection={connection.status} exchange={exchanges[selected.id]} onExchange={recordRun} openConnection={() => setView('connection')} pause={selectedPause} openBudgets={() => setView('budgets')} /></div>
       {view === 'activity' && <section className="view activity-view" aria-labelledby="activity-title"><h1 id="activity-title">Activity</h1>
         <p className="helper">What changed on the canvas, newest first, as the server published it. Card moves and demo output are hidden unless you ask for them.</p>
         <GraphActivity events={events} revision={graph.revision} />

@@ -537,7 +537,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-2 | Pause all leaves no dead end (C1) | After Pause all agents and Resume eligible agents, with nothing else holding them, every agent is Ready, the run is not `paused` unless the demo was paused with Pause demo, Import, Reset, Load demo and Graph limits are enabled and the server accepts remove and import, in MOCK and in REAL; a demo that Pause all paused goes on; a demo paused on purpose says on screen how to finish it; with Pause all on, the graph route keeps refusing start, resume, add, reset and preview-mock, and import joins them | done |
 | R5-3 | One owner for pauses (C4) | The graph never shows a pause the token service does not hold, nor hides one it holds, after any command: an agent that leaves the graph leaves no pause behind unless it still holds a reservation, and an agent that comes back (reset, import, restore) or that the demo drives shows the token service's pause | done |
 | R5-4 | Every pause says why (C2) | The token snapshot carries, for each paused agent, what holds it (Pause all, unverifiable usage and until when, an estimate awaiting reconciliation, every full scope with its dimension and whether the mock's usage fills it); resume answers whom it released, and a refusal answers 409 with the server's sentence; Budgets says it by the button, from a pure function in `lib/budget-summary.ts`; contract documented and tested | done |
-| R5-5 | A visible way back (C3) | Resume eligible agents next to Pause all agents in the top bar while something is paused, and in Ctrl+K, with the same command and text; the panel of a Paused agent says why and opens Budgets; the kill switch refusal names the way | pending |
+| R5-5 | A visible way back (C3) | Resume eligible agents next to Pause all agents in the top bar while something is paused, and in Ctrl+K, with the same command and text; the panel of a Paused agent says why and opens Budgets; the kill switch refusal names the way | done |
 | R5-6 | A new budget period says what it clears (H5) | The dialog and Details say that the mock's usage and the session budget stay until a restart; the semantics wait for the operator | pending |
 | R5-7 | Pause and resume invariants | A seeded walk over pause all, resume, raise a limit, new period, reset, import, remove, add and a call refused by a full scope, with the invariants written and justified | pending |
 | R5-8 | Browser checks | The workspace check goes back from Pause all through the new Resume, and through a full scope that Resume cannot release until the limit rises; no PASS removed; REAL without a key shows Pause all and Resume and no Resume demo | pending |
@@ -648,6 +648,14 @@ there is no Resume demo, so only a restart gets out.
   through `command`, which can hand its reply to a caller; no new `fetch` (the ratchet allows none). `budgetStatus`
   names every full scope and skips a removed agent's row; Details disables its limits, which the server refuses. Five
   test fixtures that build a `TokenSource` by hand gained `resume` and `resumeReply`.
+- R5-5 (2026-09-30). `ResumeEligibleButton` stands beside `PauseAllButton` in the top bar while `resumable(snapshot)`
+  (Pause all on, or any pause) and runs the same `tokens.resume`; Commands gains "Resume eligible agents" (group
+  Budgets), disabled when nothing is paused. `PauseNotice` shares the row under the top bar with the save warning
+  (`.topbar-notices`) on every view but Budgets, which says the same beside its own button: the last answer while it
+  still holds, `pauseSummary`, and "Open Budgets". `AgentInspector` takes `pause` (the agent's `pauseSentence`) and
+  `openBudgets`, and shows both while the agent is Paused. The kill switch refusal already named the way (R5-2). The
+  R4-3 test that pinned the save warning right after the top bar now allows the shared row. The browser check goes
+  back from Pause all through the top bar, and again through Ctrl+K.
 
 #### Questions for João
 
@@ -850,6 +858,11 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-4 | an outdated resume answer is shown | killed by "the panel words every hold…" and "Budgets says…" |
 | R5-4 | Budgets hides the holds | killed by "Budgets says…" |
 | R5-4 | a removed agent row offers limits again | killed by "a removed agent row offers no limit to change…" |
+| R5-5 | the top-bar Resume never shows | killed by "Resume eligible agents stands beside Pause all agents only while something is paused"; every file restored, sha256 identical |
+| R5-5 | the notice never shows | killed by "the notice under the top bar says what the last resume did…" |
+| R5-5 | the notice forgets the last answer | killed by the same |
+| R5-5 | a Paused agent's panel says nothing | killed by "the panel of a Paused agent says why and opens Budgets…" |
+| R5-5 | Commands has no Resume eligible agents | killed by the browser check ("Timed out: the palette offers Resume eligible agents") |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

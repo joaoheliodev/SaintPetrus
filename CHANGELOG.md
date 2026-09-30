@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 5 on `main` (2026-09-30)
 
 The operator could not un-pause the agents. Every way into a pause was tried against every way out on fresh instances
-before anything changed. No request with a real key was made. The test floor rose from 514 to 531.
+before anything changed. No request with a real key was made. The test floor rose from 514 to 534.
 
 - After **Pause all agents** and **Resume eligible agents** the graph is usable again: Pause all no longer marks the
   run paused when no demo is running, so Import, Reset, Load demo and Graph limits are enabled and the server accepts
@@ -27,6 +27,9 @@ before anything changed. No request with a real key was made. The test floor ros
   instead of the generic 400. Budgets words the answer and every hold beside **Resume eligible agents**; its summary
   names every full scope, not only the first, and leaves out a removed agent's row, whose limits Details no longer
   offers (R5-4).
+- While anything is paused, **Resume eligible agents** stands beside **Pause all agents** in the top bar and in
+  **Commands** (Ctrl+K), a notice under the top bar says what holds each agent and opens Budgets, and the panel of a
+  Paused agent says why (R5-5).
 
 ## Unreleased: Round 4 on `main` (2026-09-29)
 

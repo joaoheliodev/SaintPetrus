@@ -259,15 +259,32 @@ try {
   await until(() => click('Pause all agents'), 'Pause all agents button'); await until(async () => (await sync()).some(text => text.startsWith('Pause every agent?')), 'pause question');
   await until(() => evaluate(`document.querySelector('.react-flow__node .status')?.textContent.includes('Paused')`), 'agents paused');
   console.log('PASS: pause all asks first and pauses every agent');
-  // Resume eligible agents gives the graph back whole: no agent and not even the run stays paused (Round 5, R5-2).
-  await until(() => click('Budgets'), 'Budgets view'); await until(() => click('Resume eligible agents'), 'Resume eligible agents');
+  // The way back is where the pause was made: a notice says why and Resume eligible agents stands beside Pause all agents
+  // (Round 5, R5-5); it gives the graph back whole, with not even the run left paused (R5-2).
+  const topResume = `Array.from(document.querySelectorAll('.topbar-actions button')).find(button => button.textContent.trim() === 'Resume eligible agents')`;
+  await until(() => evaluate(`document.querySelector('.pause-notice')?.textContent.includes('Pause all agents is on, so every agent is paused.')`), 'the notice says why');
+  await until(() => evaluate(`!!${topResume}`), 'Resume eligible agents beside Pause all agents');
+  await until(() => click('Resume eligible agents'), 'Resume eligible agents');
+  await until(() => evaluate(`!document.querySelector('.pause-notice') && !${topResume}`), 'nothing left to resume');
+  await until(() => click('Budgets'), 'Budgets view');
   await until(() => evaluate(`document.querySelector('.budget-summary')?.textContent.includes('Nothing is paused.')`), 'nothing left paused');
   await until(() => click('Workspace'), 'Workspace view');
   await until(() => evaluate(`Array.from(document.querySelectorAll('.react-flow__node .status')).every(badge => badge.textContent.includes('Ready'))`), 'agents Ready again');
   const usable = await menuItems();
   assert.deepEqual([usable['Import graph…'], usable['Reset graph…'], ...(mocked ? [usable['Load demo…']] : [])], [false, false, ...(mocked ? [false] : [])], 'nothing in More stays disabled');
   assert.equal(await evaluate(`Array.from(document.querySelectorAll('.budget-card button')).every(button => !button.disabled)`), true, 'Graph limits can be applied');
-  console.log('PASS: Resume eligible agents after Pause all agents gives the graph back: agents Ready, Import, Reset and Graph limits enabled, "Nothing is paused."');
+  console.log('PASS: after Pause all agents a notice says why, and Resume eligible agents beside it gives the graph back: agents Ready, Import, Reset and Graph limits enabled, "Nothing is paused."');
+  // Ctrl+K reaches the same command (Round 5, R5-5).
+  await until(() => click('Pause all agents'), 'Pause all agents again');
+  await until(async () => (await sync()).filter(text => text.startsWith('Pause every agent?')).length >= 2, 'second pause question');
+  await until(() => evaluate(`!!${topResume}`), 'paused again');
+  for (const type of ['rawKeyDown', 'keyUp']) await call('Input.dispatchKeyEvent', { type, key: 'k', code: 'KeyK', windowsVirtualKeyCode: 75, modifiers: 2 }, session);
+  await until(() => evaluate(`document.activeElement?.getAttribute('aria-label') === 'Command'`), 'command palette focused again');
+  await type('input[aria-label="Command"]', 'resume eligible');
+  await until(() => evaluate(`document.querySelector('[role=option][aria-selected=true]')?.textContent.startsWith('Resume eligible agents')`), 'the palette offers Resume eligible agents');
+  await key('Enter');
+  await until(() => evaluate(`!document.querySelector('.pause-notice') && !${topResume} && Array.from(document.querySelectorAll('.react-flow__node .status')).every(badge => badge.textContent.includes('Ready'))`), 'resumed from the palette');
+  console.log('PASS: Ctrl+K reaches Resume eligible agents too');
   if (mocked) {
     // A demo paused on purpose says how to get the graph back, and Reset graph ends it (Round 5, R5-2).
     await menu('Load demo…'); await until(async () => (await sync()).some(text => text.startsWith('Load the demo?')), 'load demo question');

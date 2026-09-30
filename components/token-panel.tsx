@@ -4,7 +4,7 @@ import type { TokenSnapshot } from '../lib/tokens/service';
 import { Button } from './ui/button';
 import { PricePanel } from './price-panel';
 import { useConfirm } from './confirm-dialog';
-import { Gauge } from 'lucide-react';
+import { CirclePause, Gauge } from 'lucide-react';
 import { budgetMeter, budgetStatus, callCount, idle, journalWarning, pauseSummary, percent, periodNotice, resumable, resumeOutcome, resumeReplyCurrent, rowUsage, scopes, usd, type BudgetRow } from '../lib/budget-summary';
 import { cn } from '../lib/utils';
 // The one GET reader for accounting evidence: the token snapshot and the receipts behind it.
@@ -75,6 +75,23 @@ export async function askToPauseAll(command: TokenSource['command'], confirm: Re
 export function PauseAllButton({ tokens }: { tokens: TokenSource }) {
   const { pending, command } = tokens; const confirm = useConfirm();
   return <Button variant="outline" disabled={pending} onClick={() => void askToPauseAll(command, confirm)}>Pause all agents</Button>;
+}
+// Beside Pause all agents while something is paused: the same command and the same answer as in Budgets (Round 5, R5-5).
+export function ResumeEligibleButton({ tokens }: { tokens: TokenSource }) {
+  if (!resumable(tokens.data)) return null;
+  return <Button variant="outline" disabled={tokens.pending} onClick={() => void tokens.resume()}>Resume eligible agents</Button>;
+}
+// Under the top bar while something is paused: what the last resume did, what holds each agent, and the way to Budgets.
+export function PauseNotice({ tokens, agents, open }: { tokens: TokenSource; agents: readonly { id: string; name: string }[]; open: () => void }) {
+  const { data } = tokens;
+  const agentName = (id: string) => agents.find(agent => agent.id === id)?.name ?? id;
+  const pauses = data ? pauseSummary(data, agentName) : undefined;
+  if (!data || !pauses) return null;
+  const outcome = resumeReplyCurrent(tokens.resumeReply, data) ? resumeOutcome(tokens.resumeReply, agentName) : undefined;
+  return <div role="status" className="pause-notice"><CirclePause aria-hidden="true" /><div>
+    {outcome && <p>{outcome}</p>}<p><strong>{pauses.headline}</strong></p>
+    {pauses.details.length > 0 && <ul>{pauses.details.map(line => <li key={line}>{line}</li>)}</ul>}
+  </div><Button variant="outline" size="sm" onClick={open}>Open Budgets</Button></div>;
 }
 const meterStates: Record<string, string> = { available: '', warning: ' · warning', stopped: ' · stopped' };
 // The top-bar meter, from the same snapshot as Budgets: the fullest of the global and session scopes.
