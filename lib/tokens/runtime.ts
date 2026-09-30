@@ -18,13 +18,14 @@ export function openAccountingJournal(directory: string) {
 export function tokenService() {
   if (!state.saintpetrusTokens) {
     const { policy, prices } = loadConfig();
-    state.saintpetrusTokens = new TokenService(policy, prices, {
+    const service = state.saintpetrusTokens = new TokenService(policy, prices, {
       role: id => runtime().graph.snapshot().agents.find(a => a.id === id)?.name ?? id,
       ids: () => runtime().graph.snapshot().agents.map(a => a.id),
       pause: id => runtime().graph.setAgentStatus(id, 'paused'),
       pauseAll: () => { providerProxy().cancel(); runtime().mock.pause('Pause all agents'); runtime().graph.pauseAll(); },
       resumeAll: () => runtime().mock.resumeAfterPauseAll(),
     }, undefined, Date.now, new PriceCatalog(prices, join(process.cwd(), 'config/prices.json')));
+    runtime().graph.followPauses(id => service.holdsPause(id));
     const pin = state.saintpetrusAccounting;
     if (pin?.opened) state.saintpetrusTokens.restore(new AccountingJournal(pin.directory), pin.opened);
     else if (pin) state.saintpetrusTokens.journalUnopenable();

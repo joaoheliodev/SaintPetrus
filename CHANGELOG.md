@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 5 on `main` (2026-09-30)
 
 The operator could not un-pause the agents. Every way into a pause was tried against every way out on fresh instances
-before anything changed. No request with a real key was made. The test floor rose from 514 to 518.
+before anything changed. No request with a real key was made. The test floor rose from 514 to 524.
 
 - After **Pause all agents** and **Resume eligible agents** the graph is usable again: Pause all no longer marks the
   run paused when no demo is running, so Import, Reset, Load demo and Graph limits are enabled and the server accepts
@@ -16,6 +16,10 @@ before anything changed. No request with a real key was made. The test floor ros
   agents first." instead of "Global kill switch is active." (R5-2).
 - `next` 16.3.8, a patch release, closes GHSA-vcvr-r3jv-pc5j (critical: remote code execution in `next/og`
   ImageResponse, 16.2.0 to 16.3.5), published during the round, which turned `npm audit --audit-level=high` red.
+- Pauses have one owner. An agent removed or reset away while paused no longer leaves a pause behind that kept
+  **Resume eligible agents** enabled forever (unless it still holds a reservation); after a reset, an import or a
+  restart an agent the token service holds shows Paused instead of a Ready card that Run once refuses, and the demo
+  no longer overwrites a pause (R5-3).
 
 ## Unreleased: Round 4 on `main` (2026-09-29)
 

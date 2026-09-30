@@ -32,6 +32,9 @@ const onCanvas = (value: number) => Math.max(-100000, Math.min(100000, value));
 export const demoRefusal = (action: string) => `The demo is running or paused: let it finish (Resume demo if it is paused) or reset the graph before ${action}.`;
 export class GraphService {
   private graph = createGraph();
+  // The token service owns every pause; the graph shows the ones it holds (Round 5, R5-3). Only the process graph is told.
+  private held: (id: string) => boolean = () => false;
+  followPauses(held: (id: string) => boolean) { this.held = held; }
   constructor() { this.record('agent.created', 'root', 'Coordinator created.'); }
   private record(type: import('../events/types').EventType, id: string, payload: string, extra: Partial<import('../events/types').EventInput> = {}) {
     eventBus().publish({ agent_id: id, role: this.graph.agents.find(a => a.id === id)?.name ?? 'Unknown', type, payload, ...extra });
@@ -58,6 +61,8 @@ export class GraphService {
     refuseCredentials({ objective });
     const revision = this.graph.revision;
     this.graph = createGraph(this.graph.budget, objective);
+    // The Coordinator keeps its id through a reset, and with it a pause the token service still holds.
+    if (this.held('root')) this.graph.agents[0].status = 'paused';
     this.graph.revision = revision; this.emit('graph.reset', 'Graph reset.');
   }
   setBudget(budget: ExecutionBudget) {
@@ -126,6 +131,7 @@ export class GraphService {
     if (this.graph.status === 'running' || this.graph.status === 'paused') throw new GraphError(demoRefusal('importing a graph'));
     // Revisions only move forward, so a client that saw a later revision still accepts the next event.
     this.graph = { ...structuredClone(graph), revision: Math.max(this.graph.revision, graph.revision) };
+    for (const agent of this.graph.agents) if (this.held(agent.id)) agent.status = 'paused';
     this.record('graph.replaced', 'root', reason === 'imported' ? 'Graph imported from a file.' : 'Saved graph restored.');
     this.emit(`graph.${reason}`, reason === 'imported' ? 'Graph imported.' : 'Graph restored.');
   }
@@ -195,6 +201,8 @@ export class GraphService {
   setAgentStatus(id: string, status: Agent['status']) {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) throw new GraphError('Agent not found.');
+    // Nothing but the token service's release replaces a pause it holds; the demo drives statuses around it.
+    if (status !== 'paused' && this.held(id)) return;
     const from = agent.status; agent.status = status;
     if (from !== status) this.record(status === 'paused' ? 'agent.paused' : 'agent.status_changed', id, 'Agent status changed.', { status: { from, to: status } });
     this.emit('agent.updated', 'Agent status updated.', { agent });
@@ -210,7 +218,8 @@ export class GraphService {
     const agent = this.graph.agents.find(a => a.id === id);
     if (!agent) throw new GraphError('Agent not found.');
     if (charge && this.graph.costCents + 1 > this.graph.budget.maxCostCents) {
-      agent.status = 'blocked'; this.graph.status = 'blocked';
+      if (!this.held(id)) agent.status = 'blocked';
+      this.graph.status = 'blocked';
       this.emit('budget.exhausted', 'Mock budget exhausted.', { agent }); return false;
     }
     if (charge) this.graph.costCents++;

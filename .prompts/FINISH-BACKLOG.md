@@ -535,7 +535,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-1 | Reproduce before changing anything | Every entry (E1 Pause all at rest, E2 Pause all during the demo, E3 a full scope for agent, model, global and session, E4 a restart with pauses and the kill switch journaled, E5 an unverifiable reservation by service test) against every exit (X1 Resume eligible agents, X2 Resume demo, X3 raise the limit then X1, X4 a new budget period then X1, X5 restart, X6 Reset graph), from a fresh MOCK instance, with the screen and both GETs as evidence; the table below; no fix without a failing cell | done |
 | R5-A | A new critical advisory | `npm audit --audit-level=high` turned red during the round (GHSA-vcvr-r3jv-pc5j, remote code execution in `next/og` ImageResponse, `next` 16.2.0 to 16.3.5): take the patch release and a green gate, in its own commit | done |
 | R5-2 | Pause all leaves no dead end (C1) | After Pause all agents and Resume eligible agents, with nothing else holding them, every agent is Ready, the run is not `paused` unless the demo was paused with Pause demo, Import, Reset, Load demo and Graph limits are enabled and the server accepts remove and import, in MOCK and in REAL; a demo that Pause all paused goes on; a demo paused on purpose says on screen how to finish it; with Pause all on, the graph route keeps refusing start, resume, add, reset and preview-mock, and import joins them | done |
-| R5-3 | One owner for pauses (C4) | The graph never shows a pause the token service does not hold, nor hides one it holds, after any command: an agent that leaves the graph leaves no pause behind unless it still holds a reservation, and an agent that comes back (reset, import, restore) or that the demo drives shows the token service's pause | pending |
+| R5-3 | One owner for pauses (C4) | The graph never shows a pause the token service does not hold, nor hides one it holds, after any command: an agent that leaves the graph leaves no pause behind unless it still holds a reservation, and an agent that comes back (reset, import, restore) or that the demo drives shows the token service's pause | done |
 | R5-4 | Every pause says why (C2) | The token snapshot carries, for each paused agent, what holds it (Pause all, unverifiable usage and until when, an estimate awaiting reconciliation, every full scope with its dimension and whether the mock's usage fills it); resume answers whom it released, and a refusal answers 409 with the server's sentence; Budgets says it by the button, from a pure function in `lib/budget-summary.ts`; contract documented and tested | pending |
 | R5-5 | A visible way back (C3) | Resume eligible agents next to Pause all agents in the top bar while something is paused, and in Ctrl+K, with the same command and text; the panel of a Paused agent says why and opens Budgets; the kill switch refusal names the way | pending |
 | R5-6 | A new budget period says what it clears (H5) | The dialog and Details say that the mock's usage and the session budget stay until a restart; the semantics wait for the operator | pending |
@@ -623,6 +623,16 @@ there is no Resume demo, so only a restart gets out.
   "delete connection" once only; with the peer it is accepted three times. Tests: `tests/pause-resume.test.ts`
   (MOCK and REAL, the demo either way, every refusal with its sentence) and the browser check (return path and the
   paused demo).
+- R5-3 (2026-09-30). `TokenService.prunePauses` drops the pause of an agent that is not in the graph and holds no
+  reservation; `snapshot`, `resume` and `restore` run it first, so no reader ever sees a pause of a removed agent and
+  a journal written before this round loses its stale ids as it is read back, before an import could bring them
+  back. A removed agent that holds a reservation keeps its pause (an import can bring it back while its usage is
+  unsettled; the import route only refuses while a present agent holds one). `GraphService.followPauses` takes the
+  token service's `holdsPause`, wired once by `lib/tokens/runtime.ts` for the process graph: `reset` keeps the
+  Coordinator's held pause, `replace` (import and restore) marks every held agent paused although the file says
+  ready, and `setAgentStatus` and the demo's exhausted budget never replace a held pause; only the token service's
+  release (`compareAndSetAgentStatus` after `resume`) does. Graphs built for tests and files follow no one.
+  `docs/reference/state-ownership.md` says the token service owns every pause.
 
 #### Questions for João
 
@@ -803,6 +813,14 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-2 | the refusal says "Global kill switch is active." again | killed by the same |
 | R5-2 | Reset graph disabled while the demo is paused | killed by the browser check ("Reset graph ends a paused demo") |
 | R5-2 | the paused demo explains nothing | killed by the browser check ("Timed out: the paused demo explained") |
+| R5-3 | no pause is ever pruned | killed by "an agent removed or reset away takes its pause with it…", "…holding a reservation keeps its pause…" and "a journal restores no pause…"; every file restored, sha256 identical |
+| R5-3 | a reservation holder loses its pause too | killed by "an agent that leaves the graph holding a reservation keeps its pause…" |
+| R5-3 | `restore` keeps stale pauses | killed by "a journal restores no pause for an agent the restored graph no longer has" (restored by hand after a wrong reverse `sed`; sha256 identical) |
+| R5-3 | reset forgets the Coordinator's pause | killed by "the Coordinator keeps the pause the token service holds through Reset graph and the demo" |
+| R5-3 | the demo overwrites a held pause | killed by the same |
+| R5-3 | an import forgets held pauses | killed by "an import shows the pause the token service holds…" |
+| R5-3 | the demo's exhausted budget overwrites a held pause | killed by "a held pause survives the demo running out of its budget" |
+| R5-3 | the process graph is never told (`followPauses` not wired) | killed by the reset and the import tests |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

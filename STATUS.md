@@ -109,6 +109,12 @@ round's handoff); each fix below answers a cell that did not come back.
   demo runs, Resume eligible agents lets that demo go on, and a demo paused with Pause demo says on screen how to
   finish it (Reset graph now ends a paused demo too). With Pause all on, import is refused like reset and add, and
   every such refusal says to use Resume eligible agents.
+- **R5-3** The token service is the one owner of pauses and the graph shows exactly the ones it holds. Before, an
+  agent removed or reset away while paused kept its id in the token service's pauses for good, across resumes and
+  restarts, so Resume eligible agents stayed enabled with nothing to resume; and a Reset graph gave a paused
+  Coordinator a Ready card while Run once still answered "Agent paused.". Now such a pause goes with its agent
+  (unless the agent still holds a reservation, so that it comes back paused), a reset, an import or a restore shows
+  the pauses still held, and the demo never overwrites one.
 
 ## Not verified or pending
 

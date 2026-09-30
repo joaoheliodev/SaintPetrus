@@ -82,6 +82,15 @@ export class TokenService {
   private warning(row: Row) { return row.used + row.reserved >= row.limit * .8 || row.costAccountedUsd + row.costReservedUsd >= row.costLimitUsd * .8; }
   // A reset can drop the agent from the graph mid-call; a failing projection hook must not undo settled accounting.
   private pause(id: string) { this.paused.add(id); try { this.hooks.pause(id); } catch { /* The recorded pause still applies. */ } this.persist(); }
+  // The graph shows exactly the pauses held here (docs/reference/state-ownership.md).
+  holdsPause(id: string) { return this.paused.has(id); }
+  // An agent that left the graph can never run again, so its pause goes with it; one that still holds a reservation keeps
+  // it, so that it comes back paused if an import brings it back while its usage is unsettled (Round 5, R5-3).
+  private prunePauses() {
+    const present = new Set(this.hooks.ids()); let changed = false;
+    for (const id of this.paused) if (!present.has(id) && ![...this.reservations.values()].some(item => item.agent === id)) { this.paused.delete(id); changed = true; }
+    if (changed) this.persist();
+  }
   private durableState(): DurableState {
     const rows: DurableRow[] = [];
     for (const [key, row] of this.rows) {
@@ -138,7 +147,7 @@ export class TokenService {
     this.written = JSON.stringify(state);
     if (lost.length) this.accounting = { ...this.accounting, recoveredReservations: lost.length };
     lost.forEach(agent => this.pause(agent));
-    this.journal = journal; this.persist();
+    this.journal = journal; this.prunePauses(); this.persist();
     return this.accounting;
   }
   // The journal could not even be opened: nothing is written, and real calls wait until access is fixed and the server restarts.
@@ -199,7 +208,7 @@ export class TokenService {
   // A call in flight, unverifiable usage or an estimate awaiting reconciliation still belongs to this agent.
   holdsReservation(agent: string) { this.expireReservations(); return [...this.reservations.values()].some(item => item.agent === agent); }
   resume(agent?: string): string[] {
-    this.expireReservations();
+    this.expireReservations(); this.prunePauses();
     if ([...this.rows.values()].some(row => row.unverifiable > 0)) throw new TokenFailure('Usage unverifiable; restart only after checking provider billing.');
     const wasStopped = this.stopped;
     if (!agent) this.stopped = false;
@@ -255,7 +264,7 @@ export class TokenService {
     if (scope !== 'session') { this.costLimitOverrides.add(JSON.stringify([scope, id])); this.persist(); }
   }
   snapshot() {
-    this.expireReservations();
+    this.expireReservations(); this.prunePauses();
     this.scopes(this.hooks.ids()[0] ?? 'none', Object.keys(this.policy.models)[0] ?? 'none');
     const ids = this.hooks.ids();
     for (const id of ids) this.row('agent', id, this.policy.perAgent, this.policy.costLimitsUsd.perAgent);
