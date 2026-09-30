@@ -28,4 +28,6 @@ A provider that answered from a model with no captured price is a different case
 usage is known. Its reservation converts each dimension (input, output, reasoning) at the larger of the estimate and
 the reported usage, priced at least at the requested model's peak, cache-miss rate. The estimate only ever grows, and
 the agent stays paused until the operator reconciles it by hand; converting only the estimate would understate usage
-the provider has already reported (operator decision Q-10).
+the provider has already reported (operator decision Q-10). An ordinary expired estimate, with no reported usage, does
+not hold its agent: the agent can be resumed while the estimate stays counted in all four scopes until someone
+reconciles it (Round 5, R5-Q2).

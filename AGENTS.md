@@ -36,7 +36,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 540 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 541 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -117,6 +117,8 @@ OpenAI is not supported until the operator has validated it. It stays out of the
 Remembered keys and the persisted graph live in the operator's OS user data directory, never in the checkout, with the directory at 0700 and files at 0600. A legacy vault found in the checkout is copied, the copy verified, and only then the original deleted.
 
 When a provider answers with a served model that has no captured price, a reservation that expires converts at the greater of the estimate and the reported usage in each dimension (input, output, reasoning), priced at least at the requested model's peak, cache-miss rate. It stays an estimate, is never reduced automatically, and the agent stays paused until manual reconciliation.
+
+An ordinary expired estimate does not hold its agent; it stays counted, conservatively, in all four budgets. Only the estimate of an unpriced served model holds its agent, until someone reconciles it by hand (Round 5, R5-Q2, 2026-09-30).
 
 Removing an agent asks first and is refused while the agent has an active, unverifiable or unreconciled reservation. Its `agent` accounting rows stay, marked as a removed agent.
 

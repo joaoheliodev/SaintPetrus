@@ -154,6 +154,10 @@ round's handoff); each fix below answers a cell that did not come back.
   a period never grants a second session of real spend. A scope the mock filled is free again after the period, and
   Resume eligible agents releases its agent; the pause sentence now offers the period next to a higher limit and a
   restart.
+- **R5-12** Operator decision R5-Q2: an ordinary expired estimate does not hold its agent. The agent can be resumed
+  and call again while the estimate stays counted, conservatively, in all four budgets and Budgets names it; only an
+  unpriced served model's estimate holds its agent until it is reconciled by hand. The service already did this; a
+  test now pins it, and `docs/reference/reservation-expiry.md` says it.
 
 ## Not verified or pending
 

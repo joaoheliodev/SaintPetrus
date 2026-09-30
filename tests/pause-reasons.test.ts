@@ -83,6 +83,23 @@ test('R5-4 resume answers whom it released beside what still holds the others, a
   } finally { Reflect.set(globalThis, 'saintpetrusTokens', previous); runtime().mock.reset(); }
 });
 
+test('R5-12 an ordinary expired estimate does not hold its agent, and stays counted in all four budgets (operator decision R5-Q2)', async () => {
+  const { tokens, clock } = service();
+  await assert.rejects(tokens.execute(new ProviderProxy(), keyed(async () => { throw new ProviderFailure('timeout'); }), 'Question', signal(), 'a', 'System'), /timeout/);
+  assert.deepEqual(reasonsOf(tokens, 'a'), [{ kind: 'unverifiable', until: 1100 }], 'held while its usage is unverifiable');
+  clock.now += 101;
+  assert.deepEqual(reasonsOf(tokens, 'a'), [], 'nothing holds it once the reservation is an estimate');
+  assert.deepEqual(tokens.resume(), ['a']);
+  const [estimate] = tokens.snapshot().reservations;
+  assert.equal(estimate.status, 'estimated');
+  for (const [scope, id] of [['global', 'all'], ['agent', 'a'], ['model', 'fictitious-model'], ['session', tokens.sessionId]]) {
+    const counted = row(tokens, scope, id);
+    assert.ok(counted.used >= estimate.tokens && counted.estimated >= estimate.tokens, `${scope} still counts the estimate`);
+  }
+  const next = await tokens.execute(new ProviderProxy(), answered, 'Question', signal(), 'a', 'System');
+  assert.equal(next.text, 'Answer', 'the same agent calls again while there is room');
+});
+
 test('R5-10 unverifiable usage names no cause it cannot know: lost contact, unreadable usage and an unpriced served model read alike', async () => {
   const failures: [string, ProviderAdapter['complete']][] = [
     ['lost contact', async () => { throw new ProviderFailure('timeout'); }],

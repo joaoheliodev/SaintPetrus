@@ -544,6 +544,7 @@ that says why not yet and what to do. No request with a real key is made in this
 | R5-9 | Documentation | STATUS, CHANGELOG, README and a one-line guarantee in `AGENTS.md` | done |
 | R5-10 | Unverifiable usage names no cause it cannot know (C2) | Found re-running E5 at the end: the refused resume, the pause and Budgets said "a call lost contact with its provider" for every unverifiable reservation; lost contact, unreadable usage and an unpriced served model now read alike, without a false cause | done |
 | R5-11 | A new budget period clears the mock's tokens everywhere (answer to R5-Q1) | The period zeroes the global, agent and model rows and the mock's tokens in every row; the session row loses only its mock part and keeps what real calls spent; a scope the mock filled is released by the period and the next Resume; limits, pauses, Pause all and the journal format unchanged | done |
+| R5-12 | An ordinary expired estimate does not hold its agent (answer to R5-Q2) | No code change: `holds()` holds an agent only for an estimate with reported usage (an unpriced served model); a test pins that a present agent's ordinary estimate holds nothing, the agent resumes and calls again, and the estimate stays counted in all four rows | done |
 
 #### R5-1 reproduction (2026-09-30, before any change, at `23f3052`)
 
@@ -762,6 +763,13 @@ global and session nobody is paused, yet Budgets ends "then use Resume eligible 
   row, the session subtraction with a fictitious mock price, a twin server run with only the real call, the journal
   replica, the wording) and a route test (new period 200, then resume releases the agent); the browser check adds
   one PASS (the period then Resume make the agent Ready): 25 lines, none removed. Floor 539 → 540.
+- R5-12 (2026-09-30, operator decision R5-Q2). The code already matched the decision: `holds()` names a
+  `reconciliation` hold only for `status === 'estimated' && reported`, which only an unpriced served model's
+  reservation carries. No test pinned the ordinary case for a present agent (R5-4 covered the unpriced one, R5-3 a
+  removed agent), so `tests/pause-reasons.test.ts` gains one on the same scaffold: a timeout, the deadline passed,
+  no hold, `resume()` releases the agent, the estimate counted in `used` and `estimated` of the global, agent, model
+  and session rows, and the next call accepted. `AGENTS.md` records the decision after the unpriced served model
+  paragraph, and `docs/reference/reservation-expiry.md` says it with its anchors kept. Floor 540 → 541.
 
 #### Questions for João
 
@@ -1012,6 +1020,7 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-11 | the durable rows keep the mock's tokens again (`used: row.mock.total`) | killed by "a new budget period clears the mock's estimated tokens in every row…" ("global all starts again from zero") and by "a scope the mock filled is free after a new budget period…"; every file restored, sha256 identical |
 | R5-11 | the session row loses its real part too | killed by the first ("the session row loses exactly the mock part"). Its swap back matched twice, because the mutated line equalled the other branch; the line was restored by hand to the same sha256 |
 | R5-11 | `used` goes to zero but `mock` and `mockCost` stay | killed by the first ("global all starts again from zero", on `mock.total`) |
+| R5-12 | `holds()` without `&& item.reported` (every expired estimate holds its agent) | killed by "an ordinary expired estimate does not hold its agent…", the only test of 541 that failed: A-10 and every unpriced served model test stayed green, so the mutation separates the two cases; restored, sha256 identical |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
