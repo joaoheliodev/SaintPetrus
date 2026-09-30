@@ -10,6 +10,8 @@ import { GraphStore } from '../lib/server/graph-store';
 import { registerSecret } from '../lib/security/redact';
 import { EventBus } from '../lib/events/bus';
 import { optionalEventRoutes } from '../lib/events/http';
+import { ArtifactStore } from '../lib/preview/store';
+import { optionalPreviewRoutes } from '../lib/preview/http';
 import { runtime } from '../lib/server/runtime';
 import type { GraphEvent } from '../lib/orchestrator';
 
@@ -95,5 +97,20 @@ test('R4-5 the feed redacts again when it sends, so an event published before a 
     const frame = new TextDecoder().decode((await reader.read()).value);
     assert.ok(!frame.includes(key) && !frame.includes(key.slice(4, 16)), 'the old event reaches the feed without the key or a fragment of it');
     assert.match(frame, /"role":"Agent \[REDACTED\]"/); assert.match(frame, /"payload":"Answer with \[REDACTED\]"/);
+  } finally { await reader.cancel(); unregister(); }
+});
+
+test('R4-6 the preview redacts again when it sends, so a version stored before a key was configured does not repeat it', async () => {
+  // Run once reaches the preview too: TokenService passes every answer to observeArtifact.
+  const key = fictitiousKey(); const store = new ArtifactStore();
+  store.update(`agent-${key}`, `Designer ${key}`, `<html><p>Token ${key}</p></html>`); store.flush();
+  assert.ok(JSON.stringify(store.snapshot()).includes(key), 'stored as answered, before the key was configured');
+  const unregister = registerSecret(Buffer.from(key));
+  const response = optionalPreviewRoutes(true, store).get('/api/artifacts')!(new Request('http://127.0.0.1:3100/api/artifacts'));
+  const reader = response.body!.getReader();
+  try {
+    const frame = new TextDecoder().decode((await reader.read()).value);
+    assert.ok(!frame.includes(key) && !frame.includes(key.slice(4, 16)), 'the old version reaches the preview without the key or a fragment of it');
+    assert.match(frame, /"agent_id":"agent-\[REDACTED\]","role":"Designer \[REDACTED\]","source":"<html><p>Token \[REDACTED\]<\/p><\/html>"/);
   } finally { await reader.cancel(); unregister(); }
 });

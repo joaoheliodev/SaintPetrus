@@ -1,4 +1,5 @@
 import { localRequest } from '../server/http';
+import { safeStringify } from '../security/redact';
 import { artifacts, previewEnabled, type ArtifactStore } from './store';
 export function optionalPreviewRoutes(enabled = previewEnabled(), store: ArtifactStore = artifacts()) {
   const routes = new Map<string, (request: Request) => Response>();
@@ -7,7 +8,8 @@ export function optionalPreviewRoutes(enabled = previewEnabled(), store: Artifac
     let cleanup = () => {};
     const body = new ReadableStream<Uint8Array>({ start(controller) {
       let closed = false; const encoder = new TextEncoder();
-      const send = () => { if (closed) return; if ((controller.desiredSize ?? 0) <= 0) { cleanup(); controller.close(); return; } controller.enqueue(encoder.encode(`data: ${JSON.stringify(store.snapshot())}\n\n`)); };
+      // Redacted again on the way out, as every stream is, so a version stored before a key was configured cannot repeat it.
+      const send = () => { if (closed) return; if ((controller.desiredSize ?? 0) <= 0) { cleanup(); controller.close(); return; } controller.enqueue(encoder.encode(`data: ${safeStringify(store.snapshot())}\n\n`)); };
       const off = store.subscribe(send); const heartbeat = setInterval(() => {
         if ((controller.desiredSize ?? 0) <= 0) { cleanup(); controller.close(); }
         else controller.enqueue(encoder.encode(': keepalive\n\n'));

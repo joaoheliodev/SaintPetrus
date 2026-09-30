@@ -137,6 +137,17 @@ test('O2 every provider rejects HTTP errors without reading the response body', 
   }
 });
 
+test('R4-6 every stream the server sends redacts each frame as it sends it', () => {
+  // Adapters only read provider streams; every other mention is a stream this server sends.
+  const streams = runtimeFiles.filter(path => !path.startsWith('lib/providers/') && read(path).includes('text/event-stream'));
+  assert.deepEqual(streams, ['lib/events/http.ts', 'lib/preview/http.ts', 'lib/server/graph-http.ts'], 'a new stream joins this list and redacts as it sends');
+  for (const path of streams) {
+    const frames = [...read(path).matchAll(/data: \$\{([^}]*)\}/g)].map(match => match[1]);
+    assert.ok(frames.length > 0, `${path} sends data frames`);
+    assert.deepEqual(frames.filter(frame => !frame.startsWith('safeStringify(')), [], `${path} sends a frame without redacting it again`);
+  }
+});
+
 function isModelReference(node: ts.Expression): boolean {
   return (ts.isIdentifier(node) && node.text === 'model') || (ts.isPropertyAccessExpression(node) && node.name.text === 'model');
 }

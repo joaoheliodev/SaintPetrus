@@ -225,7 +225,8 @@ whose CSP allows no connections, forms, remote frames, objects, workers or base 
 `frame-ancestors` admits only the application origin. Both sandbox attributes allow scripts and nothing else.
 A sandbox is not a CPU or memory quota: an infinite loop can still exhaust the browser tab. Versions update at
 most every 250 ms and the latest 20 stay in memory. OpenAI calls stream text deltas into the preview; Gemini and
-DeepSeek update it when the answer completes.
+DeepSeek update it when the answer completes. Versions are redacted when stored and again when sent, so a key
+configured after a version was stored does not reach the preview.
 
 ## Provider notes
 

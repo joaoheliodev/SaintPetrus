@@ -93,7 +93,8 @@ on `main`.
   the process graph, which replaces every text the redactor would change with the redacted text, within its limit,
   as its own event, and the store saves that at once. The live event feed redacts again as it sends.
 - **R4-6** `npm run gate` is the one gate: CI's blocking steps in CI's order (tracked-path check, `npm audit
-  --audit-level=high`, lint, typecheck, tests held to the floor, build). CI runs `npm ci` and then the gate.
+  --audit-level=high`, lint, typecheck, tests held to the floor, build). CI runs `npm ci` and then the gate. The
+  artifact preview redacts again as it sends, like the graph stream and the feed: Run once answers reach it too.
 
 ## Not verified or pending
 

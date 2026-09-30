@@ -418,8 +418,10 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   The live event feed sends `safeStringify(batch)`: the window's field names match none of the redactor's sensitive
   key names, so the shape the panel checks is unchanged. Activity names the new event "Configured key removed from
   the graph".
-- R4-5, left as is. The artifact preview stream still sends its versions as stored: `observeArtifact` is called only
-  by `appendMockOutput`, and the demo resets the graph before it writes its fixed text, so no key can reach it. Activity
+- R4-5, left as is. The artifact preview stream still sent its versions as stored, on the claim that only
+  `appendMockOutput` calls `observeArtifact`. That claim was wrong (the operator caught it in R4-6): `TokenService`
+  passes every Run once answer to `observeArtifact` when the preview is on, so the preview now redacts as it sends
+  (R4-6, 3). Activity
   lines the open panel received before the key was configured keep the names they showed until the page reloads
   (STATUS says so). A key that is itself part of "[REDACTED]" would make redaction non-idempotent; real keys are long
   random strings, so it is not handled. The R-01 and R4-3 tests that register a key under a graph that does not
@@ -469,6 +471,13 @@ server logged "Graph file refused: a subagent has no delegation connection." onc
   their order, the stop at the first failure, the floor checked by the real script and the exit code. `AGENTS.md`:
   the gate paragraph, the audit rule, the advisory rule and the lockfile note under Dependencies, and the Codex
   exception reworded for a gate whose last step is the build. README and the resume steps above point to it.
+- R4-6, 3 (2026-09-30). The preview stream sends `safeStringify(store.snapshot())`: `ArtifactStore` redacts as it
+  stores, but a version stored before a key was configured kept the key until it left the 20-version window. The
+  version's field names match none of the redactor's sensitive key names, so the shape the panel checks is
+  unchanged. `tests/configured-key.test.ts` stores a version with a key generated at runtime, configures it and reads
+  the stream, as the feed test does; a ratchet in `tests/repository-ratchets.test.ts` lists the server's three
+  streams (graph, feed, preview) and requires every `data:` frame to go through `safeStringify`, so a new stream joins
+  the list. `AGENTS.md` records the rule, every stream redacts as it sends, and the ratchet file's description.
 
 #### Questions for João
 
@@ -638,6 +647,8 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R4-6,1 | the lint step runs typecheck | killed by "the gate is CI's blocking steps…" |
 | R4-6,1 | CI runs `npm test` instead of the gate | killed by "the gate is CI's blocking steps…" and "D5 CI holds every run to the floor…, through the gate" |
 | R4-6,1 | a command that cannot start passes | killed by "a gate command reports its exit code…" |
+| R4-6,3 | the preview sends `JSON.stringify` again | killed by "the preview redacts again when it sends…" and "every stream the server sends redacts each frame…"; restored, sha256 identical |
+| R4-6,3 | the graph stream sends `JSON.stringify` | killed by "every stream the server sends redacts each frame…"; restored, sha256 identical |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

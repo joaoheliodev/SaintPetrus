@@ -36,7 +36,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 505 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 507 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -44,7 +44,7 @@ Never delete, skip or narrow a test to get green: no `skip`, `only` or `todo`. C
 
 A change to an API contract updates its documentation and its tests in the same change.
 
-Ratchet pins and allowlists in `tests/repository-ratchets.test.ts` only go down. They hold direct `fetch` inside `lib/providers/` apart from a shrinking legacy allowlist, zero browser storage references, no provider error-body reads, no model-literal branches in adapters, React Flow nodes owned by `useNodesState`, shrinking counts of type assertions and Gitleaks suppressions, and the anchors of the reference documents below. A failing ratchet is fixed by migrating the occurrence, never by raising a pin or extending an allowlist; when a count falls, lower its pin in the same change. A new pin is computed from the current tree, never estimated. Do not add a `max-lines` limit on its own: this code concentrates density in long lines, so a line count would pass unreadable files. A useful limit needs line length too, which is a large refactor: propose it and wait.
+Ratchet pins and allowlists in `tests/repository-ratchets.test.ts` only go down. They hold direct `fetch` inside `lib/providers/` apart from a shrinking legacy allowlist, zero browser storage references, no provider error-body reads, every stream frame through `safeStringify`, no model-literal branches in adapters, React Flow nodes owned by `useNodesState`, shrinking counts of type assertions and Gitleaks suppressions, and the anchors of the reference documents below. A failing ratchet is fixed by migrating the occurrence, never by raising a pin or extending an allowlist; when a count falls, lower its pin in the same change. A new pin is computed from the current tree, never estimated. Do not add a `max-lines` limit on its own: this code concentrates density in long lines, so a line count would pass unreadable files. A useful limit needs line length too, which is a large refactor: propose it and wait.
 
 Never create a recovery copy or backup inside the project, and ask before creating one anywhere else. A recovery copy under `.audit/` was once linted as source.
 
@@ -82,7 +82,9 @@ A key never reaches `localStorage`, `sessionStorage`, a URL, a log, or a respons
 
 No key in code, an environment variable, a file, a command argument, a log, a fixture or a commit, and an agent never creates a `.env` file: tests generate synthetic material at runtime and use mocked transport only. Anything that tries to reach a provider's network during development is stopped and reported. Gitleaks must report zero findings on staged content before every commit. If it finds a secret in something already published, stop and report at once: the key must be revoked, and history is not rewritten.
 
-Do not weaken these guarantees: loopback binding; exact Origin and JSON checks on local POSTs; redaction in the feed and the export; synchronous reservations in all four scopes; conservative expiry that never releases uncertain consumption; the agent paused on `unverifiable`; fixed provider endpoints without redirects; and a `/api/provider` body that carries no key, model or URL.
+Do not weaken these guarantees: loopback binding; exact Origin and JSON checks on local POSTs; redaction in every stream and in the export; synchronous reservations in all four scopes; conservative expiry that never releases uncertain consumption; the agent paused on `unverifiable`; fixed provider endpoints without redirects; and a `/api/provider` body that carries no key, model or URL.
+
+Every stream redacts as it sends. The graph stream, the live event feed and the artifact preview serialize each frame with `safeStringify`, even when what they hold was redacted as it was stored: a key configured later is redacted only from then on, so a record kept from before would repeat it. A new stream does the same, and `tests/repository-ratchets.test.ts` lists the streams and holds every frame to it (Round 4, R4-6).
 
 A provider error body is never read, echoed, logged or returned. Adapters translate HTTP status into the shared `ProviderFailure` code vocabulary and nothing else crosses the boundary.
 
@@ -136,7 +138,7 @@ No accepted graph command may leave a graph the app cannot save (Round 4, R4-2).
 
 While `GraphStore` cannot save the graph, for whatever reason, the panel shows a persistent warning with the store's reason until it saves again (Round 4, R4-3). The reason is the parser's own sentence or a fixed one, never the refused text or a path. `GET /api/graph/persistence` serves that state read-only from the custom server, the only copy of the modules that holds the store.
 
-A key configured after it was typed into the graph leaves the graph at once (Round 4, R4-5). `registerSecret` tells the listeners registered with `onSecretRegistered`, kept on `globalThis` like the keys so either copy of the modules reaches them, and never passes them the key. The process graph (`runtime()`) follows that registry: `GraphService.redactSecrets` replaces every name, objective, summary, artifact and output the redactor would change with the redacted text, within its limit, as its own `graph.redacted` event, so the store saves it at once and a later Disconnect or Forget key cannot write the key back from memory. Credentials never call the graph or the store. The graph stream and the live event feed redact again as they send, so a record retained from before a key was configured cannot repeat it.
+A key configured after it was typed into the graph leaves the graph at once (Round 4, R4-5). `registerSecret` tells the listeners registered with `onSecretRegistered`, kept on `globalThis` like the keys so either copy of the modules reaches them, and never passes them the key. The process graph (`runtime()`) follows that registry: `GraphService.redactSecrets` replaces every name, objective, summary, artifact and output the redactor would change with the redacted text, within its limit, as its own `graph.redacted` event, so the store saves it at once and a later Disconnect or Forget key cannot write the key back from memory. Credentials never call the graph or the store. Every stream redacts again as it sends (Safety locks), so a record retained from before a key was configured cannot repeat it.
 
 ## Interface vocabulary
 
