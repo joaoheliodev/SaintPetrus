@@ -179,7 +179,6 @@ round's handoff); each fix below answers a cell that did not come back.
 - Accessibility was checked in Chromium (contrast, control names, visible focus, keyboard paths), not with a screen reader.
 - When usage cannot be parsed, the served model the response named is not carried into receipts or manual reconciliation (F-01). The panel's Forget key reaches only the selected provider; the terminal helper reaches any (F-02).
 - In `npm run dev` only, about one browser-check run in fifteen found the canvas cards focused without their outline; production never did. The cause is unproven (R1-16).
-- Three Round 5 questions change spend or pause semantics and wait for the operator (backlog Phase 11): whether a new budget period also clears the mock's usage or the session row (R5-Q1), whether an expired estimate should hold its agent until reconciled (R5-Q2), and whether a refusal that finds room in every scope, but not for the call's worst case, should still pause the agent (R5-Q3, the loop S4 found).
 
 ## Open debts and limits
 

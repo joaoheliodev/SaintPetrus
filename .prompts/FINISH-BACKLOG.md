@@ -794,11 +794,19 @@ global and session nobody is paused, yet Budgets ends "then use Resume eligible 
   second full session budget of real spend before the next restart, which is exactly what that row exists to
   prevent. Recommended: zero the mock's usage (it is not spend, and the mock's dollars are $0), keep the session row.
   Until you answer, nothing changes and the screen says what stays.
+  **Answered 2026-09-30: "concordo".** Decision as implemented in R5-11 (`6853a72`): Start a new budget period zeroes
+  the mock's estimated tokens in every budget row, the session row's mock part included; what real calls spent since
+  the server started stays in the session row; limits, pauses, Pause all and the journal format do not change. This
+  differs from the recommendation above in one point: the session row is not kept whole, it loses its mock part and
+  keeps only its real spend. The operator's wording of the decision stands, and D-10 records it.
 - **R5-Q2** An ordinary reservation that expires into an estimate does not hold its agent: the agent can be resumed
   and call again while the estimate waits for the provider-confirmed usage. Only an unpriced served model's estimate
   (A-10) holds it. Should every expired estimate hold its agent until Apply confirmed usage? It changes reservation
   semantics (and blocks that agent until you reconcile), so it waits for you. Recommended: no; the estimate already
   counts at its conservative price in every scope, and Budgets names it.
+  **Answered 2026-09-30: "concordo".** Decision: an ordinary expired estimate does not hold its agent; it stays
+  counted, conservatively, in all four budgets, and only an unpriced served model's estimate holds its agent until it
+  is reconciled by hand. The code already did this; R5-12 (`0d1e62c`) pins it with a test. D-11 records it.
 - **R5-Q3** A call the budget refuses before sending pauses its agent (`execute`: a full scope, or a worst case that
   does not fit, for example at 225 of 300 tokens). Run once asks for a quote first, which refuses without pausing, so
   from the panel this pause comes from Test connection (its first agent) or a direct `complete` request (R5-1, S4).
@@ -807,6 +815,10 @@ global and session nobody is paused, yet Budgets ends "then use Resume eligible 
   this call's worst case, stop pausing the agent (the call is refused either way and nothing is sent)? Or keep
   pausing, with the scope and the worst case named? Either changes when an agent is paused, so it waits for you.
   Recommended: pause only when a scope is full, which Resume already refuses to release.
+  **Answered 2026-09-30: "concordo".** Decision as implemented in R5-13 (`c442701`): the preflight refusal, where the
+  call's worst case does not fit the room left, does not pause the agent; the call is refused and nothing is sent.
+  An agent is paused only by a full budget (used plus reserved at or over a token or dollar limit), unverifiable
+  usage, an estimate awaiting reconciliation or Pause all. D-12 records it.
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -1126,6 +1138,17 @@ Follow-ups recorded by the review, not done in this branch:
   "Connect to" list and a Connect button that call the canvas's own `connect` (same client feedback, same
   server validation). It is an accessible path to an existing function, not a new feature. Focused cards and
   connections, which React Flow's stylesheet leaves without an outline, now show the ring. Reversible.
+- **D-10 A new budget period clears the mock's tokens (operator, R5-Q1, 2026-09-30).** The period zeroes the mock's
+  estimated tokens in every budget row, the session row's mock part included; the session row keeps what real calls
+  spent since the server started, so a period never grants a second session of real spend. Limits, pauses, Pause
+  all and the journal format are unchanged. It differs from the written recommendation, which kept the session row
+  whole. Implemented in R5-11.
+- **D-11 An ordinary expired estimate does not hold its agent (operator, R5-Q2, 2026-09-30).** It stays counted,
+  conservatively, in all four budgets; only an unpriced served model's estimate holds its agent until reconciled by
+  hand. Already the behaviour; pinned by a test in R5-12.
+- **D-12 A preflight refusal does not pause (operator, R5-Q3, 2026-09-30).** A call whose worst case does not fit the
+  room left is refused and nothing is sent, but its agent is not paused; only a full budget, unverifiable usage, an
+  estimate awaiting reconciliation or Pause all pause an agent. Implemented in R5-13.
 
 ## Perguntas para o João (questions for the operator)
 
@@ -1212,3 +1235,10 @@ Everything below is yours; nothing in it needs this conversation.
   and R5-10 in the commit that carries this entry. Floor 514 → 539. Fifty-four mutations, all killed. `test:e2e`
   passed on fresh MOCK instances (24 checks); REAL without a key was checked on screen only. Gitleaks clean on every
   staged diff. No request reached a provider. Three questions wait for the operator (R5-Q1 to R5-Q3).
+- Phase 11, Round 5 continuation (2026-09-30, on `main`): the operator answered R5-Q1 to R5-Q3 with "concordo".
+  R5-11 `6853a72` (a new budget period clears the mock's tokens in every row, the session row keeping its real
+  spend), R5-12 `0d1e62c` (an ordinary expired estimate does not hold its agent, pinned by a test), R5-13 `c442701`
+  (a preflight refusal no longer pauses), and R5-14 in the commit that carries this entry. Each decision entered
+  `AGENTS.md` in its own commit. Floor 539 → 544. Six mutations, all killed. `test:e2e` passed on fresh MOCK
+  instances with 25 PASS lines, one more than before and none removed. Gitleaks clean on every staged diff. No
+  request reached a provider. No question is open.

@@ -3,6 +3,22 @@
 Notable changes, newest first. Dates are UTC. No release has been tagged; entries are grouped by the branch
 that carried them.
 
+## Unreleased: Round 5 continuation on `main` (2026-09-30)
+
+The operator answered the three questions Round 5 left open. No request with a real key was made. The test floor rose
+from 539 to 544.
+
+- **Start a new budget period** now clears the mock's estimated tokens in every budget row. The session row loses only
+  its mock part and keeps what real calls spent since the server started, so a period never grants a second session
+  of real spend. A scope the mock filled is free again after the period, and **Resume eligible agents** releases its
+  agent; the question, Details and the pause sentence say so (R5-11, R5-Q1).
+- An ordinary expired estimate does not hold its agent: the agent can be resumed while the estimate stays counted in
+  all four budgets. Only an unpriced served model's estimate holds its agent until it is reconciled. This was already
+  the behaviour and is now pinned by a test (R5-12, R5-Q2).
+- A preflight refusal, where every scope has room but not for the call's worst case, no longer pauses the agent. The
+  call is refused as before and nothing is sent; only a full budget, unverifiable usage, an estimate awaiting
+  reconciliation or Pause all pause an agent (R5-13, R5-Q3).
+
 ## Unreleased: Round 5 on `main` (2026-09-30)
 
 The operator could not un-pause the agents. Every way into a pause was tried against every way out on fresh instances
