@@ -36,7 +36,9 @@ the branch (40 runs). Two independent reviewer agents audited `0662647..HEAD`; t
 - **Q-04** The graph is saved in the user data directory and restored at startup; import is untrusted input (strict
   format, 4 MiB, unknown fields and credential-shaped text refused, no model in the format). The export stays
   redacted; accounting stayed process-local until R-02.
-- **Q-05, Q-06** No answer, so the security contact stays a marked placeholder and there is no LICENSE.
+- **Q-05, Q-06** Answered on 2026-10-06 (Round 6). The repository is MIT licensed (`LICENSE`, copyright 2026 João
+  Hélio dos Reis Souza), with shadcn/ui's MIT notice kept for `components/ui/`; vulnerabilities are reported
+  privately through GitHub, and `SECURITY.md` publishes no personal contact.
 - **Q-07** OpenAI is out of the allowlist and not offered until validated; no snapshot or price was added.
 - **Q-08** Remembered keys moved to the user data directory (0700/0600); a legacy `data/vault` is copied, verified
   byte for byte and only then deleted, at startup.
@@ -175,7 +177,12 @@ round's handoff); each fix below answers a cell that did not come back.
 - The Responses streaming path and real error, quota and timeout handling are tested only with synthetic transport.
 - The full RF-02 panel is pending. RF-03 and RF-04 are out of scope.
 - Agent removal (Q-03), graph persistence and import (Q-04) are implemented; accounting is journaled since R-02.
-- There is no LICENSE file and the security contact in `SECURITY.md` is a marked placeholder: Q-05 and Q-06 came back empty.
+- GitHub private vulnerability reporting must be switched on by the repository owner (Settings, Advanced Security);
+  whether it is on was not verified from here. Until it is, `SECURITY.md`'s fallback applies: a public "Security
+  contact request" issue with no details, then a private channel.
+- The gate excepts GHSA-vfj7-8cjw-p6xm in `braces`, which has no fixed release, until 2026-10-20 or until a fix
+  within a minor release exists (operator decision, Round 6, R6-A). After that date the gate fails again unless a
+  fix has shipped or the operator renews the exception.
 - Accessibility was checked in Chromium (contrast, control names, visible focus, keyboard paths), not with a screen reader.
 - When usage cannot be parsed, the served model the response named is not carried into receipts or manual reconciliation (F-01). The panel's Forget key reaches only the selected provider; the terminal helper reaches any (F-02).
 - In `npm run dev` only, about one browser-check run in fifteen found the canvas cards focused without their outline; production never did. The cause is unproven (R1-16).

@@ -3,6 +3,23 @@
 Notable changes, newest first. Dates are UTC. No release has been tagged; entries are grouped by the branch
 that carried them.
 
+## Unreleased: Round 6 on `main` (2026-10-06)
+
+The operator answered the two questions left in the repository, the license (Q-06) and the security contact (Q-05).
+No request with a real key was made. The test floor rose from 544 to 553.
+
+- Four advisories published since the last green run are fixed with patch releases: proxy-addr 2.0.8 (critical),
+  sharp 0.35.5, source-map-js 1.2.2 and `@modelcontextprotocol/sdk` 1.32.1, the last through shadcn 4.21.3. braces
+  (GHSA-vfj7-8cjw-p6xm) has no fixed release; by operator decision the gate's audit step excepts exactly that
+  advisory until 2026-10-20 or until a fix exists, and every other high or critical advisory still fails it
+  (`scripts/audit-policy.mjs`) (R6-A).
+- The repository is MIT licensed: `LICENSE`, copyright 2026 João Hélio dos Reis Souza, and `"license": "MIT"` in
+  both package.json files. The components the shadcn CLI generated in `components/ui/` keep shadcn/ui's MIT notice
+  in `components/ui/LICENSE` (R6-1, Q-06).
+- `SECURITY.md` sends vulnerability reports through GitHub private vulnerability reporting and publishes no
+  personal contact; until that is switched on, a public "Security contact request" issue with no details asks for a
+  private channel (R6-2, Q-05).
+
 ## Unreleased: Round 5 continuation on `main` (2026-09-30)
 
 The operator answered the three questions Round 5 left open. No request with a real key was made. The test floor rose

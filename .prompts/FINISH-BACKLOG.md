@@ -97,10 +97,10 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | --- | --- | --- | --- | --- | --- |
 | D1 | README rewrite | Discrepancies listed in `docs/provider-validation.md` | What, requirements, install, mock run, main flow, key entry, security model, limits, validation status | no | done (53966fe; README rewritten from the code; the discrepancy list in `docs/provider-validation.md` is replaced by a note) |
 | D2 | `docs/architecture.md` | Operator requirement | Modules and the path of one call | no | done (656819f) |
-| D3 | `SECURITY.md` threat model | Operator requirement | Threat model; reporting contact left as a marked placeholder | contact (Q-05) | done (bbf8f03; the contact stays a marked placeholder until Q-05 is answered) |
+| D3 | `SECURITY.md` threat model | Operator requirement | Threat model; reporting contact left as a marked placeholder | contact (Q-05) | done (bbf8f03; Q-05 answered 2026-10-06: the placeholder gave way in R6-2, `e96433d`, to GitHub private vulnerability reporting with no personal contact) |
 | D4 | `CHANGELOG.md` | Operator requirement | What this session delivered | no | done (3bf5bf2; kept current until the final commit) |
 | D5 | CI workflow | Operator requirement | Lint, typechecks, tests, build and Gitleaks on push and PR (workflow already exists; verify and adjust) | no | done (ca808da; verified: Gitleaks over full history, tracked-path check, `npm ci`, audit, lint, both typechecks, tests and build on every push and PR. Added: the test run is held to the AGENTS.md floor with zero failures, cancellations, skips and todos) |
-| D6 | LICENSE | Operator requirement: do not choose one | Question Q-06 | yes | blocked (operator decision) |
+| D6 | LICENSE | Operator requirement: do not choose one | Question Q-06 | yes | done (Q-06 answered 2026-10-06: MIT, R6-1, `03534b8`) |
 | D7 | Permanent rules from this prompt into `AGENTS.md` | `AGENTS.md` requires prompt rules to be written down before acting on them | Test hygiene, dependency policy and published-secret stop rule added; floor kept current | no | done (5ff5bd3; also: contract changes carry docs and tests, no invented configuration values, keys nowhere and no `.env`, the list of guarantees not to weaken. Session-only rules such as this session's commit authorization were deliberately not made permanent) |
 
 ### Phase 6 — review and close
@@ -831,6 +831,7 @@ required (R6-A).
 | R6-A | The starting gate was red | `npm audit --audit-level=high` failed on the clean tree with five advisories published since 2026-09-30; the four with a patch release are taken with npm 11, and `braces`, which has none, is excepted by operator decision until 2026-10-20; gate green, browser check unchanged, one commit | done |
 | R6-1 | MIT license (Q-06) | `LICENSE` with the MIT text and "Copyright (c) 2026 João Hélio dos Reis Souza"; `license: MIT` in both package.json files and the lockfile root; README License section and Portuguese line; shadcn/ui's notice kept for `components/ui/`; licenses of the installed tree reported; `tests/repository-metadata.test.ts` | done |
 | R6-2 | Report privately, publish no contact (Q-05) | "Reporting a vulnerability" sends reports through GitHub private vulnerability reporting, with a fallback (a public "Security contact request" issue with no details) and what to send, what counts and what to expect; the placeholder is gone; no e-mail, phone or numeric deadline anywhere | done |
+| R6-3 | Records | Q-05 and Q-06 answered in place, D3 and D6 done, the checklist updated, D-13 to D-16, mutation and session log lines; STATUS and CHANGELOG say what is true now; no document still says there is no LICENSE or that the contact is a placeholder | done |
 
 #### Decisions taken
 
@@ -881,8 +882,14 @@ required (R6-A).
   tab names stay as the round wrote them. Whether private vulnerability reporting is on for the repository is not
   verified from here: switching it on is the owner's click, and the fallback covers the meantime. `AGENTS.md`
   records the decision; `tests/repository-metadata.test.ts` holds the section to it. Floor 552 → 553.
+- R6-3 (2026-10-06). Records only, no mutation. Besides D-13 and D-14, the two decisions the operator took during the
+  round are D-15 (patch releases and the braces exception) and D-16 (shadcn/ui attribution).
 
 #### Questions for João
+
+- **R6-Q1** The braces exception lapses after 2026-10-20. If braces, micromatch or fast-glob has not shipped a fix by
+  then, the gate fails again on its own. Renew the exception for a set time, or let it fail and wait? Either way it
+  is your call; nothing happens before that date.
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -1225,6 +1232,16 @@ Follow-ups recorded by the review, not done in this branch:
 - **D-12 A preflight refusal does not pause (operator, R5-Q3, 2026-09-30).** A call whose worst case does not fit the
   room left is refused and nothing is sent, but its agent is not paused; only a full budget, unverifiable usage, an
   estimate awaiting reconciliation or Pause all pause an agent. Implemented in R5-13.
+- **D-13 MIT license (operator, Q-06, 2026-10-06).** `LICENSE` with the MIT text, copyright 2026 João Hélio dos Reis
+  Souza, and `"license": "MIT"` in both package.json files. Implemented in R6-1.
+- **D-14 Security contact (operator, Q-05, 2026-10-06; the wording delegated to the assistant, security first).**
+  Reports go through GitHub private vulnerability reporting; `SECURITY.md` publishes no e-mail address or other
+  personal contact, and its fallback never asks for details in a public place. Implemented in R6-2.
+- **D-15 Patch releases and one audit exception (operator, R6-A, 2026-10-06).** The four advisories with a patch
+  release are taken in their own commit; GHSA-vfj7-8cjw-p6xm in braces, which has none, is excepted by the gate until
+  2026-10-20 or until a fix within a minor release exists, and only the operator renews or extends it.
+- **D-16 shadcn/ui attribution (operator, R6-1, 2026-10-06).** The components the shadcn CLI generated in
+  `components/ui/` keep shadcn/ui's MIT notice, copied verbatim, in `components/ui/LICENSE`.
 
 ## Perguntas para o João (questions for the operator)
 
@@ -1237,8 +1254,14 @@ Follow-ups recorded by the review, not done in this branch:
   it exist, and what happens to an agent's budget rows and unresolved reservations when it is removed?
 - **Q-04** Graph import and persistence across restarts are not planned in the docs (state is
   process-local by design). Wanted?
-- **Q-05** Security contact for `SECURITY.md` (placeholder left).
-- **Q-06** LICENSE: none exists; which one, if any?
+- **Q-05** Security contact for `SECURITY.md` (placeholder left). **Answered 2026-10-06:** "O SECURITY.md fique a seu
+  critério, mas sempre preze pela segurança." The operator delegated the choice to the assistant, security first.
+  Chosen: reports through GitHub private vulnerability reporting, no e-mail or other personal contact published, and
+  a fallback that never asks for details in public (a public "Security contact request" issue with no details, then
+  a private channel). R6-2 (`e96433d`), D-14.
+- **Q-06** LICENSE: none exists; which one, if any? **Answered 2026-10-06:** "Prefiro a licença do MIT." MIT,
+  copyright 2026 João Hélio dos Reis Souza, with shadcn/ui's MIT notice kept for `components/ui/` (asked and
+  answered during the round). R6-1 (`03534b8`), D-13.
 - **Q-08** Remembered keys are encrypted under the ignored `data/vault` inside the checkout. Move the vault to a
   per-user data directory outside the project folder (existing remembered keys would need re-entry)?
 - **Q-09** Keep the inspector's Run once action (D-06), or restrict real-provider calls to the connection probe?
@@ -1261,11 +1284,11 @@ Everything below is yours; nothing in it needs this conversation.
    connect two agents (drag, or Connect to in the inspector), move a card with the arrow keys, Run once (mock), open
    Tokens and Connect AI, export the context, delete a connection, reset. Optional, with Chromium and a fresh instance:
    `PORT=3310 npm run dev` then `TEST_APP_PORT=3310 npm run test:e2e`; and the preview check from the README.
-3. **Answer the questions** in "Perguntas para o João", above all Q-02 (the real validation plan), Q-05 (security
-   contact), Q-06 (licence), Q-07 (OpenAI snapshot prices) and Q-10 (expiry with reported usage).
+3. **Answer the questions** in "Perguntas para o João", above all Q-02 (the real validation plan), Q-07 (OpenAI
+   snapshot prices) and Q-10 (expiry with reported usage); Q-05 and Q-06 were answered on 2026-10-06.
 4. **Review the decisions** D-01 to D-09 in "Decisões tomadas" and revert any you disagree with; each is reversible.
-5. **Fill the placeholders.** The security contact in `SECURITY.md`, a `LICENSE` file if you want one, and consider
-   enabling GitHub private vulnerability reporting for the repository.
+5. **Switch on private vulnerability reporting.** `SECURITY.md` and `LICENSE` are done (Round 6); turn on GitHub
+   private vulnerability reporting in the repository's Settings, Advanced Security, so the report button exists.
 6. **Decide on this file.** `.prompts/FINISH-BACKLOG.md` is force-tracked on this branch (D-02); `AGENTS.md` says
    `.prompts/` does not survive a fresh clone, which stays true for everything else there. Keep it on `main` or untrack
    it before merging.
@@ -1318,3 +1341,10 @@ Everything below is yours; nothing in it needs this conversation.
   `AGENTS.md` in its own commit. Floor 539 → 544. Six mutations, all killed. `test:e2e` passed on fresh MOCK
   instances with 25 PASS lines, one more than before and none removed. Gitleaks clean on every staged diff. No
   request reached a provider. No question is open.
+- Phase 12, Round 6 (2026-10-06, on `main`): the operator answered Q-05 and Q-06. The starting gate was red with five
+  advisories published since 2026-09-30; asked, the operator chose patch releases for four and a dated exception for
+  braces, which has no fix: R6-A `33cec8f`. Then R6-1 `03534b8` (MIT, and shadcn/ui's notice for `components/ui/`
+  after a second question), R6-2 `e96433d` (private reporting, no personal contact), and R6-3 in the commit that
+  carries this entry. Floor 544 → 553. Twelve mutations, all killed. `test:e2e` passed with 25 PASS after the
+  dependency change. Gitleaks clean on every staged diff. No request reached a provider. One question is open
+  (R6-Q1).
