@@ -2,6 +2,20 @@
 
 Branch: `main`, which merged `night/provider-validation-ready` on 2026-09-29 (Round 4 below). That branch continued `night/provider-validation` from the operator's price-admin commit `0662647` on `night/price-admin`, following `night/price-schema`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`. Timestamped events up to 2026-09-27 live in the append-only `NIGHT-LOG.md`; those of the later rounds live in the Session log of `.prompts/FINISH-BACKLOG.md` and in `CHANGELOG.md`.
 
+## Verification checkpoint (2026-10-06)
+
+Run on a fresh, full clone of GitHub at `4a47529` (`git rev-parse --is-shallow-repository`: false), in a cloud session
+without any API key, following the README: `npm ci`, `npm run setup:hooks` and `npm run dev`, whose panel opened with
+the **MOCK** badge. `npm run gate` passed with 554 tests in 29 suites, none failed, cancelled, skipped or todo; its
+audit step excepted only GHSA-vfj7-8cjw-p6xm in `braces`, which has no fixed release, until 2026-10-20, and found no
+other high or critical advisory. On fresh instances with empty data directories, `npm run test:e2e` passed in
+development with 25 PASS, and `npm run test:browser` passed on the production build with the preview on (4 PASS).
+`SAINTPETRUS_MODE=real npm start` without any key showed the **REAL** badge, refused Run once with "No provider is
+connected. Open Connection and connect one first." and kept `dispatches` on `GET /api/provider` at 0. Gitleaks found
+nothing in the clone's working directory or in its full history across every branch (139 commits with a diff). Every
+`night/*` branch on GitHub is contained in `main`. CI passed on every push of Rounds 6 and 7 (runs 110 to 114). No
+request with a real key was made, including `GET /models`.
+
 ## Verification checkpoint (2026-09-27)
 
 Run in a cloud session without any API key: lint, both typechecks, the full suite at the floor stated in

@@ -904,7 +904,26 @@ the audit exception the policy holds, and a fresh clone of GitHub proves the fin
 | ID | Item | Acceptance criterion | Status |
 | --- | --- | --- | --- |
 | R7-1 | The documentation says what is true today | `SECURITY.md` names the braces exception in its dependency item; the validation protocol builds from a clean clone of `main`; `STATUS.md` says where the later rounds' events live; the backlog's contradicted statuses, the answers to Q-01 to Q-10, R6-Q1 as open and the checklist are current; `tests/repository-metadata.test.ts` requires README.md, SECURITY.md and AGENTS.md to name every exception's id and date; floor 553 → 554 | done |
-| R7-2 | Final records | The fresh-clone proof recorded with its numbers in STATUS, CHANGELOG and this phase; checklist item 8 names the branches contained in `main` | pending |
+| R7-2 | Final records | The fresh-clone proof recorded with its numbers in STATUS, CHANGELOG and this phase; checklist item 8 names the branches contained in `main` | done |
+
+#### Fresh-clone proof (2026-10-06, at `4a47529`, after its CI run 114 passed)
+
+| Step | Result |
+| --- | --- |
+| Clone | `git clone https://github.com/joaoheliodev/SaintPetrus.git` into an empty directory outside the working tree; not shallow; HEAD `4a47529`, level with `origin/main` |
+| Install and run, as the README says | `npm ci` added 627 packages; `npm run setup:hooks`; `npm run dev` on 3000, whose data directory did not exist yet: the panel opened with the **MOCK** badge ("MOCK mode: no provider is reachable."), one agent, `dispatches` 0, no exception or console error; the clone's tree stayed clean |
+| `npm run gate` | passed: 554 tests in 29 suites, none failed, cancelled, skipped or todo; "audit: excepted until 2026-10-20 by operator decision (AGENTS.md): GHSA-vfj7-8cjw-p6xm high in braces, no fixed release exists; only the shadcn CLI and ESLint run it, never the server." and "audit: No high or critical advisory without an exception."; build passed |
+| `test:e2e` | `PORT=3310 npm run dev` on an empty data directory, then `TEST_APP_PORT=3310 npm run test:e2e`: 25 PASS, exit 0 |
+| `test:browser` | `npm run build`, then `PORT=3210 SAINTPETRUS_PREVIEW=true npm start` on an empty data directory and `npm run test:browser`: 4 PASS, exit 0 |
+| REAL without a key | `SAINTPETRUS_MODE=real npm start` on an empty data directory, with no key variable in its environment (the container's own credential variables unset too): badge **REAL**, connection Disconnected, Send (1 call) refused before any confirmation with "No provider is connected. Open Connection and connect one first."; `GET /api/provider` `dispatches.total` 0; its data directory holds no accounting record |
+| Gitleaks 8.30.1 | `gitleaks dir .`: no leaks (about 1.55 MB scanned); `gitleaks git --log-opts=--all`: 139 commits scanned, no leaks (all refs hold 140; the one merge, `6c69307`, has no diff of its own) |
+| Branches | `git branch -r --merged origin/main`: `night/deepseek`, `night/m0-m2`, `night/orca`, `night/price-schema` and `night/provider-validation-ready`, none with a commit `main` lacks; `--no-merged` lists none |
+| Cleanup | four servers stopped by process group, none left; the four data directories (one of them the default `~/.local/share/saintpetrus`, which the literal `npm run dev` created) and the clone deleted by literal path; no Chromium profile left |
+
+`npm ci`'s own summary counts 9 high: braces' one advisory and the eight packages that reach it (micromatch,
+fast-glob, `@next/eslint-plugin-next`, eslint-config-next, `@ts-morph/common`, ts-morph, `@shadcn/registry` and
+shadcn); the gate judges the advisory where it is braces' own. No defect was found: nothing in behaviour,
+dependencies, security, CI or the documentation needed a change.
 
 #### Decisions taken
 
@@ -917,6 +936,8 @@ the audit exception the policy holds, and a fresh clone of GitHub proves the fin
   Connection and Export graph (`AGENTS.md`, Interface vocabulary). No test pins the sentences of
   `docs/provider-validation.md`. The mutations restore the saved bytes and check their sha256 instead of swapping
   back; the script also refuses a text that does not occur exactly once and a replacement equal to it.
+- R7-2 (2026-10-06). Records only, so it has no mutation (`AGENTS.md`); the R7-1 mutations entered the mutation log
+  with R7-1, as each Round 6 item's did.
 
 #### Questions for João
 
@@ -1354,8 +1375,9 @@ Everything below is yours; nothing in it needs this conversation.
 7. **Before any real call**, follow `docs/provider-validation.md` and `docs/reference/first-real-call.md`: allowlist the
    exact model in `config/token-policy.json`, enter its browser-verified price in Prices (for OpenAI, the dated
    snapshot too), use a disposable key, and check the first call against the invoice before a second one.
-8. **Branches.** `main` holds all the work. The `night/*` branches that the final verification shows contained in
-   `main` can be deleted on GitHub, or kept; R7-2 names them.
+8. **Branches.** `main` holds all the work. The final verification (Phase 13) found every `night/*` branch on GitHub
+   contained in `main`, none with a commit of its own: `night/deepseek`, `night/m0-m2`, `night/orca`,
+   `night/price-schema` and `night/provider-validation-ready`. You can delete them on GitHub, or keep them.
 9. **The braces exception** (GHSA-vfj7-8cjw-p6xm) holds through 2026-10-20, inclusive. After that, or as soon as a fix
    exists: `npx npm@11 audit fix` if the fix comes in under the patch and minor rule (`AGENTS.md`, Dependencies), then
    `npm ci` and a green gate. To renew the exception instead, the date changes in `scripts/audit-policy.mjs`, in the
@@ -1418,3 +1440,9 @@ Everything below is yours; nothing in it needs this conversation.
   carries this entry. Floor 544 → 553. Twelve mutations, all killed. `test:e2e` passed with 25 PASS after the
   dependency change. Gitleaks clean on every staged diff. No request reached a provider. One question is open
   (R6-Q1).
+- Phase 13, Round 7 (2026-10-06, on `main`): closing. R7-1 `4a47529` made the documentation and this checklist true
+  today and added a test that holds README.md, SECURITY.md and AGENTS.md to the audit exception the policy holds;
+  R7-2, in the commit that carries this entry, records the proof on a fresh, full clone: gate 554, `test:e2e` 25
+  PASS, `test:browser` 4 PASS, REAL without a key with `dispatches` 0, Gitleaks clean over every branch, every
+  `night/*` branch contained in `main`. Floor 553 → 554. Three mutations, all killed. Gitleaks clean on every staged
+  diff. No request reached a provider. One question is open (R6-Q1).

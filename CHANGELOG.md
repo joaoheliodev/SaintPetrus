@@ -3,6 +3,20 @@
 Notable changes, newest first. Dates are UTC. No release has been tagged; entries are grouped by the branch
 that carried them.
 
+## Unreleased: Round 7 on `main` (2026-10-06)
+
+The closing round: documentation and one test only. No behaviour, dependency, lockfile, configuration or CI change,
+and no request with a real key. The test floor rose from 553 to 554.
+
+- The documents say what is true today: `SECURITY.md` names the one audit exception (GHSA-vfj7-8cjw-p6xm in
+  `braces`, until 2026-10-20) among its residual risks, the validation protocol builds from a clean clone of `main`,
+  `STATUS.md` says where the later rounds' events live, and the operator's checklist and questions are current, with
+  R6-Q1 open (R7-1).
+- A test requires `README.md`, `SECURITY.md` and `AGENTS.md` to name every audit exception's id and date, so a
+  renewal cannot leave them behind (R7-1).
+- A fresh, full clone of GitHub passed the gate (554 tests), both browser checks, REAL without a key (`dispatches` 0)
+  and Gitleaks over every branch; every `night/*` branch is contained in `main` (R7-2).
+
 ## Unreleased: Round 6 on `main` (2026-10-06)
 
 The operator answered the two questions left in the repository, the license (Q-06) and the security contact (Q-05).
