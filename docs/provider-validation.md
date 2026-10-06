@@ -1,7 +1,7 @@
 # Operator protocol for real provider validation
 
 Prepared from commit `0662647` on 2026-09-26 and updated on 2026-09-27 on
-`night/provider-validation-ready` for served identities, receipts, the dispatch
+`night/provider-validation-ready`, since merged into `main`, for served identities, receipts, the dispatch
 ledger, the validation timeout and terminal DeepSeek entry. This is a procedure, not
 evidence of a real call. No provider request, model discovery or price lookup was made to prepare
 it. The operator runs the server and approves each paid step. Read
@@ -32,8 +32,8 @@ Fill this locally. No credential belongs in this document or the results table.
 | Whether feed is enabled; dispatch evidence comes from `dispatches` on `GET /api/provider` | |
 | Approved timeout method (`SAINTPETRUS_VALIDATION_TIMEOUT_MS` value or an external impairment) and disposable-key rejection method | |
 
-1. Operator: run the build on this branch before validation. Start only on
-   `127.0.0.1` with `SAINTPETRUS_MODE=real` (the header must say REAL); disable preview. Enable `SAINTPETRUS_FEED=true` at startup
+1. Operator: before validation, run the build from a clean clone of `main`, after `npm ci` and a green
+   `npm run gate`. Start only on `127.0.0.1` with `SAINTPETRUS_MODE=real` (the header must say REAL); disable preview. Enable `SAINTPETRUS_FEED=true` at startup
    if feed evidence is required. Enabling only its UI is insufficient. A restart
    no longer erases an unresolved call: the accounting journal brings it back
    `unverifiable` with its agent paused. Still avoid restarting mid-call: the

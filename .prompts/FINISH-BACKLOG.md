@@ -1,7 +1,7 @@
 # SaintPetrus finish backlog
 
-Persistent state for the autonomous finishing session on branch `night/provider-validation-ready`
-(anchors `0662647` price admin, `1445177` validation protocol). The conversation is not the record:
+Persistent state for the autonomous finishing session on branch `night/provider-validation-ready`, since merged into
+`main`, where the later rounds continued (anchors `0662647` price admin, `1445177` validation protocol). The conversation is not the record:
 this file and `git log` are. Written in English per `AGENTS.md`; the two section names the operator
 asked for are kept in Portuguese.
 
@@ -21,7 +21,7 @@ ephemeral session can resume from a fresh clone (see decision D-02).
 
 ## Definition of Done (operator section 12)
 
-- [x] Every P0 and P1 item is done, or blocked only on an operator decision or on a real provider call (F7 on Q-03/Q-04).
+- [x] Every P0 and P1 item is done, or blocked only on an operator decision or on a real provider call (F7 on Q-03/Q-04, since done as A-03 and A-04).
 - [x] `npm ci && npm run dev` starts the panel in mock mode without any key, and the main flow works end to end
   (browser check after a fresh `npm ci`).
 - [x] Full gate green with at least 338 tests and zero skips (400 tests in 29 suites).
@@ -80,7 +80,7 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | F4 | Confirm destructive actions | Operator requirement | Reset graph, run mock (resets), pause all (cancels in-flight work), disconnect credential, delete connection, add price validity and apply confirmed usage all require explicit confirmation | no | done (f42e1e1; plus Forget key from S1) |
 | F5 | Loading, empty and error states | Operator requirement | Every panel shows all three where applicable | no | done (f42e1e1; feed, preview, reservations empty states; connection badge unavailable state) |
 | F6 | Export context from the UI | Export route exists without a UI entry | Download link to the existing endpoint; no new client fetch | no | done (f42e1e1) |
-| F7 | Agent removal, graph import and persistence | Removal was deliberately blocked in `c01fb02`; import/persistence not planned in docs | Not implemented; questions Q-03 and Q-04 | yes | blocked (operator decision) |
+| F7 | Agent removal, graph import and persistence | Removal was deliberately blocked in `c01fb02`; import/persistence not planned in docs | Not implemented; questions Q-03 and Q-04 | yes | done (Q-03 and Q-04 answered 2026-09-27: A-03 and A-04, Phase 7) |
 
 ### Phase 4 — quality (P2)
 
@@ -123,8 +123,8 @@ Priority: P0 security/accounting, P1 core function, P2 quality, P3 docs/DX.
 | A-04 | P1 | Q-04 yes | Graph persisted in the user data directory; import as untrusted input (strict schema, size limit, unknown fields and credentials refused, models through the allowlist); export stays redacted; accounting documented as process-local | done |
 | A-09 | P1 | Q-09 | Run once kept only through the same preflight and budgets, with a confirmation that shows the maximum reserved cost; removed if it duplicates another action | done: kept, since no other action sends an agent's own message and records its output (the probe sends a fixed message and records nothing). `quote` shares `TokenService.plan` with `execute` |
 | A-02 | — | Q-02 | The operator validates locally; nothing to implement | done (no change) |
-| A-05 | P3 | Q-05 empty | The security contact placeholder stays | done (no change) |
-| A-06 | P3 | Q-06 empty | No LICENSE is created | done (no change) |
+| A-05 | P3 | Q-05 empty | The security contact placeholder stays | done (no change); superseded 2026-10-06: Q-05 answered, R6-2 (`e96433d`) |
+| A-06 | P3 | Q-06 empty | No LICENSE is created | done (no change); superseded 2026-10-06: Q-06 answered, MIT, R6-1 (`03534b8`) |
 
 ### Phase 8 — UI round (2026-09-27)
 
@@ -240,14 +240,18 @@ panel, nothing copied or loaded from it.
 - **Q-U1** Run once sends the agent's "Instruction" (`context.summary`), a fixed text such as "Manually configured
   agent. No provider connected." It says "No provider connected" even when one is. Changing it changes what is
   sent to the provider, so it is out of this round: the Details tab now shows it verbatim under "Instruction sent
-  with Run once". Should it be reworded, or made editable?
+  with Run once". Should it be reworded, or made editable? **Answered 2026-09-28 (Round 3):** done as Q-U1 in
+  Phase 9: the system instruction is the agent's Objective, quote and call share `TokenService.plan`, and the
+  connection test is unchanged.
 - **Q-U2** Graph events do not say which agent they concern, so Activity lines read "Agent created" without a name
   unless the live feed is on. Adding `agentId` to the graph event would be a small server change (outside this
-  round): worth doing?
+  round): worth doing? **Answered 2026-09-28 (Round 3):** done as Q-U2 in Phase 9: graph events name the agent (also
+  on `agent.removed`) or a connection's source and target, each `{ id, name }`, and carry the server's `at`.
 - **Q-U3** The mock answers every Run once with "MOCK: connection verified. No external API was called.", and the graph
   event says "Provider output recorded." even for the mock. Next to a chip that says "not verified", a first-time
   reviewer read that as a contradiction. Both are server strings: reword them (for example "MOCK answer: no provider
-  was called.")?
+  was called.")? **Answered 2026-09-28 (Round 3):** done as Q-U3 in Phase 9: the mock answers "MOCK answer: no model
+  was called and nothing was billed.", `agent.output` says "Answer recorded.", and verification is unchanged.
 
 ### Phase 9 — Round 3: operator decisions and server fixes (2026-09-28)
 
@@ -891,6 +895,33 @@ required (R6-A).
   then, the gate fails again on its own. Renew the exception for a set time, or let it fail and wait? Either way it
   is your call; nothing happens before that date.
 
+### Phase 13 — Round 7: closing (2026-10-06)
+
+On `main` from `276361a`. Documentation and one test only: no behaviour, dependency, lockfile, configuration or CI
+change, and no request with a real key. The documentation says what is true today, a test holds three documents to
+the audit exception the policy holds, and a fresh clone of GitHub proves the final state.
+
+| ID | Item | Acceptance criterion | Status |
+| --- | --- | --- | --- |
+| R7-1 | The documentation says what is true today | `SECURITY.md` names the braces exception in its dependency item; the validation protocol builds from a clean clone of `main`; `STATUS.md` says where the later rounds' events live; the backlog's contradicted statuses, the answers to Q-01 to Q-10, R6-Q1 as open and the checklist are current; `tests/repository-metadata.test.ts` requires README.md, SECURITY.md and AGENTS.md to name every exception's id and date; floor 553 → 554 | done |
+| R7-2 | Final records | The fresh-clone proof recorded with its numbers in STATUS, CHANGELOG and this phase; checklist item 8 names the branches contained in `main` | pending |
+
+#### Decisions taken
+
+- R7-1 (2026-10-06). Besides the round's list, the same test (a statement about now that the file itself
+  contradicts) found: the header named the night branch alone; the Definition of Done still called F7 blocked; A-05
+  and A-06 said the placeholder stays and no LICENSE is created; Q-U1 to Q-U3 read as open though Phase 9 did them;
+  D-03 and D-05 described the mock and OpenAI as they were before A-01 and A-07; the R1 follow-ups did not say that
+  they are still open on `main`. Each keeps its text and gains what is true now. Checklist items 2 and 7 keep their substance, but they
+  named "Tokens", "Connect AI" and "export the context", which the panel no longer has; they now say Budgets, Prices,
+  Connection and Export graph (`AGENTS.md`, Interface vocabulary). No test pins the sentences of
+  `docs/provider-validation.md`. The mutations restore the saved bytes and check their sha256 instead of swapping
+  back; the script also refuses a text that does not occur exactly once and a replacement equal to it.
+
+#### Questions for João
+
+- R6-Q1 stays open (Phase 12, and "Perguntas para o João").
+
 ## V0 review of Part 2 (`1445177`)
 
 Checked every section of `docs/provider-validation.md` and the `STATUS.md` change against the code.
@@ -1132,6 +1163,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R6-2 | the placeholder marker back in the section | killed by "vulnerabilities are reported privately through GitHub…"; restored, sha256 identical |
 | R6-2 | the fallback paragraph removed | killed by the same. Its swap back replaced the empty string, which matches everywhere, so it never ran; the paragraph was restored by hand to the same sha256 and the next mutation rerun on the restored file |
 | R6-2 | an e-mail in SECURITY.md | killed by "the files a visitor reads first publish no e-mail address" (rerun alone after the restore) |
+| R7-1 | README.md's exception date moved to 2026-10-27 | killed by "the documents name the audit exception the policy holds"; restored from the saved bytes, sha256 identical |
+| R7-1 | SECURITY.md without the advisory id | killed by the same; restored, sha256 identical (rerun on the final wording of the sentence) |
+| R7-1 | AGENTS.md's exception date moved to 2026-10-27 | killed by the same; restored, sha256 identical |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
@@ -1157,7 +1191,7 @@ parallel without editing the tree. Each finding is listed with its disposition.
 | R1-15 | major, found while fixing R1-04 | `npm run test:browser` hung since f42e1e1: "Run preview mock" now asks first and the preview check never answered the dialog | fixed (this commit): the check accepts and asserts the question; passes again |
 | R1-16 | open observation | In `npm run dev` only, about 1 run in 15 the Tab walk found the canvas cards and edge focused (`:focus-visible` true) without the override outline, while every other stop kept its ring; never in production (every run passed). The compiled CSS contains the rule; the cause is unproven (a stale dev stylesheet is the leading suspect). The check now reports whether the override was loaded when it fails | open |
 
-Follow-ups recorded by the review, not done in this branch:
+Follow-ups recorded by the review, not done on `night/provider-validation-ready` and still open on `main`:
 
 - **F-01** When a usage shape cannot be parsed, every adapter throws before returning, so the served model the
   response did name is lost: receipts show `servedModel: null` and manual reconciliation journals only the requested
@@ -1201,11 +1235,14 @@ Follow-ups recorded by the review, not done in this branch:
   `npm ci && npm run dev` to start in mock mode. The mock makes no network call and spends nothing. Only
   the development launcher changes its default; an explicit `SAINTPETRUS_MOCK=false` (shell or
   `.env.local`) still wins, and `npm start`, used for real validation, keeps the mock off. Reversible;
-  confirmation requested in Q-01.
+  confirmation requested in Q-01. Superseded by A-01 (Q-01, 2026-09-27): the mock is the default in every mode, real
+  providers need `SAINTPETRUS_MODE=real` at startup, and the `SAINTPETRUS_MOCK` variables were retired.
 - **D-05 OpenAI price key.** `AGENTS.md` says the price key is the response `model`. The OpenAI adapter now
   follows it like Gemini and DeepSeek. Real OpenAI responses usually name a dated snapshot of the alias, so
   until the operator registers that snapshot's price, an OpenAI call stays unverifiable and pauses its agent.
-  Conservative and reversible; see Q-07.
+  Conservative and reversible; see Q-07. Since A-07 (Q-07, 2026-09-27) OpenAI is out of the allowlist until the
+  operator validates it, so no OpenAI call is made; once added back, it is priced by the dated snapshot its response
+  names.
 - **D-06 Run once.** The inspector can send one call for the selected agent through the existing `complete`
   action (no new route or client fetch), and the server records the answer as that agent's output. With the dev
   mock it is free; with a real provider it is an ordinary budgeted call the user clicks for. Reversible; Q-09.
@@ -1245,15 +1282,22 @@ Follow-ups recorded by the review, not done in this branch:
 
 ## Perguntas para o João (questions for the operator)
 
-- **Q-01** Keep the mock on by default in `npm run dev` (D-03), or return to opt-in only?
+- **Q-01** Keep the mock on by default in `npm run dev` (D-03), or return to opt-in only? **Answered 2026-09-27
+  (Phase 7):** yes. The mock is the default in every mode; real providers only with an explicit startup opt-in; the
+  UI always shows MOCK or REAL. A-01.
 - **Q-02** Real validation decisions from `docs/provider-validation.md`: provider, requested and possible
   served model IDs, tariffs, output caps, four-scope token and USD limits, total approved spend, dispatch
   observation method, disposable key, and whether unobserved cache, reasoning and 429 cases may stay
-  unverified.
+  unverified. **Answered 2026-09-27 (Phase 7):** the operator validates locally; nothing to implement. A-02.
 - **Q-03** Agent removal was deliberately blocked in `c01fb02` ("node deletion stays blocked"). Should
   it exist, and what happens to an agent's budget rows and unresolved reservations when it is removed?
+  **Answered 2026-09-27 (Phase 7):** yes. Removal with confirmation; refused while the agent has an active,
+  unverifiable or unreconciled reservation; its `agent/A` accounting stays, marked removed. A-03.
 - **Q-04** Graph import and persistence across restarts are not planned in the docs (state is
-  process-local by design). Wanted?
+  process-local by design). Wanted? **Answered 2026-09-27 (Phase 7):** yes. Graph persisted in the user data
+  directory; import as untrusted input (strict schema, size limit, unknown fields and credentials refused, models
+  through the allowlist); export stays redacted; accounting documented as process-local (journaled since R-02, in
+  Round 3). A-04.
 - **Q-05** Security contact for `SECURITY.md` (placeholder left). **Answered 2026-10-06:** "O SECURITY.md fique a seu
   critério, mas sempre preze pela segurança." The operator delegated the choice to the assistant, security first.
   Chosen: reports through GitHub private vulnerability reporting, no e-mail or other personal contact published, and
@@ -1263,43 +1307,69 @@ Follow-ups recorded by the review, not done in this branch:
   copyright 2026 João Hélio dos Reis Souza, with shadcn/ui's MIT notice kept for `components/ui/` (asked and
   answered during the round). R6-1 (`03534b8`), D-13.
 - **Q-08** Remembered keys are encrypted under the ignored `data/vault` inside the checkout. Move the vault to a
-  per-user data directory outside the project folder (existing remembered keys would need re-entry)?
+  per-user data directory outside the project folder (existing remembered keys would need re-entry)? **Answered
+  2026-09-27 (Phase 7):** yes. Remembered keys move to the OS user data directory (dir 0700, files 0600); a legacy
+  vault in the checkout is copied, verified and only then deleted. A-08.
 - **Q-09** Keep the inspector's Run once action (D-06), or restrict real-provider calls to the connection probe?
+  **Answered 2026-09-27 (Phase 7):** Run once is kept only through the same preflight and budgets, with a
+  confirmation that shows the maximum reserved cost; kept, since no other action sends an agent's own message and
+  records its output. A-09.
 - **Q-10** When a provider answers with a served model that has no price, the reservation later expires into the
   preflight estimate even if the provider reported more usage (a review test: 4,000 input tokens against an estimate
   of 19). Should expiry convert at the greater of the estimate and the reported usage, per dimension, at the dearest
   captured tariff? Recommended: yes, since it only makes the guard stricter; it changes spend accounting, so it waits
   for you. Meanwhile the agent stays paused and Apply confirmed usage replaces the estimate with invoice figures.
+  **Answered 2026-09-27 (Phase 7):** yes. Expiry of an unpriced served model converts at max(estimate, reported) per
+  dimension, at least at the requested model's peak/cache-miss rate; it stays an estimate, is never reduced
+  automatically, and the agent stays paused until manual reconciliation. A-10.
 - **Q-07** OpenAI now prices the served snapshot (D-05). Which dated IDs and prices should be registered
-  before any OpenAI use, or should OpenAI be removed from the allowlist until then?
+  before any OpenAI use, or should OpenAI be removed from the allowlist until then? **Answered 2026-09-27 (Phase
+  7):** OpenAI removed from the allowlist and documented as unsupported until validated; no snapshot or price
+  registered. A-07.
+- **R6-Q1** Renew the braces exception (GHSA-vfj7-8cjw-p6xm) when it lapses on 2026-10-20? **Open** (asked in Phase
+  12). Until you answer, the code's default stands: the exception is not renewed; from 2026-10-21, or as soon as a fix
+  within a minor release exists, the gate and CI fail at the audit step; a fix comes in through `npm audit fix` under
+  the patch and minor rule (`AGENTS.md`, Dependencies); only the operator renews. Recommended: check on 2026-10-19.
 
 ## Checklist do João
 
 Everything below is yours; nothing in it needs this conversation.
 
-1. **Verify the branch.** `git fetch origin night/provider-validation-ready && git checkout night/provider-validation-ready`,
-   then `npm ci`, `npm run setup:hooks` and `npm run lint && npm run typecheck && npm test && npm run build`. Expect at
-   least 400 tests and zero skips (the floor in `AGENTS.md`), and a green CI run on the branch head.
+1. **Verify `main`.** A fresh, full clone (`git clone https://github.com/joaoheliodev/SaintPetrus.git`, no `--depth`),
+   then `npm ci`, `npm run setup:hooks` and `npm run gate`. Expect at least 554 tests and no skip (the floor in
+   `AGENTS.md`), and a green CI run on the head of `main`.
 2. **Try the keyless panel.** `npm run dev`, open http://127.0.0.1:3000 and walk the main flow: add an agent, edit it,
    connect two agents (drag, or Connect to in the inspector), move a card with the arrow keys, Run once (mock), open
-   Tokens and Connect AI, export the context, delete a connection, reset. Optional, with Chromium and a fresh instance:
-   `PORT=3310 npm run dev` then `TEST_APP_PORT=3310 npm run test:e2e`; and the preview check from the README.
-3. **Answer the questions** in "Perguntas para o João", above all Q-02 (the real validation plan), Q-07 (OpenAI
-   snapshot prices) and Q-10 (expiry with reported usage); Q-05 and Q-06 were answered on 2026-10-06.
-4. **Review the decisions** D-01 to D-09 in "Decisões tomadas" and revert any you disagree with; each is reversible.
-5. **Switch on private vulnerability reporting.** `SECURITY.md` and `LICENSE` are done (Round 6); turn on GitHub
-   private vulnerability reporting in the repository's Settings, Advanced Security, so the report button exists.
-6. **Decide on this file.** `.prompts/FINISH-BACKLOG.md` is force-tracked on this branch (D-02); `AGENTS.md` says
-   `.prompts/` does not survive a fresh clone, which stays true for everything else there. Keep it on `main` or untrack
-   it before merging.
+   Budgets, Prices and Connection, Export graph, delete a connection, reset. Optional, with Chromium and a fresh
+   instance: `PORT=3310 npm run dev` then `TEST_APP_PORT=3310 npm run test:e2e`; and the preview check from the README.
+3. **Questions.** Q-01 to Q-10 are answered (2026-09-27; Q-05 and Q-06 on 2026-10-06). What stays with you: R6-Q1
+   (item 9), DeepSeek's model and price (D7 in `STATUS.md`; no agent enters them) and the first real call (item 7).
+4. **Review the decisions** D-01 to D-16 in "Decisões tomadas" and revert any you disagree with; each is reversible.
+5. **Switch on private vulnerability reporting** in the repository's Settings, Advanced Security, so the "Report a
+   vulnerability" button `SECURITY.md` points to exists. Optional, in the same panel: Secret scanning, Push protection
+   and Dependabot alerts.
+6. **Decide on this file.** `.prompts/FINISH-BACKLOG.md` is tracked on `main` with `git add -f` (D-02); `AGENTS.md` says
+   `.prompts/` does not survive a fresh clone, which stays true for everything else there. Keep it public, or untrack
+   it.
 7. **Before any real call**, follow `docs/provider-validation.md` and `docs/reference/first-real-call.md`: allowlist the
-   exact model in `config/token-policy.json`, enter its browser-verified price in Tokens → Prices (for OpenAI, the dated
+   exact model in `config/token-policy.json`, enter its browser-verified price in Prices (for OpenAI, the dated
    snapshot too), use a disposable key, and check the first call against the invoice before a second one.
-8. **Merge.** No pull request was opened; open one from `night/provider-validation-ready` to `main` when you are ready.
-9. **Optional maintenance.** CI warns that `actions/checkout@v4` and `actions/setup-node@v4` run on a deprecated Node
-   20 runtime; moving to v5 is a major update, so it is yours to approve. Patch and minor updates are available for
-   next, eslint-config-next, tsx, lucide-react, react, @xyflow/react and tailwind; none was applied (0 vulnerabilities).
-10. **Follow-ups** F-01 and F-02 and observation R1-16 are listed with the review findings above.
+8. **Branches.** `main` holds all the work. The `night/*` branches that the final verification shows contained in
+   `main` can be deleted on GitHub, or kept; R7-2 names them.
+9. **The braces exception** (GHSA-vfj7-8cjw-p6xm) holds through 2026-10-20, inclusive. After that, or as soon as a fix
+   exists: `npx npm@11 audit fix` if the fix comes in under the patch and minor rule (`AGENTS.md`, Dependencies), then
+   `npm ci` and a green gate. To renew the exception instead, the date changes in `scripts/audit-policy.mjs`, in the
+   test that pins it (`tests/audit-policy.test.ts`), in `AGENTS.md`, `README.md` and `SECURITY.md` (the R7-1 test in
+   `tests/repository-metadata.test.ts` makes the documents move together), and only on your order (R6-Q1).
+10. **Optional maintenance.** CI warns that `actions/checkout@v4`, `actions/setup-node@v4` and
+    `gitleaks/gitleaks-action@v2` target the deprecated Node.js 20 runtime, which GitHub now replaces with Node.js 24;
+    moving to their next major is yours to approve. CI also notes that `ubuntu-latest` moves to Ubuntu 26 from
+    2026-10-19. `npm outdated` (it only reads the npm registry) showed on 2026-10-06: patch releases for tsx 4.23.15
+    and cn 0.2.6; minor releases for next and eslint-config-next 16.4.0, react, react-dom, @types/react and
+    @types/react-dom 19.3.0, @xyflow/react 12.12.0, lucide-react 1.52.0, and tailwindcss and @tailwindcss/postcss
+    4.3.3; major releases for typescript 7.0.2, eslint 10.12.0, @types/node 26.6.4 and cn 0.4.0. An update stays
+    within patch and minor, with a green gate (`AGENTS.md`, Dependencies).
+11. **Follow-ups** F-01 and F-02 and observation R1-16 are listed with the review findings above.
 
 ## Session log
 

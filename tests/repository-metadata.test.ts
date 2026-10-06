@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { auditExceptions } from '../scripts/audit-policy.mjs';
 
 const read = (path: string) => readFileSync(path, 'utf8');
 // One line per sentence, however the file wraps it.
@@ -44,4 +45,15 @@ test('R6-2 vulnerabilities are reported privately through GitHub, with a fallbac
   assert.ok(section.includes('"Report a vulnerability"'), 'GitHub private vulnerability reporting first');
   assert.ok(section.includes('Open a public issue titled "Security contact request" that says only that you have a security report, with no details'), 'and a fallback that carries nothing');
   assert.ok(section.includes('Never put keys, cookies, unredacted transcripts, screenshots or exploit details in an issue, pull request or discussion.'));
+});
+
+// A renewal moves the exception's date in the policy; the documents that name it have to move with it.
+test('R7-1 the documents name the audit exception the policy holds', () => {
+  for (const path of ['README.md', 'SECURITY.md', 'AGENTS.md']) {
+    const text = read(path);
+    for (const { id, until } of auditExceptions) {
+      assert.ok(text.includes(id), `${path} names ${id}`);
+      assert.ok(text.includes(until), `${path} says ${id} is excepted until ${until}`);
+    }
+  }
 });

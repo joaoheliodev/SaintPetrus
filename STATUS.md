@@ -1,6 +1,6 @@
 # SaintPetrus — current status
 
-Branch: `main`, which merged `night/provider-validation-ready` on 2026-09-29 (Round 4 below). That branch continued `night/provider-validation` from the operator's price-admin commit `0662647` on `night/price-admin`, following `night/price-schema`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`; timestamped events live in the append-only `NIGHT-LOG.md`.
+Branch: `main`, which merged `night/provider-validation-ready` on 2026-09-29 (Round 4 below). That branch continued `night/provider-validation` from the operator's price-admin commit `0662647` on `night/price-admin`, following `night/price-schema`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`. Timestamped events up to 2026-09-27 live in the append-only `NIGHT-LOG.md`; those of the later rounds live in the Session log of `.prompts/FINISH-BACKLOG.md` and in `CHANGELOG.md`.
 
 ## Verification checkpoint (2026-09-27)
 
