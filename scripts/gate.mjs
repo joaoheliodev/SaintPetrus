@@ -10,8 +10,9 @@ import { pathToFileURL } from 'node:url';
 const npm = process.env.npm_execpath ? [process.execPath, process.env.npm_execpath] : ['npm'];
 export const gateSteps = [
   { name: 'check-staged --tracked', command: [process.execPath, 'scripts/check-staged.mjs', '--tracked'] },
-  { name: 'npm audit --audit-level=high', command: [...npm, 'audit', '--audit-level=high'],
-    onFailure: 'Fix an advisory with a patch or minor release and a green gate. With no fix available, or if the registry did not answer, stop and report: this step is never skipped.' },
+  // npm audit, judged by scripts/audit-policy.mjs: it holds the one advisory the operator excepted (AGENTS.md).
+  { name: 'npm audit --audit-level=high', command: [process.execPath, 'scripts/audit-policy.mjs'],
+    onFailure: 'Fix an advisory with a patch or minor release and a green gate. With no fix available, or if the registry did not answer, stop and report: this step is never skipped, and only the operator excepts an advisory.' },
   { name: 'lint', command: [...npm, 'run', 'lint'] },
   { name: 'typecheck', command: [...npm, 'run', 'typecheck'] },
   { name: 'tests, held to the floor in AGENTS.md', command: [...npm, 'test'], floor: true },

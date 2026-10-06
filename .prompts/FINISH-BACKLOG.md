@@ -820,6 +820,40 @@ global and session nobody is paused, yet Budgets ends "then use Resume eligible 
   An agent is paused only by a full budget (used plus reserved at or over a token or dollar limit), unverifiable
   usage, an estimate awaiting reconciliation or Pause all. D-12 records it.
 
+### Phase 12 — Round 6: license and security contact (2026-10-06)
+
+On `main` from `534c56c`. The operator answered the two questions left in the repository: Q-06 (license) and Q-05
+(security contact). The round touches documentation and metadata only, after one dependency commit the starting gate
+required (R6-A).
+
+| ID | Item | Acceptance criterion | Status |
+| --- | --- | --- | --- |
+| R6-A | The starting gate was red | `npm audit --audit-level=high` failed on the clean tree with five advisories published since 2026-09-30; the four with a patch release are taken with npm 11, and `braces`, which has none, is excepted by operator decision until 2026-10-20; gate green, browser check unchanged, one commit | done |
+
+#### Decisions taken
+
+- R6-A (2026-10-06). The gate on the clean tree stopped at `npm audit`: proxy-addr (critical, GHSA-jqcg-44mw-7w3h),
+  sharp (GHSA-wq5f-xc86-pv6w), source-map-js (GHSA-68fv-2mgg-jv7q), `@modelcontextprotocol/sdk` (GHSA-6qxp-vccf-f47h)
+  and braces (GHSA-vfj7-8cjw-p6xm), all high but the first. `shadcn` is a runtime dependency only for the CSS
+  `app/globals.css` imports, and it brings in the MCP SDK (with express and proxy-addr), fast-glob, micromatch and
+  braces; `next` brings in sharp and postcss with source-map-js. The registry had patch releases for four:
+  proxy-addr 2.0.8, sharp 0.35.5 (libvips 1.3.4), source-map-js 1.2.2 and the MCP SDK 1.32.1 through shadcn 4.21.0 →
+  4.21.3 (a patch inside `^4.21.0`, published 2026-10-06, which adds `@shadcn/registry` and drops its cosmiconfig
+  chain). braces 3.0.3 is the latest release and is affected, and micromatch 4.0.8 and fast-glob 3.3.3, also the
+  latest, depend on it; the only offered "fix" downgrades shadcn to 1.0.0. The round forbade dependency changes
+  without asking, so the agent stopped and asked; the operator chose both recommendations: the four patch releases
+  in their own commit, and a temporary exception for braces. Neither passes the gate alone, so they land together.
+  `npx npm@11 audit fix` changed only `package-lock.json` (50 entries: 31 version changes, 6 added, 6 removed and the
+  dev flag of 7 that the old shadcn no longer reaches; the 38 `libc` fields kept), then `npm ci` installed it as CI
+  does. `scripts/audit-policy.mjs` judges `npm audit --json`: it excepts exactly GHSA-vfj7-8cjw-p6xm in braces until
+  2026-10-20 inclusive or until a non-major fix exists, and fails on any other high or critical advisory and on a
+  missing report; the gate's audit step runs it, so CI follows. `AGENTS.md` records the decision (Operator
+  decisions, the gate paragraph and Dependencies), README says it, and `tests/audit-policy.test.ts` pins the rule
+  and the one exception; the R4-6 gate test follows the step's new command. Gate green (549), `test:e2e` 25 PASS
+  on a fresh MOCK instance. Floor 544 → 549.
+
+#### Questions for João
+
 ## V0 review of Part 2 (`1445177`)
 
 Checked every section of `docs/provider-validation.md` and the `STATUS.md` change against the code.
@@ -1049,6 +1083,11 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R5-12 | `holds()` without `&& item.reported` (every expired estimate holds its agent) | killed by "an ordinary expired estimate does not hold its agent…", the only test of 541 that failed: A-10 and every unpriced served model test stayed green, so the mutation separates the two cases; restored, sha256 identical |
 | R5-13 | the preflight refusal pauses again (`fail(…, true)`) | killed by "a preflight refusal pauses no one, and a smaller call…", "over the routes, a Run once refused at preflight…", the walk's new check ("a preflight refusal paused …"), RF-06 (four scopes, 100%, direct API) and P2: 7 of 544; restored, sha256 identical |
 | R5-13 | a scope exactly full no longer pauses (`Token or monetary budget exhausted.` with `false`) | killed by "a scope exactly full still refuses and pauses…", RF-06 four scopes, O4, R5-3, R5-4 and R5-11: 10 of 544 |
+| R6-A | the exception no longer checks the advisory id | killed by "every other high or critical advisory still fails the audit, braces' own included…" (a second braces advisory); restored, sha256 identical |
+| R6-A | the exception ignores its date | killed by "braces' advisory without a fixed release passes the audit through 2026-10-20… and fails the day after" |
+| R6-A | the exception survives a fix | killed by "a fix for braces ends its exception at once…" |
+| R6-A | a moderate advisory blocks | killed by "every other high or critical advisory still fails the audit… and moderate or low ones do not" |
+| R6-A | the gate runs the raw `npm audit` again | killed by the two R4-6 gate tests (the step's command and the stop at the audit) |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

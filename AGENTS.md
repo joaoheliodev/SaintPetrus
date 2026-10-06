@@ -26,7 +26,7 @@ One gate, run in full before every commit:
 npm run gate
 ```
 
-`scripts/gate.mjs` runs CI's blocking steps in CI's order and stops at the first that fails: `node scripts/check-staged.mjs --tracked`, `npm audit --audit-level=high`, lint, typecheck, the tests held to the floor by `scripts/check-test-floor.mjs` on their own output, and the build. CI installs with `npm ci` and runs the same script, so the steps live in one place; its Gitleaks job stays apart, and so does Gitleaks on the staged diff before every commit (Safety locks). A commit once passed an older subset of these steps and turned CI red on an advisory published that day (Round 4, R4-6). The gate needs installed dependencies: after a change to them, run `npm ci` first, as CI does.
+`scripts/gate.mjs` runs CI's blocking steps in CI's order and stops at the first that fails: `node scripts/check-staged.mjs --tracked`, `npm audit --audit-level=high` (judged by `scripts/audit-policy.mjs`, which holds the one exception under Operator decisions), lint, typecheck, the tests held to the floor by `scripts/check-test-floor.mjs` on their own output, and the build. CI installs with `npm ci` and runs the same script, so the steps live in one place; its Gitleaks job stays apart, and so does Gitleaks on the staged diff before every commit (Safety locks). A commit once passed an older subset of these steps and turned CI red on an advisory published that day (Round 4, R4-6). The gate needs installed dependencies: after a change to them, run `npm ci` first, as CI does.
 
 `npm audit` asks the registry. If the registry does not answer, the gate fails: report it and never skip the step. How a new advisory is fixed is under Dependencies.
 
@@ -36,7 +36,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 544 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 549 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -150,6 +150,8 @@ A key configured after it was typed into the graph leaves the graph at once (Rou
 
 Every pause says why and has a way out on screen (Round 5). The token service owns every pause and its snapshot names what holds each agent; the graph shows exactly those pauses; Pause all agents pauses the run only while the demo runs; and while anything is paused, **Resume eligible agents** stands beside **Pause all agents** and in Commands, and a notice under the top bar says why. `tests/pause-invariant.test.ts` holds this after every step of a seeded walk through the routes; a new way to pause or resume joins it in the change that adds it.
 
+GHSA-vfj7-8cjw-p6xm (`braces`, high: denial of service through deeply nested patterns) has no fixed release, and every `shadcn` from 2.0.0 and `eslint-config-next` pull `braces` in; only the shadcn CLI and ESLint run it, never the server (operator decision, 2026-10-06). The gate's audit step excepts exactly that advisory of that package until 2026-10-20, or until a fix within a minor release exists, whichever comes first, and then fails again; every other high or critical advisory still fails it, and so does a missing report. `scripts/audit-policy.mjs` holds the one exception and `tests/audit-policy.test.ts` pins it. Only the operator adds, renews or extends an exception.
+
 ## Interface vocabulary
 
 The panel, the README and the tests use these words and no synonyms:
@@ -174,7 +176,7 @@ The §5.4 detectors and the RF-07 handoff come from `lib/core`. They are pure, d
 
 Prefer what is already installed. A new dependency needs its justification in the commit message and the handoff, a permissive license (MIT, Apache-2.0, BSD or ISC), no telemetry and active maintenance. Updates stay within patch and minor versions, and only with a green gate.
 
-A new advisory that turns `npm audit` red is fixed the same way: a patch or minor release and a green gate. With no fix available, stop and report. Regenerate `package-lock.json` with a current npm: npm 10 drops the `libc` fields newer npm writes for platform packages, so use npm 11 (`npx npm@11 audit fix`) and then install with `npm ci`, as CI does (Round 4, R4-5).
+A new advisory that turns `npm audit` red is fixed the same way: a patch or minor release and a green gate. With no fix available, stop and report; only the operator excepts an advisory, as under Operator decisions. Regenerate `package-lock.json` with a current npm: npm 10 drops the `libc` fields newer npm writes for platform packages, so use npm 11 (`npx npm@11 audit fix`) and then install with `npm ci`, as CI does (Round 4, R4-5).
 
 ## State ownership
 

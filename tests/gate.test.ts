@@ -22,7 +22,8 @@ function gateRun(outcomes: (command: string[]) => Run) {
 
 test('R4-6 the gate is CI\'s blocking steps in CI\'s order, and CI runs nothing else', () => {
   assert.deepEqual(gateSteps.map(step => step.name), ['check-staged --tracked', 'npm audit --audit-level=high', 'lint', 'typecheck', 'tests, held to the floor in AGENTS.md', 'build']);
-  const ends = [['scripts/check-staged.mjs', '--tracked'], ['audit', '--audit-level=high'], ['run', 'lint'], ['run', 'typecheck'], ['test'], ['run', 'build']];
+  // The audit runs through scripts/audit-policy.mjs, which judges npm audit's report (Round 6, R6-A).
+  const ends = [['scripts/check-staged.mjs', '--tracked'], ['scripts/audit-policy.mjs'], ['run', 'lint'], ['run', 'typecheck'], ['test'], ['run', 'build']];
   gateSteps.forEach((step, index) => assert.deepEqual(step.command.slice(-ends[index].length), ends[index], step.name));
   assert.equal(JSON.parse(readFileSync('package.json', 'utf8')).scripts.gate, 'node scripts/gate.mjs');
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
@@ -31,10 +32,10 @@ test('R4-6 the gate is CI\'s blocking steps in CI\'s order, and CI runs nothing 
 });
 
 test('R4-6 the gate stops at the first step that fails and says what to do; the audit is never skipped', async () => {
-  const { run, ran } = gateRun(command => ({ code: command.includes('audit') ? 1 : 0, output: '' }));
+  const { run, ran } = gateRun(command => ({ code: command.includes('scripts/audit-policy.mjs') ? 1 : 0, output: '' }));
   const lines: string[] = [];
   assert.equal(await runGate({ run, log: line => { lines.push(line); } }), 1);
-  assert.deepEqual(ran, ['scripts/check-staged.mjs --tracked', 'audit --audit-level=high'], 'nothing runs after the failing step');
+  assert.deepEqual(ran, ['scripts/check-staged.mjs --tracked', `${process.execPath} scripts/audit-policy.mjs`], 'nothing runs after the failing step');
   assert.match(lines.join('\n'), /FAILED at npm audit --audit-level=high\. .*registry did not answer.*never skipped/);
 });
 
