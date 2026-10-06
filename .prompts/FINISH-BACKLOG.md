@@ -829,6 +829,7 @@ required (R6-A).
 | ID | Item | Acceptance criterion | Status |
 | --- | --- | --- | --- |
 | R6-A | The starting gate was red | `npm audit --audit-level=high` failed on the clean tree with five advisories published since 2026-09-30; the four with a patch release are taken with npm 11, and `braces`, which has none, is excepted by operator decision until 2026-10-20; gate green, browser check unchanged, one commit | done |
+| R6-1 | MIT license (Q-06) | `LICENSE` with the MIT text and "Copyright (c) 2026 João Hélio dos Reis Souza"; `license: MIT` in both package.json files and the lockfile root; README License section and Portuguese line; shadcn/ui's notice kept for `components/ui/`; licenses of the installed tree reported; `tests/repository-metadata.test.ts` | done |
 
 #### Decisions taken
 
@@ -851,6 +852,22 @@ required (R6-A).
   decisions, the gate paragraph and Dependencies), README says it, and `tests/audit-policy.test.ts` pins the rule
   and the one exception; the R4-6 gate test follows the step's new command. Gate green (549), `test:e2e` 25 PASS
   on a fresh MOCK instance. Floor 544 → 549.
+- R6-1 (2026-10-06, operator decision Q-06). `LICENSE` holds the operator's text byte for byte (UTF-8, LF, one final
+  newline); its body equals the MIT text that react, zustand and next install. `"license": "MIT"` was added to
+  `package.json` and `lib/core/package.json` and nothing else; `npx npm@11 install --package-lock-only
+  --ignore-scripts` changed one lockfile line, the root's `license` (npm 10 would have dropped the `libc` fields), and
+  `npm ci` installed it. README gains a License section before Repository rename and "Licença: MIT (veja LICENSE)."
+  at the end of the Portuguese one. The inventory (read only, no network) found no third-party header in any tracked
+  file, but `components/ui/` holds five files (419 lines) the shadcn CLI generated from shadcn/ui, MIT, "Copyright
+  (c) 2023 shadcn", without a header: third-party code in the repository, a stop condition, so the agent asked. The
+  operator chose to attribute them: `components/ui/LICENSE` is a verbatim copy of `node_modules/shadcn/LICENSE.md`,
+  the README says so, and `AGENTS.md` keeps a later CLI component under that notice. Installed production tree, 374
+  packages: MIT 314, ISC 32, BSD-3-Clause 8, Apache-2.0 8, BSD-2-Clause 5, BlueOak-1.0.0 2, 0BSD 1, (MIT OR CC0-1.0)
+  1 (type-fest), and three known exceptions: `@img/sharp-libvips-linux-x64` (LGPL-3.0-or-later),
+  `@img/sharp-wasm32` (Apache-2.0 AND LGPL-3.0-or-later AND MIT), both installed by npm for next's optional sharp and
+  not copied into the repository, and `caniuse-lite` (CC-BY-4.0, data). Python-2.0 (argparse) left the production
+  tree with R6-A. The whole installed tree (627 packages, dev included) has no GPL, AGPL, SSPL, UNLICENSED or missing
+  license. Floor 549 → 552.
 
 #### Questions for João
 
@@ -1088,6 +1105,10 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R6-A | the exception survives a fix | killed by "a fix for braces ends its exception at once…" |
 | R6-A | a moderate advisory blocks | killed by "every other high or critical advisory still fails the audit… and moderate or low ones do not" |
 | R6-A | the gate runs the raw `npm audit` again | killed by the two R4-6 gate tests (the step's command and the stop at the audit) |
+| R6-1 | `"license": "ISC"` in package.json | killed by "the repository is MIT licensed…"; restored, sha256 identical |
+| R6-1 | LICENSE without its "AS IS" paragraph | killed by the same and by "the components the shadcn CLI generated keep shadcn/ui's MIT notice" (the same MIT terms) |
+| R6-1 | an e-mail in the README | killed by "the files a visitor reads first publish no e-mail address" |
+| R6-1 | `components/ui/LICENSE` without shadcn's copyright line | killed by "the components the shadcn CLI generated keep shadcn/ui's MIT notice" |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

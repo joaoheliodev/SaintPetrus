@@ -288,6 +288,13 @@ pauses every agent), so it refuses one that already holds work or has a keyed pr
 - Accessibility was checked in Chromium (contrast, names, focus, keyboard paths), not with a screen reader.
 - The core health detectors in `lib/core` are integrated as a library; their orchestration is future work.
 
+## License
+
+SaintPetrus is released under the MIT License; see [LICENSE](LICENSE). It covers the code in this repository, apart
+from `components/ui/`: the shadcn CLI generated those components from shadcn/ui, and they keep its MIT notice
+(Copyright (c) 2023 shadcn) in [components/ui/LICENSE](components/ui/LICENSE). Every dependency npm installs keeps its
+own license.
+
 ## Repository rename
 
 The repository was renamed from StPetrus to SaintPetrus. GitHub redirects the old URL, but update existing
@@ -300,3 +307,5 @@ com orçamento e acompanhar o custo. Execute `npm ci` e `npm run dev` e abra htt
 mock vem ligado por padrão e o painel inteiro funciona sem chave; provedores reais só com `SAINTPETRUS_MODE=real`. Nenhuma chamada com chave real foi
 feita; a primeira chamada real de cada provedor segue `docs/provider-validation.md`. Não publique chaves em
 issues, capturas de tela ou commits. Consulte `SECURITY.md`.
+
+Licença: MIT (veja LICENSE).
