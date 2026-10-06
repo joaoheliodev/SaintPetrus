@@ -2,10 +2,29 @@
 
 ## Reporting a vulnerability
 
-Report privately. Use GitHub private vulnerability reporting on this repository (Security, then "Report a
-vulnerability") when it is enabled. Otherwise write to **[SECURITY CONTACT: placeholder, to be provided by the
-maintainer]** and wait for a private channel before sending details. Never attach keys, cookies, unredacted
-transcripts or screenshots to a public issue.
+Report privately. Use GitHub private vulnerability reporting: open this repository's Security tab (GitHub may label
+it "Security and quality") and choose "Report a vulnerability". Reports made there are visible only to you and the
+maintainer.
+
+If you cannot see "Report a vulnerability", the maintainer has not switched it on yet. Open a public issue titled
+"Security contact request" that says only that you have a security report, with no details, and wait for the
+maintainer to arrange a private channel. Never put keys, cookies, unredacted transcripts, screenshots or exploit
+details in an issue, pull request or discussion.
+
+What to send, privately: the commit you tested, whether it ran in MOCK or REAL mode, steps to reproduce (MOCK is
+enough for almost everything), what you expected and what happened, and the impact you see (a key exposed, money
+spent, code run). Never send a real provider key: if a key is part of the finding, say where it appeared and the
+maintainer will revoke it.
+
+What counts: anything that breaks what the Threat model below promises, such as a key leaving where it should stay,
+a redaction that misses, a request that gets past the loopback, Host or Origin checks, a budget that can be passed,
+an import file the parser accepts that it should refuse, or the preview sandbox letting a script out. Items the
+Threat model lists as out of scope or accepted residual risk are already known; a way to make one of them worse is
+still welcome.
+
+What to expect: SaintPetrus is maintained by one person, so replies are best effort, with no guaranteed response
+time and no bounty. No release has been tagged, so only the latest commit on main receives fixes. You will be
+credited after the fix if you want to be.
 
 ## If a key leaks
 

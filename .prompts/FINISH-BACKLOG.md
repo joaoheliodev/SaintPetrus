@@ -830,6 +830,7 @@ required (R6-A).
 | --- | --- | --- | --- |
 | R6-A | The starting gate was red | `npm audit --audit-level=high` failed on the clean tree with five advisories published since 2026-09-30; the four with a patch release are taken with npm 11, and `braces`, which has none, is excepted by operator decision until 2026-10-20; gate green, browser check unchanged, one commit | done |
 | R6-1 | MIT license (Q-06) | `LICENSE` with the MIT text and "Copyright (c) 2026 João Hélio dos Reis Souza"; `license: MIT` in both package.json files and the lockfile root; README License section and Portuguese line; shadcn/ui's notice kept for `components/ui/`; licenses of the installed tree reported; `tests/repository-metadata.test.ts` | done |
+| R6-2 | Report privately, publish no contact (Q-05) | "Reporting a vulnerability" sends reports through GitHub private vulnerability reporting, with a fallback (a public "Security contact request" issue with no details) and what to send, what counts and what to expect; the placeholder is gone; no e-mail, phone or numeric deadline anywhere | done |
 
 #### Decisions taken
 
@@ -868,6 +869,18 @@ required (R6-A).
   not copied into the repository, and `caniuse-lite` (CC-BY-4.0, data). Python-2.0 (argparse) left the production
   tree with R6-A. The whole installed tree (627 packages, dev included) has no GPL, AGPL, SSPL, UNLICENSED or missing
   license. Floor 549 → 552.
+- R6-2 (2026-10-06, operator decision Q-05). The operator left the wording to the assistant, security first. Only the
+  body of "Reporting a vulnerability" changed, to the round's text: report through GitHub private vulnerability
+  reporting (the Security tab, which GitHub may label "Security and quality", then "Report a vulnerability"); if
+  that is not visible, a public issue titled "Security contact request" with no details, waiting for a private
+  channel; never keys, cookies, unredacted transcripts, screenshots or exploit details in a public place; what to
+  send, what counts (the Threat model's promises; its out-of-scope and residual-risk items are known) and what to
+  expect (one maintainer, best effort, no response time, no bounty, fixes on main only, credit if wanted). The
+  marker "[SECURITY CONTACT: placeholder…]" is gone; the `.env.example` sentence under Credentials is another subject
+  and stays. GitHub's documentation (docs.github.com) was blocked by this environment's network policy, so the two
+  tab names stay as the round wrote them. Whether private vulnerability reporting is on for the repository is not
+  verified from here: switching it on is the owner's click, and the fallback covers the meantime. `AGENTS.md`
+  records the decision; `tests/repository-metadata.test.ts` holds the section to it. Floor 552 → 553.
 
 #### Questions for João
 
@@ -1109,6 +1122,9 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R6-1 | LICENSE without its "AS IS" paragraph | killed by the same and by "the components the shadcn CLI generated keep shadcn/ui's MIT notice" (the same MIT terms) |
 | R6-1 | an e-mail in the README | killed by "the files a visitor reads first publish no e-mail address" |
 | R6-1 | `components/ui/LICENSE` without shadcn's copyright line | killed by "the components the shadcn CLI generated keep shadcn/ui's MIT notice" |
+| R6-2 | the placeholder marker back in the section | killed by "vulnerabilities are reported privately through GitHub…"; restored, sha256 identical |
+| R6-2 | the fallback paragraph removed | killed by the same. Its swap back replaced the empty string, which matches everywhere, so it never ran; the paragraph was restored by hand to the same sha256 and the next mutation rerun on the restored file |
+| R6-2 | an e-mail in SECURITY.md | killed by "the files a visitor reads first publish no e-mail address" (rerun alone after the restore) |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

@@ -36,7 +36,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 552 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 553 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -153,6 +153,8 @@ Every pause says why and has a way out on screen (Round 5). The token service ow
 GHSA-vfj7-8cjw-p6xm (`braces`, high: denial of service through deeply nested patterns) has no fixed release, and every `shadcn` from 2.0.0 and `eslint-config-next` pull `braces` in; only the shadcn CLI and ESLint run it, never the server (operator decision, 2026-10-06). The gate's audit step excepts exactly that advisory of that package until 2026-10-20, or until a fix within a minor release exists, whichever comes first, and then fails again; every other high or critical advisory still fails it, and so does a missing report. `scripts/audit-policy.mjs` holds the one exception and `tests/audit-policy.test.ts` pins it. Only the operator adds, renews or extends an exception.
 
 The repository is MIT licensed, copyright 2026 João Hélio dos Reis Souza (operator decision Q-06, 2026-10-06). LICENSE and the license field of package.json say the same, and a new dependency keeps the permissive-license rule under Dependencies. `components/ui/`, which the shadcn CLI generated from shadcn/ui, keeps shadcn/ui's MIT notice, copied verbatim, in `components/ui/LICENSE` (operator decision, 2026-10-06); a component the CLI adds later lives under that notice too.
+
+Vulnerabilities are reported through GitHub private vulnerability reporting. SECURITY.md publishes no e-mail address or other personal contact, and its fallback never asks for details in a public place (operator decision Q-05, 2026-10-06: the operator left the wording to the assistant, security first).
 
 ## Interface vocabulary
 

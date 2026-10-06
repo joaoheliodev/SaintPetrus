@@ -34,3 +34,14 @@ test('R6-1 the components the shadcn CLI generated keep shadcn/ui\'s MIT notice,
 test('R6-1 the files a visitor reads first publish no e-mail address', () => {
   for (const path of ['LICENSE', 'README.md', 'SECURITY.md', 'components/ui/LICENSE']) assert.doesNotMatch(read(path), email, path);
 });
+
+test('R6-2 vulnerabilities are reported privately through GitHub, with a fallback that asks for no detail in public (operator decision Q-05)', () => {
+  const policy = read('SECURITY.md');
+  const start = policy.indexOf('## Reporting a vulnerability\n');
+  assert.ok(start >= 0, 'the section exists');
+  const section = flat(policy.slice(start, policy.indexOf('\n## ', start + 1)));
+  assert.doesNotMatch(section, /placeholder|\[SECURITY CONTACT/i, 'no marker is left');
+  assert.ok(section.includes('"Report a vulnerability"'), 'GitHub private vulnerability reporting first');
+  assert.ok(section.includes('Open a public issue titled "Security contact request" that says only that you have a security report, with no details'), 'and a fallback that carries nothing');
+  assert.ok(section.includes('Never put keys, cookies, unredacted transcripts, screenshots or exploit details in an issue, pull request or discussion.'));
+});
