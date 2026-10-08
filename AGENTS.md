@@ -36,7 +36,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 554 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 555 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -156,6 +156,8 @@ The repository is MIT licensed, copyright 2026 João Hélio dos Reis Souza (oper
 
 Vulnerabilities are reported through GitHub private vulnerability reporting. SECURITY.md publishes no e-mail address or other personal contact, and its fallback never asks for details in a public place (operator decision Q-05, 2026-10-06: the operator left the wording to the assistant, security first).
 
+CI is pinned, and updates wait a week (2026-10-08: the operator asked for Round 8, and these two rules are the assistant's recommendation, security first). The runner and every action in `.github/workflows/ci.yml` stay pinned: `runs-on: ubuntu-24.04`, never a `-latest` label that moves on its own, and every `uses:` at a full 40-character commit SHA with its version in a comment on the same line. Changing a pin is a deliberate commit that updates it and passes CI on a temporary branch before it reaches `main`; `tests/gate.test.ts` holds the pins. An update that fixes no advisory waits until seven full days after its publication; the fix for an advisory goes in at once, under Dependencies.
+
 ## Interface vocabulary
 
 The panel, the README and the tests use these words and no synonyms:
@@ -178,7 +180,7 @@ The §5.4 detectors and the RF-07 handoff come from `lib/core`. They are pure, d
 
 ## Dependencies
 
-Prefer what is already installed. A new dependency needs its justification in the commit message and the handoff, a permissive license (MIT, Apache-2.0, BSD or ISC), no telemetry and active maintenance. Updates stay within patch and minor versions, and only with a green gate.
+Prefer what is already installed. A new dependency needs its justification in the commit message and the handoff, a permissive license (MIT, Apache-2.0, BSD or ISC), no telemetry and active maintenance. Updates stay within patch and minor versions, and only with a green gate. An update that fixes no advisory waits seven days from its publication (Operator decisions, 2026-10-08).
 
 A new advisory that turns `npm audit` red is fixed the same way: a patch or minor release and a green gate. With no fix available, stop and report; only the operator excepts an advisory, as under Operator decisions. Regenerate `package-lock.json` with a current npm: npm 10 drops the `libc` fields newer npm writes for platform packages, so use npm 11 (`npx npm@11 audit fix`) and then install with `npm ci`, as CI does (Round 4, R4-5).
 

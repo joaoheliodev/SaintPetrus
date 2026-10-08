@@ -943,6 +943,34 @@ dependencies, security, CI or the documentation needed a change.
 
 - R6-Q1 stays open (Phase 12, and "Perguntas para o João").
 
+### Phase 14 — Round 8: maintenance (2026-10-08)
+
+On `main` from `8d3bca7`. No new feature and no request with a real key. CI moves off `ubuntu-latest` and pins every
+action by commit SHA; dependencies take only patch and minor releases published seven days or more; a fresh clone
+proves the final state.
+
+| ID | Item | Acceptance criterion | Status |
+| --- | --- | --- | --- |
+| R8-1 | CI pins its runner and every action | `ubuntu-24.04` in both jobs; actions/checkout v7.0.1, actions/setup-node v7.0.0 and gitleaks/gitleaks-action v3.0.0, the newest release of each newest major published seven days or more, each at the commit SHA its tag resolves to, with the version in a comment; `AGENTS.md` holds the two rules (Operator decisions, 2026-10-08, and Dependencies) and `tests/gate.test.ts` the pins; CI green on `ci/r8-prova` before `main`; floor 554 → 555 | done |
+
+#### Decisions taken
+
+- R8-1 (2026-10-08). Publication dates come from the release pages on GitHub, read with WebFetch, because the
+  session's GitHub API reaches only this repository: actions/checkout v7.0.1, 20 Jul 2026 (v7.0.0, 18 Jun);
+  actions/setup-node v7.0.0, 14 Jul 2026; gitleaks/gitleaks-action v3.0.0, 30 May 2026. setup-node v7.1.0 was
+  published on 2026-10-08 and waits until 2026-10-15. Each SHA is what `git ls-remote <repo> refs/tags/<tag>
+  refs/tags/<tag>^{}` returned: the three tags are lightweight (no `^{}` line), and a fetch of each confirmed a commit
+  whose `action.yml` says `runs.using: node24`. The notes of the majors skipped, against our use: checkout v5 moved to
+  Node 24, v6 keeps persisted credentials in a separate file (we keep the default `persist-credentials: true`), and
+  v7 refuses a fork's pull request under `pull_request_target` or `workflow_run` unless `allow-unsafe-pr-checkout`
+  is set (our triggers are `push` and `pull_request`); `fetch-depth: 0` still fetches the whole history. setup-node v5
+  caches automatically when `package.json` names a `packageManager` (ours names none, and `cache: npm` is explicit),
+  v6 limits that to npm, and v7 moved to ESM and stopped exporting a dummy `NODE_AUTH_TOKEN` (we set no
+  `registry-url`); its README advises against automatic caching in workflows with elevated privileges, and `checks`
+  holds only `contents: read`. gitleaks-action v3 changes only the runtime: "No changes to inputs, outputs, or
+  behavior." `tests/gate.test.ts` held the Gitleaks line to the literal `@v2`, the text this change alters, so that
+  assertion now requires the pinned form instead.
+
 ## V0 review of Part 2 (`1445177`)
 
 Checked every section of `docs/provider-validation.md` and the `STATUS.md` change against the code.
@@ -1187,6 +1215,8 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R7-1 | README.md's exception date moved to 2026-10-27 | killed by "the documents name the audit exception the policy holds"; restored from the saved bytes, sha256 identical |
 | R7-1 | SECURITY.md without the advisory id | killed by the same; restored, sha256 identical (rerun on the final wording of the sentence) |
 | R7-1 | AGENTS.md's exception date moved to 2026-10-27 | killed by the same; restored, sha256 identical |
+| R8-1 | the Gitleaks action back to the tag `@v2` | killed by "R8-1 CI pins its runner and every action" and by "R4-6 the gate is CI's blocking steps in CI's order…"; restored from the saved bytes, sha256 identical |
+| R8-1 | the `checks` job back to `runs-on: ubuntu-latest` | killed by "R8-1 CI pins its runner and every action"; restored, sha256 identical |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 

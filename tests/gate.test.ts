@@ -28,7 +28,18 @@ test('R4-6 the gate is CI\'s blocking steps in CI\'s order, and CI runs nothing 
   assert.equal(JSON.parse(readFileSync('package.json', 'utf8')).scripts.gate, 'node scripts/gate.mjs');
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
   assert.deepEqual([...ci.matchAll(/^\s*- run: (.+)$/gm)].map(match => match[1]), ['npm ci', 'npm run gate']);
-  assert.match(ci, /uses: gitleaks\/gitleaks-action@v2/, 'the Gitleaks job stays');
+  assert.match(ci, /^\s*- uses: gitleaks\/gitleaks-action@[0-9a-f]{40}(\s+#.*)?$/m, 'the Gitleaks job stays, pinned');
+});
+
+// A label like ubuntu-latest, or an action's tag, can move under CI without a commit; a pin changes only in one.
+test('R8-1 CI pins its runner and every action', () => {
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const runners = [...ci.matchAll(/^\s*runs-on:\s*(.+)$/gm)].map(match => match[1].trim());
+  assert.ok(runners.length > 0, 'every job names its runner');
+  for (const runner of runners) assert.doesNotMatch(runner, /-latest$/, `runs-on: ${runner}`);
+  const actions = [...ci.matchAll(/^\s*(?:- )?uses:\s*(.+)$/gm)].map(match => match[1].trim());
+  assert.ok(actions.length > 0, 'the workflow uses actions');
+  for (const action of actions) assert.match(action, /@[0-9a-f]{40}(\s+#.*)?$/, `uses: ${action}`);
 });
 
 test('R4-6 the gate stops at the first step that fails and says what to do; the audit is never skipped', async () => {
