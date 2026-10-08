@@ -951,7 +951,57 @@ proves the final state.
 
 | ID | Item | Acceptance criterion | Status |
 | --- | --- | --- | --- |
-| R8-1 | CI pins its runner and every action | `ubuntu-24.04` in both jobs; actions/checkout v7.0.1, actions/setup-node v7.0.0 and gitleaks/gitleaks-action v3.0.0, the newest release of each newest major published seven days or more, each at the commit SHA its tag resolves to, with the version in a comment; `AGENTS.md` holds the two rules (Operator decisions, 2026-10-08, and Dependencies) and `tests/gate.test.ts` the pins; CI green on `ci/r8-prova` before `main`; floor 554 → 555 | done |
+| R8-1 | CI pins its runner and every action | `ubuntu-24.04` in both jobs; actions/checkout v7.0.1, actions/setup-node v7.0.0 and gitleaks/gitleaks-action v3.0.0, the newest release of each newest major published seven days or more, each at the commit SHA its tag resolves to, with the version in a comment; `AGENTS.md` holds the two rules (Operator decisions, 2026-10-08, and Dependencies) and `tests/gate.test.ts` the pins; CI green on `ci/r8-prova` before `main`; floor 554 → 555 | done (`825ed84`; CI run 116 on `ci/r8-prova`, 117 on `main`; the branch's deletion was refused, see below) |
+| R8-2 | Patch releases a week old | The newest patch of each direct dependency's own line published seven full days or more, and inside the existing `^` ranges only the lockfile moves; lockfile from npm 11 under `--before` seven days back, then `npm ci`; 38 `libc` fields, every `resolved` on registry.npmjs.org, no new install script or license, audit only braces; gate, `test:e2e` and `test:browser` | done (`8410228`, CI run 118) |
+| R8-3a | react, react-dom and their types 19.3.0 | Same checks | done (`ddb8121`, CI run 119) |
+| R8-3b | @xyflow/react 12.12.0 | Same checks; the two React Flow reference decisions still hold in the new code | done (`86e813f`, CI run 120) |
+| R8-3c | tailwindcss and @tailwindcss/postcss 4.3.3 | Same checks; the main screen captured before and after shows no difference beyond antialiasing | done (`762f807`, CI run 121; no pixel differs) |
+| R8-3d | next and eslint-config-next 16.4.0 | Only when published seven days or more | deferred until 2026-10-13 (published 2026-10-06) |
+| R8-4 | Records | STATUS checkpoint, CHANGELOG, this phase, the checklist; no current document cites a replaced version or `ubuntu-latest` | done |
+
+#### Updates (ages on 2026-10-08)
+
+| Package | From | To | Age of the new version | Result |
+| --- | --- | --- | --- | --- |
+| runner | `ubuntu-latest` | `ubuntu-24.04` | — | committed, R8-1 |
+| actions/checkout | v4 | v7.0.1 (`3d3c42e5…`) | 80 days | committed, R8-1 |
+| actions/setup-node | v4 | v7.0.0 (`82076278…`) | 86 days | committed, R8-1; v7.1.0 (published 2026-10-08) deferred until 2026-10-15 |
+| gitleaks/gitleaks-action | v2 | v3.0.0 (`e0c47f4f…`) | 131 days | committed, R8-1 |
+| react, react-dom | 19.2.6 | 19.2.8, then 19.3.0 | 78.9, then 28.9 days | committed, R8-2 and R8-3a |
+| @types/react | 19.2.14 | 19.2.18, then 19.3.0 | 69.7, then 28.8 days | committed, R8-2 and R8-3a |
+| @types/react-dom | 19.2.3 | 19.2.7, then 19.3.0 | 35.1, then 28.8 days | committed, R8-2 and R8-3a |
+| tailwindcss, @tailwindcss/postcss | 4.2.1 | 4.2.4, then 4.3.3 | 170.0, then 84.1 days | committed, R8-2 and R8-3c |
+| @xyflow/react | 12.11.6 | 12.12.0 | 14.1 days | committed, R8-3b |
+| eslint-config-next | 16.3.4 | 16.3.8 | 7.9 days | committed, R8-2 |
+| tsx | 4.23.13 | 4.23.15 | 18.3 days | committed, R8-2 |
+| @types/node | 22.19.19 | 22.19.21 | 119.7 days | committed, R8-2 |
+| cn | 0.2.5 | 0.2.6 | 32.1 days | committed, R8-2 (lockfile only, inside `^0.2.5`) |
+| lucide-react | 1.41.0 | 1.49.0 | 8.7 days | committed, R8-2 (lockfile only, inside `^1.41.0`); 1.50.0 to 1.53.0 deferred until 2026-10-09 to 2026-10-15 |
+| shadcn | 4.21.3 | 4.21.4 | 1.1 days | deferred until 2026-10-14 |
+| next, eslint-config-next | 16.3.8 | 16.4.0 | 1.8 days | deferred until 2026-10-13 |
+| @types/node | 22.19.21 | 22.20.5 (minor) | 6.7 days | not in this round's list (22.20.4 is 19.6 days old); yours |
+| typescript | 5.9.3 | 7.0.2 | 91.9 days | out of the round: major |
+| eslint | 9.39.5 | 10.12.0 | 5.8 days | out of the round: major |
+| @types/node | 22.19.21 | 26.6.4 | 6.7 days | out of the round: major; the project stays on the 22 line |
+| cn | 0.2.6 | 0.4.0 | 16.2 days | out of the round: in 0.x a minor breaks |
+
+Pulled in with them, each published seven days or more: lightningcss 1.32.0, enhanced-resolve 5.26.0, the
+@tailwindcss/oxide platform packages, scheduler 0.28.0, @xyflow/system 0.0.83, @types/d3-selection 3.0.12 and
+@types/d3-zoom 3.0.9.
+
+#### Fresh-clone proof (2026-10-08, at `762f807`, after its CI run 121 passed)
+
+| Step | Result |
+| --- | --- |
+| Clone | `git clone https://github.com/joaoheliodev/SaintPetrus.git` into an empty directory outside the working tree; not shallow; HEAD `762f807`, level with `origin/main` |
+| Install and run, as the README says | `npm ci` added 623 packages; `npm run setup:hooks`; `npm run dev` on 3000, whose data directory did not exist yet: the panel opened with the **MOCK** badge, one agent, `dispatches` 0, no exception or console error; the clone's tree stayed clean |
+| `npm run gate` | passed: 555 tests in 29 suites, none failed, cancelled, skipped or todo; "audit: excepted until 2026-10-20 by operator decision (AGENTS.md): GHSA-vfj7-8cjw-p6xm high in braces, …" and "audit: No high or critical advisory without an exception."; build passed |
+| `test:e2e` | `PORT=3310 npm run dev` on an empty data directory, then `TEST_APP_PORT=3310 npm run test:e2e`: 25 PASS |
+| `test:browser` | `npm run build`, then `PORT=3210 SAINTPETRUS_PREVIEW=true npm start` on an empty data directory and `npm run test:browser`: 4 PASS |
+| REAL without a key | `SAINTPETRUS_MODE=real npm start` on an empty data directory, no key variable in its environment: badge **REAL**, connection Disconnected, Send (1 call) refused before any confirmation with "No provider is connected. Open Connection and connect one first."; `dispatches.total` 0; no accounting record |
+| Gitleaks 8.30.1 | `gitleaks dir .`: no leaks; `gitleaks git --log-opts=--all`: 145 commits scanned (146 in all refs; the merge `6c69307` has no diff of its own), no leaks |
+| Branches | `night/deepseek`, `night/m0-m2`, `night/orca`, `night/price-schema` and `night/provider-validation-ready` contained in `main`, none with a commit of its own; `ci/r8-prova` is still there (see R8-1 below), at `825ed84`, also contained in `main` |
+| Cleanup | every server stopped by its process group; the data directories (one the default `~/.local/share/saintpetrus`) and the clone deleted by literal path; no Chromium profile left |
 
 #### Decisions taken
 
@@ -970,6 +1020,31 @@ proves the final state.
   holds only `contents: read`. gitleaks-action v3 changes only the runtime: "No changes to inputs, outputs, or
   behavior." `tests/gate.test.ts` held the Gitleaks line to the literal `@v2`, the text this change alters, so that
   assertion now requires the pinned form instead.
+- R8-1, the temporary branch. CI passed on `ci/r8-prova` (run 116, both jobs on ubuntu-24.04, no annotation: the
+  Node 20 warnings and the `ubuntu-latest` notice are gone), `main` was fast-forwarded to it and passed (run 117). Then
+  `git push origin --delete ci/r8-prova` was refused with HTTP 403 by this session's git proxy, five times with
+  backoff, although pushes to the branch and to `main` were accepted. The branch was not deleted any other way; it
+  points to `825ed84`, which `main` contains, and deleting it is left to the operator on GitHub.
+- R8-2 and R8-3 (2026-10-08). Publication times come from `npm view <name> time`. Each lockfile was regenerated with
+  npm 11 under `--before` set seven days back, so nothing a change pulled in is younger, and every changed entry's age
+  was checked anyway. Inside a `^` range only the lockfile moved (`npm update`): cn and lucide-react; shadcn's 4.21.4
+  is a day old. The four wasm-only helpers the old lockfile hoisted (`@emnapi/core`, `@emnapi/wasi-threads`,
+  `@napi-rs/wasm-runtime`, `@tybys/wasm-util`) now nest under `@tailwindcss/oxide-wasm32-wasi`, so x64 installs 623
+  packages instead of 627. `npm audit signatures` is not verified: npm fetches Sigstore's TUF root from
+  `tuf-repo-cdn.sigstore.dev`, which this environment does not reach. No code needed a change. The dependency
+  commits carry only `package.json` and `package-lock.json`, as the round requires, so their records are here in
+  R8-4; each commit's body holds its own record meanwhile.
+- R8-3b. The two React Flow decisions were read against the new code: `adoptUserNodes` still reuses an internal node
+  only when `userNode === internals.userNode`, and MiniMap still sizes its viewport from `style?.width ?? 200`.
+- R8-3c. The main screen of a fresh production instance, at 1440×900 in the environment's Chromium, was captured twice
+  with tailwind 4.2.4 (identical to each other) and once with 4.3.3, whose CSS carries the 4.3.3 banner: no pixel
+  differs.
+- ESLint 9 is recorded as out of support, as the round states; eslint.org is blocked from this environment, so it was
+  not read here (eslint 10.0.0 was published 2026-02-06, and the newest 9.x, 9.39.5, on 2026-07-10).
+
+#### Questions for João
+
+- R6-Q1 stays open (Phase 12, and "Perguntas para o João").
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -1387,7 +1462,7 @@ Follow-ups recorded by the review, not done on `night/provider-validation-ready`
 Everything below is yours; nothing in it needs this conversation.
 
 1. **Verify `main`.** A fresh, full clone (`git clone https://github.com/joaoheliodev/SaintPetrus.git`, no `--depth`),
-   then `npm ci`, `npm run setup:hooks` and `npm run gate`. Expect at least 554 tests and no skip (the floor in
+   then `npm ci`, `npm run setup:hooks` and `npm run gate`. Expect at least 555 tests and no skip (the floor in
    `AGENTS.md`), and a green CI run on the head of `main`.
 2. **Try the keyless panel.** `npm run dev`, open http://127.0.0.1:3000 and walk the main flow: add an agent, edit it,
    connect two agents (drag, or Connect to in the inspector), move a card with the arrow keys, Run once (mock), open
@@ -1405,22 +1480,24 @@ Everything below is yours; nothing in it needs this conversation.
 7. **Before any real call**, follow `docs/provider-validation.md` and `docs/reference/first-real-call.md`: allowlist the
    exact model in `config/token-policy.json`, enter its browser-verified price in Prices (for OpenAI, the dated
    snapshot too), use a disposable key, and check the first call against the invoice before a second one.
-8. **Branches.** `main` holds all the work. The final verification (Phase 13) found every `night/*` branch on GitHub
-   contained in `main`, none with a commit of its own: `night/deepseek`, `night/m0-m2`, `night/orca`,
-   `night/price-schema` and `night/provider-validation-ready`. You can delete them on GitHub, or keep them.
+8. **Branches.** `main` holds all the work. The final verifications (Phases 13 and 14) found every `night/*` branch on
+   GitHub contained in `main`, none with a commit of its own: `night/deepseek`, `night/m0-m2`, `night/orca`,
+   `night/price-schema` and `night/provider-validation-ready`. You can delete them on GitHub, or keep them. Delete
+   `ci/r8-prova` too: Round 8's temporary branch, at `825ed84`, which `main` contains; this environment was refused
+   when it tried to delete it (Phase 14, R8-1).
 9. **The braces exception** (GHSA-vfj7-8cjw-p6xm) holds through 2026-10-20, inclusive. After that, or as soon as a fix
    exists: `npx npm@11 audit fix` if the fix comes in under the patch and minor rule (`AGENTS.md`, Dependencies), then
-   `npm ci` and a green gate. To renew the exception instead, the date changes in `scripts/audit-policy.mjs`, in the
+   `npm ci` and a green gate; an advisory's fix does not wait the seven days other updates wait. To renew the exception instead, the date changes in `scripts/audit-policy.mjs`, in the
    test that pins it (`tests/audit-policy.test.ts`), in `AGENTS.md`, `README.md` and `SECURITY.md` (the R7-1 test in
    `tests/repository-metadata.test.ts` makes the documents move together), and only on your order (R6-Q1).
-10. **Optional maintenance.** CI warns that `actions/checkout@v4`, `actions/setup-node@v4` and
-    `gitleaks/gitleaks-action@v2` target the deprecated Node.js 20 runtime, which GitHub now replaces with Node.js 24;
-    moving to their next major is yours to approve. CI also notes that `ubuntu-latest` moves to Ubuntu 26 from
-    2026-10-19. `npm outdated` (it only reads the npm registry) showed on 2026-10-06: patch releases for tsx 4.23.15
-    and cn 0.2.6; minor releases for next and eslint-config-next 16.4.0, react, react-dom, @types/react and
-    @types/react-dom 19.3.0, @xyflow/react 12.12.0, lucide-react 1.52.0, and tailwindcss and @tailwindcss/postcss
-    4.3.3; major releases for typescript 7.0.2, eslint 10.12.0, @types/node 26.6.4 and cn 0.4.0. An update stays
-    within patch and minor, with a green gate (`AGENTS.md`, Dependencies).
+10. **Optional maintenance.** CI runs on `ubuntu-24.04` with every action pinned to a commit SHA (`AGENTS.md`,
+    Operator decisions, 2026-10-08); a pin changes only in a deliberate commit that passes CI on a temporary branch
+    first. Updates wait seven days from their publication (Phase 14 has the table). Waiting now: next and
+    eslint-config-next 16.4.0 (from 2026-10-13), shadcn 4.21.4 (from 2026-10-14), lucide-react 1.50.0 to 1.53.0
+    (2026-10-09 to 2026-10-15) and actions/setup-node v7.1.0 (from 2026-10-15). Majors, yours to approve: typescript 7,
+    eslint 10 (ESLint 9 is out of support, as Round 8 records), @types/node 26 (the project stays on the 22 line; the
+    22.20 minor was not in Round 8's list) and cn 0.4 (in 0.x a minor breaks). Dependabot version updates for
+    github-actions and npm are optional, and switching them on is yours.
 11. **Follow-ups** F-01 and F-02 and observation R1-16 are listed with the review findings above.
 
 ## Session log
@@ -1476,3 +1553,11 @@ Everything below is yours; nothing in it needs this conversation.
   PASS, `test:browser` 4 PASS, REAL without a key with `dispatches` 0, Gitleaks clean over every branch, every
   `night/*` branch contained in `main`. Floor 553 → 554. Three mutations, all killed. Gitleaks clean on every staged
   diff. No request reached a provider. One question is open (R6-Q1).
+- Phase 14, Round 8 (2026-10-08, on `main`): maintenance. R8-1 `825ed84` pinned the CI runner to `ubuntu-24.04` and
+  every action to a commit SHA, after CI passed on the temporary branch `ci/r8-prova`, whose deletion this environment
+  was refused; R8-2 `8410228` took the patch releases a week old; R8-3 took react 19.3.0 (`ddb8121`), @xyflow/react
+  12.12.0 (`86e813f`) and tailwind 4.3.3 (`762f807`, the main screen identical before and after); next 16.4.0 waits
+  until 2026-10-13. R8-4, in the commit that carries this entry, records a fresh-clone proof: gate 555, `test:e2e` 25
+  PASS, `test:browser` 4 PASS, REAL without a key with `dispatches` 0, Gitleaks clean over every branch. Floor 554 →
+  555. Two mutations, both killed. CI green on every push (runs 116 to 121). Gitleaks clean on every staged diff. No
+  request reached a provider. One question is open (R6-Q1).

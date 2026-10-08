@@ -3,6 +3,21 @@
 Notable changes, newest first. Dates are UTC. No release has been tagged; entries are grouped by the branch
 that carried them.
 
+## Unreleased: Round 8 on `main` (2026-10-08)
+
+Maintenance only: no new feature and no request with a real key. The test floor rose from 554 to 555.
+
+- CI runs on `ubuntu-24.04` instead of `ubuntu-latest`, which GitHub moves to Ubuntu 26 between 2026-10-19 and
+  2026-11-19, and every action is pinned to a commit SHA: actions/checkout v7.0.1, actions/setup-node v7.0.0 and
+  gitleaks/gitleaks-action v3.0.0, all on Node 24. A test refuses a `-latest` runner and any action not pinned by SHA,
+  and `AGENTS.md` says a pin changes only in a deliberate commit that passes CI on a temporary branch first (R8-1).
+- An update that fixes no advisory waits seven days from its publication (`AGENTS.md`, R8-1). Within that rule and
+  within patch and minor: react and react-dom 19.3.0 with their types, @xyflow/react 12.12.0, tailwindcss and
+  @tailwindcss/postcss 4.3.3, eslint-config-next 16.3.8, tsx 4.23.15, @types/node 22.19.21, cn 0.2.6 and lucide-react
+  1.49.0 (R8-2, R8-3). next 16.4.0 waits until 2026-10-13; majors stay out.
+- A fresh, full clone of GitHub passed the gate (555 tests), both browser checks, REAL without a key (`dispatches` 0)
+  and Gitleaks over every branch (R8-4).
+
 ## Unreleased: Round 7 on `main` (2026-10-06)
 
 The closing round: documentation and one test only. No behaviour, dependency, lockfile, configuration or CI change,

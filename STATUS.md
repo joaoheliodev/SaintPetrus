@@ -2,6 +2,29 @@
 
 Branch: `main`, which merged `night/provider-validation-ready` on 2026-09-29 (Round 4 below). That branch continued `night/provider-validation` from the operator's price-admin commit `0662647` on `night/price-admin`, following `night/price-schema`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`. Timestamped events up to 2026-09-27 live in the append-only `NIGHT-LOG.md`; those of the later rounds live in the Session log of `.prompts/FINISH-BACKLOG.md` and in `CHANGELOG.md`.
 
+## Verification checkpoint (2026-10-08)
+
+Run on a fresh, full clone of GitHub at `762f807` (not shallow), in a cloud session without any API key, following the
+README: `npm ci`, `npm run setup:hooks` and `npm run dev`, whose panel opened with the **MOCK** badge. `npm run gate`
+passed with 555 tests in 29 suites, none failed, cancelled, skipped or todo; its audit step excepted only
+GHSA-vfj7-8cjw-p6xm in `braces`, which has no fixed release, until 2026-10-20, and found no other high or critical
+advisory. On fresh instances with empty data directories, `npm run test:e2e` passed with 25 PASS and
+`npm run test:browser` with 4 PASS on the production build. `SAINTPETRUS_MODE=real npm start` without any key showed
+the **REAL** badge, refused Run once and kept `dispatches` on `GET /api/provider` at 0. Gitleaks found nothing in the
+clone's working directory or in its history across every branch (145 commits with a diff).
+
+Round 8 was maintenance. CI runs on `ubuntu-24.04` with actions/checkout v7.0.1, actions/setup-node v7.0.0 and
+gitleaks/gitleaks-action v3.0.0, each pinned to its commit SHA. Dependencies moved within patch and minor, each
+version published seven days or more before: react and react-dom 19.3.0 with @types/react and @types/react-dom 19.3.0,
+@xyflow/react 12.12.0, tailwindcss and @tailwindcss/postcss 4.3.3, eslint-config-next 16.3.8, tsx 4.23.15,
+@types/node 22.19.21, cn 0.2.6 and lucide-react 1.49.0; the main screen rendered the same before and after the
+tailwind minor. Waiting for their week: next and eslint-config-next 16.4.0 (from 2026-10-13), shadcn 4.21.4 (from
+2026-10-14), lucide-react 1.50.0 to 1.53.0 (2026-10-09 to 2026-10-15) and actions/setup-node v7.1.0 (from 2026-10-15).
+Left out as majors: typescript 7, eslint 10, @types/node 26 and cn 0.4. `npm audit signatures` was not verified:
+this environment cannot reach Sigstore's TUF repository. CI passed on every push of the round (runs 116 to 121). Every
+`night/*` branch and `ci/r8-prova`, the round's temporary branch, are contained in `main`; this environment was refused
+when it tried to delete `ci/r8-prova`. No request with a real key was made, including `GET /models`.
+
 ## Verification checkpoint (2026-10-06)
 
 Run on a fresh, full clone of GitHub at `4a47529` (`git rev-parse --is-shallow-repository`: false), in a cloud session
