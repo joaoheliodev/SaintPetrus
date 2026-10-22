@@ -12,14 +12,14 @@ const braces = (fix: Fix = major) => entry('braces', 'high', [advisory('braces',
 // Vulnerable only through braces: judged where the advisory is braces' own.
 const micromatch = entry('micromatch', 'high', ['braces'], major);
 
-test('R6-A braces\' advisory without a fixed release passes the audit through 2026-10-20, with what reaches it, and fails the day after', () => {
+test('R6-A braces\' advisory without a fixed release passes the audit through 2026-11-20, with what reaches it, and fails the day after', () => {
   const verdict = auditVerdict(report(braces(), micromatch), '2026-10-06');
   assert.equal(verdict.passed, true);
-  assert.deepEqual(verdict.excepted.map(item => [item.id, item.package, item.until]), [['GHSA-vfj7-8cjw-p6xm', 'braces', '2026-10-20']]);
-  assert.equal(auditVerdict(report(braces(), micromatch), '2026-10-20').passed, true, 'the last day still holds');
-  const lapsed = auditVerdict(report(braces(), micromatch), '2026-10-21');
+  assert.deepEqual(verdict.excepted.map(item => [item.id, item.package, item.until]), [['GHSA-vfj7-8cjw-p6xm', 'braces', '2026-11-20']]);
+  assert.equal(auditVerdict(report(braces(), micromatch), '2026-11-20').passed, true, 'the last day still holds');
+  const lapsed = auditVerdict(report(braces(), micromatch), '2026-11-21');
   assert.equal(lapsed.passed, false, 'the day after, the gate fails again');
-  assert.deepEqual(lapsed.blocking.map(item => [item.id, item.lapsed]), [['GHSA-vfj7-8cjw-p6xm', 'its exception lapsed after 2026-10-20']]);
+  assert.deepEqual(lapsed.blocking.map(item => [item.id, item.lapsed]), [['GHSA-vfj7-8cjw-p6xm', 'its exception lapsed after 2026-11-20']]);
 });
 
 test('R6-A a fix for braces ends its exception at once, whether in range or minor', () => {
@@ -54,7 +54,7 @@ test('R6-A no report fails the audit: the registry did not answer', () => {
   }
 });
 
-test('R6-A the exceptions are the operator\'s: exactly one, for braces, until 2026-10-20', () => {
-  assert.deepEqual(auditExceptions.map(({ id, package: name, until }) => ({ id, package: name, until })), [{ id: 'GHSA-vfj7-8cjw-p6xm', package: 'braces', until: '2026-10-20' }]);
+test('R6-A the exceptions are the operator\'s: exactly one, for braces, until 2026-11-20', () => {
+  assert.deepEqual(auditExceptions.map(({ id, package: name, until }) => ({ id, package: name, until })), [{ id: 'GHSA-vfj7-8cjw-p6xm', package: 'braces', until: '2026-11-20' }]);
   assert.match(auditExceptions[0].why, /no fixed release/);
 });

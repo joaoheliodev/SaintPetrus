@@ -1046,6 +1046,27 @@ Pulled in with them, each published seven days or more: lightningcss 1.32.0, enh
 
 - R6-Q1 stays open (Phase 12, and "Perguntas para o João").
 
+### Phase 15 — Round 9: security fixes (2026-10-22)
+
+On `main` from `ddc7b56`, at the operator's request to finish so that real calls can be made. No behaviour change and
+no request with a real key; the working tree is left for the operator to commit (`AGENTS.md`, Commits).
+
+| ID | Item | Acceptance criterion | Status |
+| --- | --- | --- | --- |
+| R9-1 | next's three advisories | next and eslint-config-next 16.4.1 (published 2026-10-14, 8.1 days), which the release notes name as the fix for GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr (critical) and GHSA-p3m5-59mp-jv5r (high); hono 4.13.13 and ip-address 10.7.4 for two moderate advisories; lockfile from npm 11 under `--before` seven days back; 38 `libc` fields, every `resolved` on registry.npmjs.org, no new install script or license; every gate step but the audit green (555 tests, build); `test:e2e` 25 PASS, `test:browser` 4 PASS, REAL without a key refused with `dispatches` 0 and the security headers in place | done (uncommitted) |
+| R9-2 | braces | The exception lapsed after 2026-10-20; braces 3.0.3 is still the latest and still affected. The operator renewed it until 2026-11-20 (R6-Q1, D-17); the date moves in the policy, its test and the three documents the R7-1 test holds to it; the full gate is green again | done (uncommitted) |
+
+#### Decisions taken
+
+- R9-1 (2026-10-22). 16.4.1 rather than 16.4.2: 16.4.1 is the security release, while 16.4.2 (2026-10-15, 6.9
+  days) carries only Turbopack and documentation fixes, so it waits its week. The Next.js upgrade guide in
+  `node_modules/next/dist/docs/` describes the move to 16 and nothing specific to 16.4. No code needed a change.
+  Dependency updates have no mutation; the gate and the browser checks are the proof.
+
+#### Questions for João
+
+- None open. R6-Q1 was answered on 2026-10-22 (D-17).
+
 ## V0 review of Part 2 (`1445177`)
 
 Checked every section of `docs/provider-validation.md` and the `STATUS.md` change against the code.
@@ -1292,6 +1313,8 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R7-1 | AGENTS.md's exception date moved to 2026-10-27 | killed by the same; restored, sha256 identical |
 | R8-1 | the Gitleaks action back to the tag `@v2` | killed by "R8-1 CI pins its runner and every action" and by "R4-6 the gate is CI's blocking steps in CI's order…"; restored from the saved bytes, sha256 identical |
 | R8-1 | the `checks` job back to `runs-on: ubuntu-latest` | killed by "R8-1 CI pins its runner and every action"; restored, sha256 identical |
+| R9-2 | the policy's date back to 2026-10-20 | killed by the two R6-A tests that pin the exception and its date; restored from the saved bytes, sha256 identical |
+| R9-2 | README.md left at the old date | killed by "R7-1 the documents name the audit exception the policy holds"; restored, sha256 identical |
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
 
@@ -1405,6 +1428,9 @@ Follow-ups recorded by the review, not done on `night/provider-validation-ready`
   2026-10-20 or until a fix within a minor release exists, and only the operator renews or extends it.
 - **D-16 shadcn/ui attribution (operator, R6-1, 2026-10-06).** The components the shadcn CLI generated in
   `components/ui/` keep shadcn/ui's MIT notice, copied verbatim, in `components/ui/LICENSE`.
+- **D-17 The braces exception renewed (operator, R6-Q1, 2026-10-22).** GHSA-vfj7-8cjw-p6xm in braces stays excepted
+  until 2026-11-20, or until a fix within a minor release exists; braces 3.0.3 is still the latest and still affected.
+  The date moved in `scripts/audit-policy.mjs`, `tests/audit-policy.test.ts`, `AGENTS.md`, `README.md` and `SECURITY.md`.
 
 ## Perguntas para o João (questions for the operator)
 
@@ -1456,6 +1482,8 @@ Follow-ups recorded by the review, not done on `night/provider-validation-ready`
   12). Until you answer, the code's default stands: the exception is not renewed; from 2026-10-21, or as soon as a fix
   within a minor release exists, the gate and CI fail at the audit step; a fix comes in through `npm audit fix` under
   the patch and minor rule (`AGENTS.md`, Dependencies); only the operator renews. Recommended: check on 2026-10-19.
+  **Answered 2026-10-22:** "Renovar até 20/11" (the recommended option, chosen from three). The exception now holds
+  until 2026-11-20, or until a fix within a minor release exists, whichever comes first. Round 9, D-17.
 
 ## Checklist do João
 
@@ -1485,16 +1513,16 @@ Everything below is yours; nothing in it needs this conversation.
    `night/price-schema` and `night/provider-validation-ready`. You can delete them on GitHub, or keep them. Delete
    `ci/r8-prova` too: Round 8's temporary branch, at `825ed84`, which `main` contains; this environment was refused
    when it tried to delete it (Phase 14, R8-1).
-9. **The braces exception** (GHSA-vfj7-8cjw-p6xm) holds through 2026-10-20, inclusive. After that, or as soon as a fix
+9. **The braces exception** (GHSA-vfj7-8cjw-p6xm) holds through 2026-11-20, inclusive, after your renewal (D-17). After that, or when a fix
    exists: `npx npm@11 audit fix` if the fix comes in under the patch and minor rule (`AGENTS.md`, Dependencies), then
    `npm ci` and a green gate; an advisory's fix does not wait the seven days other updates wait. To renew the exception instead, the date changes in `scripts/audit-policy.mjs`, in the
    test that pins it (`tests/audit-policy.test.ts`), in `AGENTS.md`, `README.md` and `SECURITY.md` (the R7-1 test in
    `tests/repository-metadata.test.ts` makes the documents move together), and only on your order (R6-Q1).
 10. **Optional maintenance.** CI runs on `ubuntu-24.04` with every action pinned to a commit SHA (`AGENTS.md`,
     Operator decisions, 2026-10-08); a pin changes only in a deliberate commit that passes CI on a temporary branch
-    first. Updates wait seven days from their publication (Phase 14 has the table). Waiting now: next and
-    eslint-config-next 16.4.0 (from 2026-10-13), shadcn 4.21.4 (from 2026-10-14), lucide-react 1.50.0 to 1.53.0
-    (2026-10-09 to 2026-10-15) and actions/setup-node v7.1.0 (from 2026-10-15). Majors, yours to approve: typescript 7,
+    first. Updates wait seven days from their publication (Phase 14 has the table). next and eslint-config-next
+    are at 16.4.1, the security release (Round 9). Past their week and not taken: shadcn 4.21.4, lucide-react 1.53.0
+    and actions/setup-node v7.1.0; next 16.4.2 from 2026-10-22. Majors, yours to approve: typescript 7,
     eslint 10 (ESLint 9 is out of support, as Round 8 records), @types/node 26 (the project stays on the 22 line; the
     22.20 minor was not in Round 8's list) and cn 0.4 (in 0.x a minor breaks). Dependabot version updates for
     github-actions and npm are optional, and switching them on is yours.
@@ -1561,3 +1589,8 @@ Everything below is yours; nothing in it needs this conversation.
   PASS, `test:browser` 4 PASS, REAL without a key with `dispatches` 0, Gitleaks clean over every branch. Floor 554 →
   555. Two mutations, both killed. CI green on every push (runs 116 to 121). Gitleaks clean on every staged diff. No
   request reached a provider. One question is open (R6-Q1).
+- Phase 15, Round 9 (2026-10-22): next and eslint-config-next 16.4.1 for three advisories (two critical), hono and
+  ip-address for two moderate ones. Every gate step but the audit green (555 tests, build); `test:e2e` 25 PASS,
+  `test:browser` 4 PASS, REAL without a key with `dispatches` 0. The braces exception had lapsed after 2026-10-20; the
+  operator renewed it until 2026-11-20 (R6-Q1, D-17) and the full gate is green. Left uncommitted for the operator. No
+  request reached a provider. No question is open.

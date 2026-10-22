@@ -3,6 +3,17 @@
 Notable changes, newest first. Dates are UTC. No release has been tagged; entries are grouped by the branch
 that carried them.
 
+## Unreleased: Round 9 (2026-10-22)
+
+Security fixes and one renewed exception: no new feature and no request with a real key. The test floor stays at 555.
+
+- next and eslint-config-next 16.3.8 -> 16.4.1, the release that fixes GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr
+  (critical, unauthenticated remote code execution) and GHSA-p3m5-59mp-jv5r (high, denial of service). 16.4.2,
+  six days old, adds only Turbopack and documentation fixes, so it waits.
+- hono 4.13.7 -> 4.13.13 and ip-address 10.7.2 -> 10.7.4 in the lockfile, for two moderate advisories.
+- The braces exception (GHSA-vfj7-8cjw-p6xm) lapsed after 2026-10-20 with no fix released; by operator decision it
+  is renewed until 2026-11-20, or until a fix within a minor release exists (R6-Q1).
+
 ## Unreleased: Round 8 on `main` (2026-10-08)
 
 Maintenance only: no new feature and no request with a real key. The test floor rose from 554 to 555.

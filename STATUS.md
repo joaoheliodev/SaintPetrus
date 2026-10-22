@@ -217,9 +217,11 @@ round's handoff); each fix below answers a cell that did not come back.
 - GitHub private vulnerability reporting must be switched on by the repository owner (Settings, Advanced Security);
   whether it is on was not verified from here. Until it is, `SECURITY.md`'s fallback applies: a public "Security
   contact request" issue with no details, then a private channel.
-- The gate excepts GHSA-vfj7-8cjw-p6xm in `braces`, which has no fixed release, until 2026-10-20 or until a fix
-  within a minor release exists (operator decision, Round 6, R6-A). After that date the gate fails again unless a
-  fix has shipped or the operator renews the exception.
+- The gate excepts GHSA-vfj7-8cjw-p6xm in `braces`, which still has no fixed release (3.0.3 is the latest), until
+  2026-11-20 or until a fix within a minor release exists (operator decision, Round 6, R6-A, renewed on 2026-10-22,
+  R6-Q1). After that date the gate fails again unless a fix has shipped or the operator renews the exception.
+- next 16.4.1 fixes GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr (critical, remote code execution) and
+  GHSA-p3m5-59mp-jv5r (high, denial of service), which reached every next from 16.0.0 to 16.4.0 (Round 9).
 - Accessibility was checked in Chromium (contrast, control names, visible focus, keyboard paths), not with a screen reader.
 - When usage cannot be parsed, the served model the response named is not carried into receipts or manual reconciliation (F-01). The panel's Forget key reaches only the selected provider; the terminal helper reaches any (F-02).
 - In `npm run dev` only, about one browser-check run in fifteen found the canvas cards focused without their outline; production never did. The cause is unproven (R1-16).

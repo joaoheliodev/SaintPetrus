@@ -77,7 +77,7 @@ content of the graph (objectives, model answers, events, exports), which can hol
 - Keyring integration was exercised on Linux only; macOS and Windows paths are covered by test doubles.
 - Dependencies are audited in CI (`npm audit --audit-level=high`) and installed from the lockfile; a
   compromised upstream package is outside what this project can detect. The operator excepted one advisory until
-  2026-10-20: GHSA-vfj7-8cjw-p6xm in `braces`, which has no fixed release, is reached only by the shadcn CLI and
+  2026-11-20: GHSA-vfj7-8cjw-p6xm in `braces`, which has no fixed release, is reached only by the shadcn CLI and
   ESLint, and is never run by the server (`AGENTS.md`, Operator decisions).
 
 ## Credentials
