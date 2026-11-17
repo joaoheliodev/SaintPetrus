@@ -1082,6 +1082,7 @@ Gitleaks job included). On 2026-11-17 the operator asked for the errors to be re
 | R10-2 | The updates Round 8 deferred | Patch releases of the pinned packages and lucide-react inside its range, each a week old; gate, `test:e2e`, `test:browser`, the main screen compared before and after | done |
 | R10-3 | F-01: a usage failure names the served model | The failure carries the served model for every adapter, plain and streamed; reservation, `call`, `expiry` and `manual` receipts and the reconciled interval name it; a divergence is recorded; expiry charges the same; tests, mutations, documents | done |
 | R10-4 | F-02: forget any saved key from the panel | The server reports saved copies by provider name only; Connection lists them with Forget for each, after Disconnect, after a restart and in MOCK mode; every Forget asks first; tests, mutations, a hand check in a browser, documents | done |
+| R10-8 | `main` | On the operator's order ("faz o merge", 2026-11-17), `main` fast-forwarded from `ddc7b56` to this branch, no merge commit of its own; gate green before, CI green on `main` after | done |
 | R10-5 | Records | `AGENTS.md` (floor 566 and the two rules), STATUS checkpoint and round, CHANGELOG, this phase, the checklist | done |
 | R10-6 | Merge Round 9 | `claude/pensive-einstein-w804lj` (Phase 15, never on `main`) merged into this branch; the package files keep this round's newer versions; both rounds' records kept in order; gate and browser checks green after the merge | done |
 | R10-7 | The audit exceptions (operator, 2026-11-17) | GHSA-fc5q-39xc-vjpf in picomatch, published since 2026-11-16 with no fixed release, excepted until 2026-12-17; the braces entry removed; policy, its tests and the three documents the R7-1 test holds; mutations | done |
@@ -1662,9 +1663,8 @@ Follow-ups recorded by the review. Both were done in Round 10 (Phase 16, R10-3 a
 
 Everything below is yours; nothing in it needs this conversation.
 
-0. **Rounds 9 and 10 are on `claude/inspiring-pasteur-vkzyic`, not on `main`.** `main` is still at `ddc7b56`. The branch
-   holds Round 9 (merged in R10-6) and Round 10, with a green gate and CI. Review it and bring it into `main` when you
-   are ready; nothing else waits on it.
+0. **Rounds 9 and 10 are on `main`** (fast-forward, 2026-11-17, R10-8). `claude/pensive-einstein-w804lj` and
+   `claude/inspiring-pasteur-vkzyic` are contained in `main`; delete them on GitHub when you like.
 
 1. **Verify `main`.** A fresh, full clone (`git clone https://github.com/joaoheliodev/SaintPetrus.git`, no `--depth`),
    then `npm ci`, `npm run setup:hooks` and `npm run gate`. Expect at least 555 tests and no skip (the floor in
@@ -1783,4 +1783,5 @@ Everything below is yours; nothing in it needs this conversation.
   `test:browser` with 4 PASS on fresh instances. Committed and pushed on the operator's order (`11a03e7`,
   `9443ffa`, CI run 124 green with Gitleaks). On 2026-11-17, on the operator's order, Round 9's branch was merged
   (R10-6), GHSA-fc5q-39xc-vjpf in picomatch excepted until 2026-12-17 and the braces entry removed (R10-7, six
-  mutations killed). No request reached a provider. No question is open.
+  mutations killed). Then, on the operator's order, `main` was fast-forwarded to the branch (R10-8). No request
+  reached a provider. No question is open.

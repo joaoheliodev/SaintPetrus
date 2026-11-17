@@ -5,8 +5,8 @@ that carried them.
 
 ## Unreleased: Round 10 (2026-11-16 and 2026-11-17)
 
-On `claude/inspiring-pasteur-vkzyic`, which merges Round 9's branch. No request with a real key. The test floor rose
-from 555 to 566.
+On `claude/inspiring-pasteur-vkzyic`, which merges Round 9's branch, and on `main` by fast-forward on 2026-11-17. No
+request with a real key. The test floor rose from 555 to 566.
 
 - The gate is green again. It had turned red on advisories published since Round 8; Round 9 had already moved next to
   16.4.1 for the two critical ones (GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr) and GHSA-p3m5-59mp-jv5r, but that

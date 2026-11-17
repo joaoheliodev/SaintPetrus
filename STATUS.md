@@ -272,8 +272,9 @@ closed; what is left is listed under "Not verified or pending".
   (typescript-eslint 8.73.0, published 2026-11-16, among them), lucide-react 1.71.0 to 1.73.0, actions/setup-node
   v7.1.0 (a pin changes only after CI passes on a temporary branch), and the minors zustand 5.1.0, @base-ui/react
   1.9.0 and @types/node 22.20.
-- `main` is still at `ddc7b56`: Rounds 9 and 10 live on `claude/inspiring-pasteur-vkzyic` until the operator
-  merges it.
+- `main` was fast-forwarded to `claude/inspiring-pasteur-vkzyic` on the operator's order on 2026-11-17, so Rounds 9
+  and 10 are on `main`. `claude/pensive-einstein-w804lj` and `claude/inspiring-pasteur-vkzyic` are contained in it;
+  deleting them on GitHub is the operator's.
 - Accessibility was checked in Chromium (contrast, control names, visible focus, keyboard paths), not with a screen reader.
 - F-01 and F-02, the two follow-ups of the R1 review, are done (Round 10). R1-16 stays an open observation.
 - In `npm run dev` only, about one browser-check run in fifteen found the canvas cards focused without their outline; production never did. The cause is unproven (R1-16).
