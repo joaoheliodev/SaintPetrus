@@ -77,8 +77,10 @@ content of the graph (objectives, model answers, events, exports), which can hol
 - Keyring integration was exercised on Linux only; macOS and Windows paths are covered by test doubles.
 - Dependencies are audited in CI (`npm audit --audit-level=high`) and installed from the lockfile; a
   compromised upstream package is outside what this project can detect. The operator excepted one advisory until
-  2026-12-17: GHSA-fc5q-39xc-vjpf in `picomatch`, which has no fixed release, is reached only by the shadcn CLI and
-  ESLint, and is never run by the server (`AGENTS.md`, Operator decisions).
+  2026-12-17: GHSA-fc5q-39xc-vjpf in `picomatch`, which has no fixed release, is reached through the npm tree only by the
+  shadcn CLI and ESLint. Next.js carries its own compiled copy, which the server uses only to match the `images`
+  patterns of `next.config.ts`; this app sets none, and the attack needs a glob pattern the attacker controls
+  (`AGENTS.md`, Operator decisions).
 
 ## Credentials
 

@@ -247,7 +247,7 @@ closed; what is left is listed under "Not verified or pending".
 - **R10-6** Round 9's branch is merged. Its package changes gave way to this round's newer ones (next 16.4.5 over
   16.4.1; hono gone, ip-address 10.7.6 over 10.7.4); its renewal of the braces exception and its records are kept.
 - **R10-7** The audit exceptions, by operator decision on 2026-11-17: GHSA-fc5q-39xc-vjpf in picomatch (high: ReDoS,
-  no fixed release, run only by ESLint and the shadcn CLI) is excepted until 2026-12-17 or until a fix within a
+  no fixed release; the attack needs a glob pattern the attacker controls) is excepted until 2026-12-17 or until a fix within a
   minor release exists; the braces exception is removed, because `npm audit` no longer reports its advisory.
 
 ## Not verified or pending
@@ -268,6 +268,9 @@ closed; what is left is listed under "Not verified or pending".
 - The gate excepts GHSA-fc5q-39xc-vjpf in `picomatch`, which has no fixed release, until 2026-12-17 or until a fix
   within a minor release exists (operator decision, 2026-11-17, Round 10). After that date the gate fails again
   unless a fix has shipped or the operator renews the exception. The braces exception is gone (Round 10, R10-7).
+  The npm package is run only by ESLint and the shadcn CLI. Next.js also carries its own compiled copy, which
+  `npm audit` cannot see: the server uses it only to match the `images` patterns of `next.config.ts`, none of which
+  this app sets, and a patched copy reaches it only through a next release.
 - Waiting for their week or for an order: next 16.4.6, the fixes of the remaining moderate advisories
   (typescript-eslint 8.73.0, published 2026-11-16, among them), lucide-react 1.71.0 to 1.73.0, actions/setup-node
   v7.1.0 (a pin changes only after CI passes on a temporary branch), and the minors zustand 5.1.0, @base-ui/react

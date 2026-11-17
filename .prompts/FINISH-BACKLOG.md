@@ -1082,10 +1082,11 @@ Gitleaks job included). On 2026-11-17 the operator asked for the errors to be re
 | R10-2 | The updates Round 8 deferred | Patch releases of the pinned packages and lucide-react inside its range, each a week old; gate, `test:e2e`, `test:browser`, the main screen compared before and after | done |
 | R10-3 | F-01: a usage failure names the served model | The failure carries the served model for every adapter, plain and streamed; reservation, `call`, `expiry` and `manual` receipts and the reconciled interval name it; a divergence is recorded; expiry charges the same; tests, mutations, documents | done |
 | R10-4 | F-02: forget any saved key from the panel | The server reports saved copies by provider name only; Connection lists them with Forget for each, after Disconnect, after a restart and in MOCK mode; every Forget asks first; tests, mutations, a hand check in a browser, documents | done |
-| R10-8 | `main` | On the operator's order ("faz o merge", 2026-11-17), `main` fast-forwarded from `ddc7b56` to this branch, no merge commit of its own; gate green before, CI green on `main` after | done |
 | R10-5 | Records | `AGENTS.md` (floor 566 and the two rules), STATUS checkpoint and round, CHANGELOG, this phase, the checklist | done |
 | R10-6 | Merge Round 9 | `claude/pensive-einstein-w804lj` (Phase 15, never on `main`) merged into this branch; the package files keep this round's newer versions; both rounds' records kept in order; gate and browser checks green after the merge | done |
 | R10-7 | The audit exceptions (operator, 2026-11-17) | GHSA-fc5q-39xc-vjpf in picomatch, published since 2026-11-16 with no fixed release, excepted until 2026-12-17; the braces entry removed; policy, its tests and the three documents the R7-1 test holds; mutations | done |
+| R10-8 | `main` | On the operator's order ("faz o merge", 2026-11-17), `main` fast-forwarded from `ddc7b56` to this branch, no merge commit of its own; gate green before, CI green on `main` after | done |
+| R10-9 | Correct the picomatch record | AGENTS.md, SECURITY.md, STATUS and the policy say where picomatch runs, Next.js's compiled copy included | done |
 
 #### Updates (ages on 2026-11-16)
 
@@ -1198,6 +1199,15 @@ eslint 10, @types/node 26, @xyflow/react 13 and cn 0.5 (majors).
   within a minor release exists. Asked in the same message, the operator ordered the dead braces entry removed. The
   policy's tests moved from braces to picomatch as their worked example, with the same five tests and one more
   assertion: braces' advisory blocks again if it ever comes back.
+- R10-9 (2026-11-17, correction). R10-7 said the server never runs picomatch. Next.js carries its own compiled copy
+  (`next/dist/compiled/picomatch`, no version in its manifest), outside the npm tree, so `npm audit` never sees it.
+  The server loads it only in `match-remote-pattern.js` and `match-local-pattern.js`, which compare image URLs with
+  the `images.remotePatterns` and `images.localPatterns` of `next.config.ts`; this app sets neither and uses no
+  `next/image`, and the build uses it for its own traces. The advisory (GitHub, published 2026-10-19, no patched
+  version) needs a glob pattern the attacker controls, matched against a short crafted string; every pattern here is
+  the project's own configuration. AGENTS.md, SECURITY.md, STATUS and the policy's `why` now say that. Documentation
+  and a printed sentence only: no mutation. When the gate's exception ends because a fix exists, a next release that
+  updates its compiled copy is a separate update to look for.
 
 #### Questions for João
 
@@ -1598,7 +1608,7 @@ Follow-ups recorded by the review. Both were done in Round 10 (Phase 16, R10-3 a
   until 2026-11-20, or until a fix within a minor release exists; braces 3.0.3 is still the latest and still affected.
   The date moved in `scripts/audit-policy.mjs`, `tests/audit-policy.test.ts`, `AGENTS.md`, `README.md` and `SECURITY.md`.
 - **D-18 The picomatch exception, and braces' removed (operator, R10-Q1 and R10-Q2, 2026-11-17).** GHSA-fc5q-39xc-vjpf
-  in picomatch, which has no fixed release and is run only by ESLint and the shadcn CLI, is excepted until 2026-12-17
+  in picomatch, which has no fixed release and whose npm package only ESLint and the shadcn CLI run, is excepted until 2026-12-17
   or until a fix within a minor release exists. The braces entry, which `npm audit` no longer matched, is removed.
 
 ## Perguntas para o João (questions for the operator)

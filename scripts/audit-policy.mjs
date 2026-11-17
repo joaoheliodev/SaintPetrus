@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 
 // Only the operator adds, renews or extends an entry. One lapses on its date, or as soon as a non-major fix exists.
 export const auditExceptions = [
-  { id: 'GHSA-fc5q-39xc-vjpf', package: 'picomatch', until: '2026-12-17', why: 'no fixed release exists; only the shadcn CLI and ESLint run it, never the server' },
+  { id: 'GHSA-fc5q-39xc-vjpf', package: 'picomatch', until: '2026-12-17', why: 'no fixed release exists; ESLint and the shadcn CLI run this package, and the attack needs a glob pattern the attacker controls' },
 ];
 const blockingSeverities = ['high', 'critical'];
 
