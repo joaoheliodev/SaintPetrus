@@ -22,6 +22,8 @@ export class Credentials {
     entry.unregister(); entry.secret.fill(0); this.entries.delete(provider);
   }
   async forget(provider: ProviderId) { this.disconnect(provider); await this.vault.forget(provider); }
+  // Names only, and true after Disconnect or a restart: a saved copy outlives the key in memory.
+  saved() { return this.vault.saved(); }
   status(provider: ProviderId) { const entry = this.entries.get(provider); return { provider, connected: !!entry, remembered: entry?.remembered ?? false }; }
   async use<T>(provider: ProviderId, callback: (key: Buffer) => Promise<T>): Promise<T> {
     const entry = this.entries.get(provider); if (!entry) throw new Error('Provider not connected.');

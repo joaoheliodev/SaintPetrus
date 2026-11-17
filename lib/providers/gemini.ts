@@ -1,7 +1,7 @@
 import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
 import { fieldNames, ProviderFailure, type Completion, type ProviderAdapter, type RequestOptions, type Usage } from './adapter';
-import { ModelIdError, normalizeModelId } from './model-id';
+import { ModelIdError, normalizeModelId, servedModelId } from './model-id';
 import { thinkingCallValid } from './thinking-policy';
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -37,6 +37,8 @@ export class GeminiAdapter implements ProviderAdapter {
   async complete(input: string, signal: AbortSignal, options?: RequestOptions, onDispatch?: () => void) {
     if (!thinkingCallValid(this.id, options?.thinking)) throw new ProviderFailure('invalid_request');
     return this.credentials.use('gemini', async key => {
+      // Who answered, once the response says so: a failure after that still names it.
+      let served: string | undefined;
       try {
         const messages = options?.messages ?? [{ role: 'user' as const, content: input }];
         const system = [options?.systemPrompt ?? '', ...messages.filter(m => m.role === 'system').map(m => m.content)].filter(Boolean).join('\n');
@@ -57,6 +59,7 @@ export class GeminiAdapter implements ProviderAdapter {
           while (true) { const { value, done } = await reader.read(); if (done) break; bytes += value.byteLength; if (bytes > 262144) throw new ProviderFailure('upstream'); body += decoder.decode(value, { stream: true }); }
         } finally { await reader.cancel(); }
         const payload = JSON.parse(body + decoder.decode());
+        served = servedModelId(this.id, payload?.modelVersion);
         // Without a usage object, the names the response did carry are the diagnosis.
         if (!record(payload?.usageMetadata)) throw new ProviderFailure('upstream', fieldNames(payload));
         const usage = geminiUsage(payload.usageMetadata);
@@ -74,8 +77,7 @@ export class GeminiAdapter implements ProviderAdapter {
         return { text, usage, billingModel, ...(outcome ? { outcome } : {}) };
       } catch (error) {
         if (signal.aborted) throw new ProviderFailure('cancelled');
-        if (ProviderFailure.is(error)) throw error;
-        throw new ProviderFailure('upstream');
+        throw (ProviderFailure.is(error) ? error : new ProviderFailure('upstream')).servedBy(served);
       }
     });
   }

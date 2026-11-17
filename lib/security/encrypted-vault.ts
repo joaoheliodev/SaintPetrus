@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
-import { chmod, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 export interface Keyring { loadOrCreate(): Promise<Buffer>; }
 export type ProviderId = 'gemini' | 'openai' | 'deepseek' | 'anthropic' | 'openrouter';
@@ -38,6 +38,11 @@ export class EncryptedVault {
       cipher.setAAD(Buffer.from(`saintpetrus:${provider}:1`)); cipher.setAuthTag(Buffer.from(record.tag, 'base64'));
       return Buffer.concat([cipher.update(Buffer.from(record.ciphertext, 'base64')), cipher.final()]);
     } finally { key.fill(0); }
+  }
+  // Which providers have a saved copy, read from the file names alone: no file is opened and the keyring is not asked.
+  async saved(): Promise<ProviderId[]> {
+    const names: string[] = await readdir(this.directory).catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return []; throw error; });
+    return providers.filter(provider => names.includes(`${provider}.json`));
   }
   async forget(provider: ProviderId) {
     providerId(provider);

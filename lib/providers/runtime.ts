@@ -11,7 +11,9 @@ import type { Credentials } from '../security/credentials';
 // Every provider except the synthetic one authenticates with a stored credential.
 export type KeyedProvider = Exclude<ModelProvider, 'mock'>;
 export type ConnectionState = 'disconnected' | 'configured' | 'verified' | 'rejected' | 'incomplete';
-export type ProviderStatusSnapshot = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable: boolean; verified: boolean; verifiedAt?: number; failureCode?: string; state: ConnectionState; validationTimeoutMs?: number; remembered?: boolean; mode: 'mock' | 'real' };
+export type ProviderStatusSnapshot = { provider: string; model: string; connected: boolean; mocked: boolean; mockAvailable: boolean; verified: boolean; verifiedAt?: number; failureCode?: string; state: ConnectionState; validationTimeoutMs?: number; remembered?: boolean; mode: 'mock' | 'real';
+  // Added by GET /api/provider: the providers with an encrypted copy saved on this machine, by name only.
+  savedKeys?: string[] };
 const keyedProvider = (value: unknown): value is KeyedProvider => isModelProvider(value) && value !== 'mock';
 const adapters: Record<KeyedProvider, new (model: string, credentials: Credentials) => ProviderAdapter> = { gemini: GeminiAdapter, openai: OpenAIAdapter, deepseek: DeepSeekAdapter };
 type ModelAllowlist = Readonly<Record<string, { provider: ModelProvider }>>;

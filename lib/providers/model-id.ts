@@ -11,3 +11,7 @@ export function normalizeModelId(provider: ModelProvider, value: unknown): strin
   if (!MODEL_ID.test(normalized)) throw new ModelIdError('invalid_model_format');
   return normalized;
 }
+// For a failure that still wants to name who answered: the identity when the response gave a usable one, else nothing.
+export function servedModelId(provider: ModelProvider, value: unknown): string | undefined {
+  try { return normalizeModelId(provider, value); } catch { return undefined; }
+}

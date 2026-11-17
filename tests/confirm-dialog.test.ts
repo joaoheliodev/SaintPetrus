@@ -32,12 +32,15 @@ test('U8 no native dialog is left, and every confirmation keeps its question and
   for (const [question, label] of [
     ['Reset the graph?', 'Reset graph'], ['Load the demo?', 'Load demo'], ['Load the preview demo?', 'Load preview demo'],
     ['Import ${file.name}?', 'Import graph'], ['selected connections`}?', 'Delete'], ['Remove ${agent.name}?', 'Remove agent'],
-    ['Disconnect the ${status?.provider ?? \'\'} key?', 'Disconnect'], ['Forget the ${status?.provider ?? \'\'} key?', 'Forget key'],
+    ['Disconnect the ${status?.provider ?? \'\'} key?', 'Disconnect'],
     ['Pause every agent?', 'Pause all agents'], ['Replace the expired estimate ${item.id}', 'Apply confirmed usage'], ['Add this price validity?', 'Add validity'],
   ]) {
     const at = all.indexOf(question); assert.ok(at > 0, question);
     assert.ok(all.slice(at, at + 400).includes(`confirmLabel: '${label}'`), `${question} → ${label}`);
   }
   assert.match(all, /confirm\(\{ message: runQuestion\(quoted\.data\?\.quote\), confirmLabel: 'Send \(1 call\)' \}\)/);
+  // Forget names the provider it acts on, the selected one or a saved key's (F-02), so its question is built apart.
+  assert.ok(all.includes('`Forget the ${target} key? This clears it from backend memory and deletes any encrypted copy saved on this machine. It cannot be undone.'), 'Forget keeps its question');
+  assert.match(all, /confirm\(\{ message: forgetQuestion\(target, status\?\.provider\), confirmLabel: 'Forget key', destructive: true \}\)/);
   assert.match(await readFile('components/confirm-dialog.tsx', 'utf8'), /initialFocus=\{cancel\}/, 'focus starts on Cancel');
 });

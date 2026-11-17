@@ -39,7 +39,9 @@ made against each provider, not to the first call of a session.
 - `provider.usage_unparsed`: the usage shape or the served model identity is outside the adapter's
   contract. The event lists field names, never values. The parser fails closed and pauses the agent;
   that is the intended behavior, not a defect. Correct the parser from those names in one change
-  instead of retrying.
+  instead of retrying. When the response had already named its model in a usable form, the reservation
+  and its receipts name that served model, and `provider.rerouted` is published if it differs from the
+  requested one. That name is a record only: expiry still converts at the dearest eligible candidate.
 - An unverifiable reservation: Tokens shows `■ Awaiting usage` with the reservation ID, and the rows
   count it as unverifiable. A timeout or a 5xx lands here too, because losing contact is not evidence
   that nothing was billed.

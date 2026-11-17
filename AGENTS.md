@@ -36,7 +36,7 @@ The Codex sandbox is the exception. There `npm run build` fails with `Could not 
 
 `npm run typecheck` runs twice on purpose, once for the app and once for `tsconfig.core.json`, because `lib/core` is published as a dependency-free pure package and must typecheck on its own.
 
-The test count is a floor, not a target. It stands at 555 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
+The test count is a floor, not a target. It stands at 566 today. A run below the floor means the working tree is incomplete: stop and report instead of building on top of it. Raise the number here in the change that adds tests; a stale floor silently authorizes losing the difference.
 
 Every fix ships with a test that dies with it. After the gate is green, deliberately break the line you just fixed and confirm one of your tests fails. A test that survives the mutation covers nothing, so report the mutation result alongside the diff. A change that only touches documentation has no mutation: say so instead of inventing one.
 
@@ -67,6 +67,8 @@ A model policy declares whether the model can produce a reproducible answer at a
 A usage parser is strict and fails closed on a shape it does not know. It never fills a missing field with zero: the input bands differ by orders of magnitude, so a guess would price an unread response as if someone had read it. DeepSeek's `prompt_tokens_details.cached_tokens` must equal `prompt_cache_hit_tokens`; that is the only cheap evidence the two documented fields mean what we assume.
 
 When a provider's usage shape cannot be parsed, record the set of field names the response carried, never a value. Names are not an error body, and they turn a failed first call into one correction instead of a blind retry.
+
+A failure raised after a response named its model carries that served model, and nothing else of the response (Round 9, F-01, 2026-11-16: the assistant's recommendation, closing a follow-up of the R1 review). It is an identifier `normalizeModelId` accepted, so the reservation, its receipts and a later manual reconciliation name who answered, and the reconciled interval protects that model's price history too. It is a record only: it never narrows the expiry floor, never prices anything and never holds an agent, because one unreadable response is not the invoice.
 
 `config/prices.json` is maintained by the operator, from their own browser, with a `verifiedAt` date. No agent transcribes a provider's price into it, and no agent adds a DeepSeek price or model identifier to configuration. Independent readings of the DeepSeek page on the same day produced different numbers, and cached snapshots circulate as if official. Until the operator enters a DeepSeek model with its price, selecting it is refused with `model_not_allowlisted`; that is the correct answer, not a gap to close.
 
@@ -115,6 +117,8 @@ The mock is the default in every mode. Real providers are enabled only by an exp
 OpenAI is not supported until the operator has validated it. It stays out of the policy allowlist, and no agent registers an OpenAI snapshot or price.
 
 Remembered keys and the persisted graph live in the operator's OS user data directory, never in the checkout, with the directory at 0700 and files at 0600. A legacy vault found in the checkout is copied, the copy verified, and only then the original deleted.
+
+The panel may know which providers have a saved key, and nothing more (Round 9, F-02, 2026-11-16: the assistant's recommendation, closing a follow-up of the R1 review). `GET /api/provider` answers `savedKeys`, provider names read from the vault's file names alone: no file is opened and the keyring is not asked. **Saved keys** in Connection offers Forget for each, in either mode and whatever is connected; every Forget asks first, and the server decides.
 
 When a provider answers with a served model that has no captured price, a reservation that expires converts at the greater of the estimate and the reported usage in each dimension (input, output, reasoning), priced at least at the requested model's peak, cache-miss rate. It stays an estimate, is never reduced automatically, and the agent stays paused until manual reconciliation.
 

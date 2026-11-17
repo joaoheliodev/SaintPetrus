@@ -18,7 +18,9 @@ export async function readResponseStream(response: Response, onText: (text: stri
       let billingModel: string;
       try { billingModel = normalizeModelId('openai', event.response?.model); }
       catch { throw new ProviderFailure('upstream', fieldNames(event.response)); }
-      completion = { text: redactText(text), billingModel, usage: openAIUsage(event.response?.usage, event.response) };
+      // Usage that cannot be parsed still fails closed, naming the snapshot the response did give.
+      try { completion = { text: redactText(text), billingModel, usage: openAIUsage(event.response?.usage, event.response) }; }
+      catch (error) { throw ProviderFailure.is(error) ? error.servedBy(billingModel) : error; }
     }
   }
   try {

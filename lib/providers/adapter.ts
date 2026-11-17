@@ -35,6 +35,10 @@ export class ProviderFailure extends Error {
   // `fields` carries the names of the keys a response actually had when its shape could not be
   // parsed, and never a value. Names are not an error body: they are what turns a failed first call
   // into one correction instead of a blind second attempt.
-  constructor(readonly code: ProviderFailureCode, readonly fields?: readonly string[]) { super(code); Object.defineProperty(this, providerFailureBrand, { value: true }); }
+  // `servedModel` is the model a response named before the rest of it proved unusable: an identifier already checked
+  // by `normalizeModelId`, never usage and never an error body. The receipt and a later manual reconciliation name it.
+  constructor(readonly code: ProviderFailureCode, readonly fields?: readonly string[], readonly servedModel?: string) { super(code); Object.defineProperty(this, providerFailureBrand, { value: true }); }
+  // The same failure, naming who served the response when it did not already.
+  servedBy(model: string | undefined): ProviderFailure { return model === undefined || this.servedModel !== undefined ? this : new ProviderFailure(this.code, this.fields, model); }
   static is(value: unknown): value is ProviderFailure { return value instanceof Error && Reflect.get(value, providerFailureBrand) === true; }
 }

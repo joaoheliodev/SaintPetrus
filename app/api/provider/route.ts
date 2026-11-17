@@ -6,12 +6,16 @@ import { tokenService } from '@/lib/tokens/runtime';
 import { TokenFailure, UnpricedServedModel } from '@/lib/tokens/service';
 import { runtime as graphRuntime } from '@/lib/server/runtime';
 import { ProviderFailure } from '@/lib/providers/adapter';
+import { credentials } from '@/lib/security/runtime';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   if (!localRequest(request, false)) return safeJson({ error: 'Local requests only.' }, 403);
   // Dispatches are the server's own evidence of which requests left for a provider; they carry no payload.
-  return safeJson({ ...providerStatus(), dispatches: providerProxy().dispatches.snapshot() });
+  // Saved keys are provider names only, so the panel can offer to forget a copy whose key is no longer in memory.
+  // A vault that cannot be listed reports none rather than failing the whole status.
+  const savedKeys = await credentials().saved().catch(() => []);
+  return safeJson({ ...providerStatus(), savedKeys, dispatches: providerProxy().dispatches.snapshot() });
 }
 export async function POST(request: Request) {
   if (!localRequest(request, true)) return safeJson({ error: 'Same-origin local requests only.' }, 403);

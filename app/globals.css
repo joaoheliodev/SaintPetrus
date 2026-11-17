@@ -238,6 +238,10 @@ kbd { padding: 0 5px; border: 1px solid var(--border); border-radius: 4px; font:
 .provider-panel input[type=checkbox] { width: auto; margin: 0; }
 .optional-features { display: grid; gap: 8px; margin-top: 12px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted-foreground); }
 .optional-features h2 { color: var(--foreground); }
+.saved-keys { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); color: var(--muted-foreground); }
+.saved-keys h2, .saved-keys li > span { color: var(--foreground); }
+.saved-keys ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.saved-keys li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .provider-panel input:not([type=checkbox]), .provider-panel select {
   width: 100%; min-height: 2.5rem; padding: .5rem;
   background: var(--background); color: var(--foreground); border: 1px solid var(--input);

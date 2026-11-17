@@ -124,7 +124,7 @@ original. A file already present in the new place is never overwritten: the old 
 | Transport | One loopback POST to `/api/credentials` with the exact Origin, JSON and a client header | One request | Body never logged or echoed |
 | Backend memory | A `Buffer` per provider in `Credentials`, registered with the redactor | Until Disconnect, Forget key, a replacement key or process exit; there is no idle expiry | The buffer is zeroed |
 | Each provider call | A `Buffer` copy handed to the adapter, then the request header string | One provider request | The copy is zeroed; the header string cannot be zeroed in JavaScript |
-| Remembered (opt-in) | AES-256-GCM ciphertext in `vault/<provider>.json` under the OS user data directory; the master key stays in the OS keyring (on Windows, a DPAPI-wrapped master sits next to it) | Until forgotten | **Forget key** in Connect AI deletes the selected provider's file and clears its memory; `npm run key -- forget <provider>` does the same for any provider, including after a restart, when no key is in memory and the panel shows no saved copy |
+| Remembered (opt-in) | AES-256-GCM ciphertext in `vault/<provider>.json` under the OS user data directory; the master key stays in the OS keyring (on Windows, a DPAPI-wrapped master sits next to it) | Until forgotten | **Forget key** in Connection deletes the selected provider's file and clears its memory. **Saved keys** in the same view lists every provider with a file, read from the file names alone (`GET /api/provider`, `savedKeys`: names, never content, and the keyring is not asked), and forgets any of them, also after Disconnect or a restart when no key is in memory; `npm run key -- forget <provider>` does the same from a terminal |
 
 The saved graph, `graph.json`, sits in the same user data directory with the same permissions, written through the
 redactor like the export. It is read back at startup through the strict parser that checks an import, so a file
@@ -153,7 +153,7 @@ A legacy `data/` stays ignored by Git and refused by the pre-commit hook and CI'
 check, even when forced. The vault directory is kept at 0700 and each file at 0600 where the
 platform supports it. There is no plaintext fallback: an unavailable keyring refuses persistence.
 Disconnect clears memory only; Forget key also deletes the saved copy and cancels a call in
-flight. A key never reaches browser storage, cookies, URLs, logs, API responses, events,
+flight, for the selected provider or for any provider listed under Saved keys. A key never reaches browser storage, cookies, URLs, logs, API responses, events,
 exports, receipts or the dispatch ledger.
 
 ## Local network and output boundaries

@@ -115,6 +115,16 @@ export function ConnectionChip({ source, open }: { source: ProviderStatusSource;
     {status?.validationTimeoutMs !== undefined && <span className="provider-badge is-incomplete" title="Set at server startup with SAINTPETRUS_VALIDATION_TIMEOUT_MS">⏱ Validation timeout · {status.validationTimeoutMs} ms</span>}
   </>;
 }
+// Every provider the vault can hold a copy for, as the panel names it.
+const providerNames: Record<string, string> = { openai: 'OpenAI', gemini: 'Google Gemini', deepseek: 'DeepSeek', anthropic: 'Anthropic', openrouter: 'OpenRouter' };
+// The providers the server says have an encrypted copy saved on this machine. A saved copy outlives Disconnect and a
+// restart, so it is listed whatever is connected; a name the panel does not know is not shown.
+export const savedKeyProviders = (status: Pick<ProviderStatusSnapshot, 'savedKeys'> | undefined) => {
+  const saved = status?.savedKeys;
+  return Array.isArray(saved) ? Object.keys(providerNames).filter(name => saved.includes(name)) : [];
+};
+// Forgetting cancels the call in flight and clears the proof, whichever provider it names: say so when it is another one's.
+export const forgetQuestion = (target: string, selected: string | undefined) => `Forget the ${target} key? This clears it from backend memory and deletes any encrypted copy saved on this machine. It cannot be undone.${target === selected || !selected || selected === 'none' ? '' : ' A call in flight is cancelled and the current connection must be tested again.'}`;
 // Where the form starts: the current keyed pair, or the mock while it is on offer.
 const initialProvider = (status: ProviderStatusSnapshot | undefined) => status && keyedProviders.includes(status.provider) ? status.provider : status?.mockAvailable === false ? 'gemini' : 'mock';
 export function ConnectionView({ source, children }: { source: ProviderStatusSource; children?: React.ReactNode }) {
@@ -123,11 +133,11 @@ export function ConnectionView({ source, children }: { source: ProviderStatusSou
   const [provider, setProvider] = useState(() => initialProvider(status));
   const [model, setModel] = useState(() => status && keyedProviders.includes(status.provider) ? status.model : ''); const [custom, setCustom] = useState('');
   const [show, setShow] = useState(false); const [remember, setRemember] = useState(false);
-  const realMode = status?.mode === 'real'; const confirm = useConfirm();
+  const realMode = status?.mode === 'real'; const confirm = useConfirm(); const saved = savedKeyProviders(status);
   // Uncontrolled, transient field: no credential in React state or browser storage. Leaving the view removes it with its value.
   const keyField = useRef<HTMLInputElement>(null);
-  async function configure(action: 'set' | 'disconnect' | 'forget') {
-    const selected = action === 'set' ? provider : status?.provider ?? 'none';
+  async function configure(action: 'set' | 'disconnect' | 'forget', target?: string) {
+    const selected = action === 'set' ? provider : target ?? status?.provider ?? 'none';
     const body: Record<string, unknown> = { action, provider: selected };
     if (action === 'set') {
       body.model = selected === 'mock' ? 'mock-v1' : model || custom.trim();
@@ -151,13 +161,14 @@ export function ConnectionView({ source, children }: { source: ProviderStatusSou
       ? `${mocked ? 'Mock verified' : 'Connection verified'} · ${data.latencyMs} ms`
       : refusalMessage(status, data?.error));
   }
-  async function run(action: 'connect' | 'test' | 'disconnect' | 'forget') {
+  // `target` names the provider whose key Forget acts on; without it, the selected one.
+  async function run(action: 'connect' | 'test' | 'disconnect' | 'forget', target = status?.provider ?? '') {
     if (action === 'disconnect' && !await confirm({ message: `Disconnect the ${status?.provider ?? ''} key? It is cleared from backend memory and a call in flight is cancelled.`, confirmLabel: 'Disconnect', destructive: true })) return;
-    if (action === 'forget' && !await confirm({ message: `Forget the ${status?.provider ?? ''} key? This clears it from backend memory and deletes any encrypted copy saved on this machine. It cannot be undone.`, confirmLabel: 'Forget key', destructive: true })) return;
+    if (action === 'forget' && !await confirm({ message: forgetQuestion(target, status?.provider), confirmLabel: 'Forget key', destructive: true })) return;
     setPending(true); setResult('');
     try {
       if (action === 'disconnect') { await configure('disconnect'); setResult('Disconnected. Credential removed from the backend.'); return; }
-      if (action === 'forget') { await configure('forget'); setResult('Key forgotten: cleared from memory and any saved encrypted copy deleted.'); return; }
+      if (action === 'forget') { await configure('forget', target); setResult(`${providerNames[target] ?? 'Key'} key forgotten: cleared from memory and any saved encrypted copy deleted.`); return; }
       const selectedModel = provider === 'mock' ? 'mock-v1' : model || custom.trim();
       if (provider !== 'mock' && !keyField.current?.value && !status?.connected) { setResult('Enter an API key before connecting.'); return; }
       if (action === 'connect' || keyField.current?.value || !status?.connected || status.provider !== provider || status.model !== selectedModel) await configure('set');
@@ -190,7 +201,11 @@ export function ConnectionView({ source, children }: { source: ProviderStatusSou
           <Button variant="outline" disabled={pending || !status?.connected} onClick={() => run('disconnect')}>Disconnect</Button>
           <Button variant="outline" disabled={pending || !status || !keyedProviders.includes(status.provider)} onClick={() => run('forget')}>Forget key</Button>
         </div>
-        {status?.remembered && <p>An encrypted copy of this key is saved on this machine. Forget key deletes it.</p>}
+        {saved.length > 0 && <section className="saved-keys" aria-labelledby="saved-keys-title">
+          <h2 id="saved-keys-title">Saved keys</h2>
+          <p>Encrypted copies kept on this machine, also while the key is not connected. Forgetting one deletes its copy and clears that key from backend memory.</p>
+          <ul>{saved.map(name => <li key={name}><span>{providerNames[name]}</span><Button variant="outline" size="sm" disabled={pending} onClick={() => run('forget', name)}>Forget {providerNames[name]} key</Button></li>)}</ul>
+        </section>}
         <p role="status">{result}</p>
         {children}
   </section>;

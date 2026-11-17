@@ -74,7 +74,8 @@ reasoning turned off where the provider allows it, and no response cache.
    the dispatch in the ledger immediately before the network call, refuses redirects and reads at most a
    bounded body. An HTTP error becomes a `ProviderFailure` code without reading the error body. A success is
    parsed strictly: text, usage (a shape it does not know fails closed, recording only field names) and the
-   served model id.
+   served model id. A failure raised after the response named its model carries that id, and nothing else of
+   the response, so the reservation and its receipts can name who answered.
 9. **Reconciliation.** The served model, not the requested one, is the price key. If the capture holds no price
    for it, the call is `unverifiable`: the hold stays, the agent pauses and an event says so. Otherwise the
    reservation is replaced by the reported usage at the captured rate for the hour the answer arrived (peak if

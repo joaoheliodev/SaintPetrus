@@ -184,6 +184,11 @@ credits/free tier and rounding; a locally priced usage result is not an invoice.
   Register `R` and every possible served ID before dispatch. A missing or
   malformed `modelVersion` fails closed as unverifiable and publishes
   `provider.usage_unparsed` with field names only.
+  **Served identity on a usage failure (every provider):** when the response
+  named its model and its usage then failed to parse, the call receipt, the
+  reservation and the later `expiry` and `manual` receipts carry that
+  `servedModel` instead of `null`, and `provider.rerouted` records a divergence.
+  Expiry pricing is unchanged by it.
 - **DeepSeek usage:** `prompt_tokens`, `completion_tokens`, `total_tokens` must
   agree; cache hit + miss must equal prompt. Optional cached detail must equal
   cache hits. Reasoning detail, when present, must not exceed completion; it is

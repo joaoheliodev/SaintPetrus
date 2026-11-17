@@ -386,9 +386,19 @@ export class TokenService {
     let verdict: BillingVerdict = 'unverifiable';
     let outcome = 'completed'; let dispatch: Dispatch | undefined; let reportedUsage: ReceiptUsage | undefined;
     let priced: { servedPriceVersionId: string; band: 'peak' | 'offPeak'; costUsd: number; journal: JournalInterval | null } | undefined;
+    // Who answered goes on the reservation the moment the response says so, before usage is checked: a call that fails
+    // after that still names its served model in the receipt, the reservation and a later manual reconciliation. The
+    // divergence is published here, before pricing, so it stays on record even when the served model cannot be priced.
+    const served = (model: string) => {
+      reservation.billingModel = model;
+      if (model !== adapter.model) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.rerouted', severity: 'warning', payload: `Request for ${adapter.model} was served by ${model}.` });
+    };
     try {
       const result = await proxy.execute(adapter, input, signal, options, { correlationId: reservation.id, onDispatch: sent => { dispatch = sent; } });
       const approximate = adapter.id === 'mock';
+      // Only the synthetic mock is priced as asked; a keyed adapter that names no served model cannot be priced at all.
+      const billingModel = result.billingModel ?? (approximate ? adapter.model : undefined);
+      if (billingModel) served(billingModel);
       const usage = approximate ? { prompt: inputEstimate, completion: this.counter.count(result.text), total: 0 } : result.usage;
       // After provider contact these are not budget refusals: the call stays unverifiable.
       if (!usage) throw new TokenFailure('Provider usage missing.');
@@ -400,12 +410,7 @@ export class TokenService {
       // The invoice names the model that answered, not the one that was asked for: providers reroute
       // and bill at the served model's rate. A served model with no operator-verified price cannot be
       // reconciled, and a call that already happened must not be released as if it were free.
-      // Only the synthetic mock is priced as asked; a keyed adapter that names no served model cannot be priced at all.
-      const billingModel = result.billingModel ?? (approximate ? adapter.model : undefined);
       if (!billingModel) throw new ProviderFailure('upstream');
-      reservation.billingModel = billingModel;
-      // Published before pricing so the divergence stays on record even when the served model cannot be priced.
-      if (billingModel !== adapter.model) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.rerouted', severity: 'warning', payload: `Request for ${adapter.model} was served by ${billingModel}.` });
       // Never the requested model's tariff: a served model without a captured price stays unverifiable.
       const billingPrice = Object.hasOwn(reservation.priceVersions, billingModel) ? reservation.priceVersions[billingModel].price : undefined;
       if (!billingPrice) {
@@ -438,6 +443,9 @@ export class TokenService {
       return { ...result, usage, approximate, cached: false };
     } catch (error) {
       if (verdict === 'billed') throw error;
+      // The adapter read who answered before the response stopped being usable. It only names the reservation: expiry
+      // still converts at the dearest eligible candidate, because one unreadable response proves nothing about the invoice.
+      if (ProviderFailure.is(error) && error.servedModel) served(error.servedModel);
       if (error instanceof UnpricedServedModel) eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'provider.unpriced', severity: 'error', payload: `${error.servedModel} answered a request for ${error.requestedModel} and has no captured price. Reservation ${error.reservationId} stays unverifiable and the agent is paused; price that model, then reconcile the expired estimate with provider-confirmed usage.` });
       else eventBus().publish({ agent_id: agent, role: this.hooks.role?.(agent) ?? agent, type: 'error', severity: 'error', payload: 'Provider execution failed.' });
       // Names only. A shape we cannot parse pauses the agent, and the names are what makes the next

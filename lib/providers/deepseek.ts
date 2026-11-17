@@ -1,7 +1,7 @@
 import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
 import { fieldNames, ProviderFailure, type Completion, type ProviderAdapter, type RequestOptions, type Usage } from './adapter';
-import { ModelIdError, normalizeModelId } from './model-id';
+import { ModelIdError, normalizeModelId, servedModelId } from './model-id';
 import { thinkingCallValid } from './thinking-policy';
 const endpoint = 'https://api.deepseek.com/chat/completions';
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -57,6 +57,8 @@ export class DeepSeekAdapter implements ProviderAdapter {
     if (!options || !thinkingCallValid(this.id, options.thinking) || !options.thinking) throw new ProviderFailure('invalid_request');
     const thinking = options.thinking;
     return this.credentials.use('deepseek', async key => {
+      // Who answered, once the response says so: a failure after that still names it.
+      let served: string | undefined;
       try {
         const system = [options.systemPrompt, ...options.messages.filter(m => m.role === 'system').map(m => m.content)].filter(Boolean).join('\n');
         const messages = [...(system ? [{ role: 'system', content: redactText(system) }] : []), ...options.messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: redactText(m.content) }))];
@@ -75,6 +77,7 @@ export class DeepSeekAdapter implements ProviderAdapter {
         } finally { await reader.cancel(); }
         const payload: unknown = JSON.parse(body + decoder.decode());
         if (!record(payload)) throw new ProviderFailure('upstream');
+        served = servedModelId(this.id, payload.model);
         // Without a usage object, the names the response did carry are the diagnosis.
         if (!record(payload.usage)) throw new ProviderFailure('upstream', fieldNames(payload));
         const usage = deepseekUsage(payload.usage);
@@ -94,8 +97,7 @@ export class DeepSeekAdapter implements ProviderAdapter {
         return { text, usage, billingModel, ...(outcome ? { outcome } : {}) };
       } catch (error) {
         if (signal.aborted) throw new ProviderFailure('cancelled');
-        if (ProviderFailure.is(error)) throw error;
-        throw new ProviderFailure('upstream');
+        throw (ProviderFailure.is(error) ? error : new ProviderFailure('upstream')).servedBy(served);
       }
     });
   }

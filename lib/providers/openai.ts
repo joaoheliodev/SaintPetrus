@@ -2,7 +2,7 @@ import { readResponseStream } from './response-stream';
 import type { Credentials } from '../security/credentials';
 import { redactText } from '../security/redact';
 import { fieldNames, ProviderFailure, type ProviderAdapter, type RequestOptions } from './adapter';
-import { ModelIdError, normalizeModelId } from './model-id';
+import { ModelIdError, normalizeModelId, servedModelId } from './model-id';
 import { thinkingCallValid } from './thinking-policy';
 import { openAIUsage } from './openai-usage';
 const endpoint = 'https://api.openai.com/v1/responses';
@@ -22,6 +22,8 @@ export class OpenAIAdapter implements ProviderAdapter {
   async complete(input: string, signal: AbortSignal, options?: RequestOptions, onDispatch?: () => void) {
     if (!thinkingCallValid(this.id, options?.thinking)) throw new ProviderFailure('invalid_request');
     return this.credentials.use('openai', async key => {
+      // Who answered, once the response says so: a failure after that still names it.
+      let served: string | undefined;
       try {
         const generation = options?.thinking?.mode === 'enabled' ? { reasoning: { effort: options.thinking.effort } } : options ? { temperature: options.temperature } : {};
         onDispatch?.();
@@ -41,6 +43,7 @@ export class OpenAIAdapter implements ProviderAdapter {
           body += decoder.decode(value, { stream: true });
         }
         const payload = JSON.parse(body + decoder.decode());
+        served = servedModelId(this.id, payload?.model);
         if (!Array.isArray(payload.output)) throw new ProviderFailure('upstream');
         const texts: string[] = [];
         for (const item of payload.output) {
@@ -56,8 +59,7 @@ export class OpenAIAdapter implements ProviderAdapter {
         return { text: redactText(texts.join('\n')), usage, billingModel };
       } catch (error) {
         if (signal.aborted) throw new ProviderFailure('cancelled');
-        if (ProviderFailure.is(error)) throw error;
-        throw new ProviderFailure('upstream');
+        throw (ProviderFailure.is(error) ? error : new ProviderFailure('upstream')).servedBy(served);
       }
     });
   }

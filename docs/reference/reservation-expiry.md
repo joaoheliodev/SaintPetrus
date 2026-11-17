@@ -14,6 +14,12 @@ for the accepted loss of coincidental headroom from unrelated providers. Do not 
 this to ordinary release: only a failure that proves no generation occurred is `unbilled`, and later
 reconciliation must replace the same converted amount rather than charge it twice.
 
+A response that named its model and then could not be used (an unknown usage shape, usage that does not add
+up) is a third case. The reservation, its receipts and a later manual reconciliation name that served model,
+so the reconciled interval protects its price history too. The name does not narrow the floor: one unreadable
+response is not the invoice, so expiry converts exactly as if the served model were unknown, and with no
+reported usage the estimate does not hold its agent.
+
 A reservation still in flight when the process stopped comes back from the accounting journal as
 `unverifiable`. Its deadline is the latest it could have had had the process lived: `createdAt` plus the
 provider timeout (`DEFAULT_PROVIDER_TIMEOUT_MS`) plus `reservationTtlMs`. It is computed from journaled data

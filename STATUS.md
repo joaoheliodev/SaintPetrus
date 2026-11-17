@@ -2,6 +2,19 @@
 
 Branch: `main`, which merged `night/provider-validation-ready` on 2026-09-29 (Round 4 below). That branch continued `night/provider-validation` from the operator's price-admin commit `0662647` on `night/price-admin`, following `night/price-schema`. Remote repository: `joaoheliodev/SaintPetrus`. Permanent rules live in `AGENTS.md`. Timestamped events up to 2026-09-27 live in the append-only `NIGHT-LOG.md`; those of the later rounds live in the Session log of `.prompts/FINISH-BACKLOG.md` and in `CHANGELOG.md`.
 
+## Verification checkpoint (2026-11-16)
+
+Run in a cloud session without any API key, on the working branch `claude/inspiring-pasteur-vkzyic`, level with
+`main` at `ddc7b56` when the round began. The starting gate was red at the audit step: ten high or critical
+advisories published since 2026-10-08, two of them critical in next (Round 9 below). After the round `npm run gate`
+passed with 566 tests in 29 suites, none failed, cancelled, skipped or todo, and its audit step found no high or
+critical advisory and excepted nothing. On fresh instances with empty data directories, `npm run test:e2e` passed in
+development with 25 PASS and `npm run test:browser` on the production build with 4 PASS. The main screen of a fresh
+production instance at 1440×900 differs from the one captured before the dependency changes in one pixel of
+1,296,000, by one level of one channel. Not run in this round: Gitleaks (no binary in this environment and none was
+installed), a fresh-clone proof and CI, because nothing was committed or pushed: the tree is left dirty for the
+operator, as `AGENTS.md` requires. No request with a real key was made, including `GET /models`.
+
 ## Verification checkpoint (2026-10-08)
 
 Run on a fresh, full clone of GitHub at `762f807` (not shallow), in a cloud session without any API key, following the
@@ -202,6 +215,34 @@ round's handoff); each fix below answers a cell that did not come back.
   full budget, unverifiable usage, an estimate awaiting reconciliation or Pause all, so the loop R5-1 found (S4:
   Resume, the next call refused, paused again) is gone.
 
+## Round 9 (2026-11-16)
+
+The operator asked for the project to be analysed, improved and finished. Everything the backlog still held open
+that needs no operator decision and no real key was closed; what is left is listed under "Not verified or pending".
+
+- **R9-1** The gate was red on a clean tree: GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr (critical) and
+  GHSA-p3m5-59mp-jv5r (high) in next up to 16.4.0, and high advisories in undici, zod, body-parser and
+  systeminformation, all transitive and all with a fix. next and eslint-config-next moved to 16.4.5, the newest
+  16.4 release published seven days or more (16.4.6 was six days old), and the lockfile was regenerated with npm 11
+  restricted to versions a week old: undici 7.30.2, zod 4.6.7, systeminformation 5.33.19, and shadcn 4.23.0 inside
+  its range, which no longer depends on the MCP SDK and its express tree (65 packages gone, body-parser among them).
+  Twelve moderate or low advisories remain, none blocking; their fixes are younger than a week or need a major.
+- **R9-2** The updates Round 8 left waiting, each a week old or more: react and react-dom 19.3.1, @xyflow/react
+  12.12.1, tailwindcss and @tailwindcss/postcss 4.3.5, zustand 5.0.16 and, inside its range, lucide-react 1.70.0.
+- **R9-3 (F-01)** A response that named its model and then could not be used lost that name: the receipt said
+  `servedModel: null` and a manual reconciliation journaled only the requested model. Now the failure carries the
+  served model, for every provider, plain or streamed, and the reservation, the `call`, `expiry` and `manual`
+  receipts and the reconciled interval name it; a divergence publishes `provider.rerouted`. Expiry charges exactly
+  what it charged before.
+- **R9-4 (F-02)** The panel could forget only the selected provider's key, and said a copy was saved only while
+  the key was in memory. Now `GET /api/provider` answers `savedKeys`, the providers with an encrypted copy, read
+  from the vault's file names alone, and **Saved keys** in Connection lists them with a Forget button each, also
+  after Disconnect, after a restart and in MOCK mode.
+- **The braces exception** lapsed on 2026-10-20 and was not renewed (R6-Q1 stayed unanswered). `npm audit` no
+  longer reports GHSA-vfj7-8cjw-p6xm for braces 3.0.3, so the gate excepts nothing. The lapsed entry is still in
+  `scripts/audit-policy.mjs`, with the test and the three documents that name it: the list is the operator's, and
+  removing a dead entry is theirs to order.
+
 ## Not verified or pending
 
 - No provider has answered a real request. Gemini step 1B and DeepSeek D7 wait for explicit operator approval and follow `docs/reference/first-real-call.md`. `GET /models` is not approved.
@@ -217,11 +258,17 @@ round's handoff); each fix below answers a cell that did not come back.
 - GitHub private vulnerability reporting must be switched on by the repository owner (Settings, Advanced Security);
   whether it is on was not verified from here. Until it is, `SECURITY.md`'s fallback applies: a public "Security
   contact request" issue with no details, then a private channel.
-- The gate excepts GHSA-vfj7-8cjw-p6xm in `braces`, which has no fixed release, until 2026-10-20 or until a fix
-  within a minor release exists (operator decision, Round 6, R6-A). After that date the gate fails again unless a
-  fix has shipped or the operator renews the exception.
+- The braces exception (GHSA-vfj7-8cjw-p6xm, operator decision, Round 6, R6-A) lapsed on 2026-10-20. Since
+  2026-11-16 at the latest `npm audit` no longer reports that advisory, so nothing is excepted; the lapsed entry
+  stays in `scripts/audit-policy.mjs` until the operator orders it removed (Round 9).
+- Round 9 was not committed, pushed, scanned with Gitleaks or run in CI: the agent does not commit (`AGENTS.md`).
+  The operator commits it, with Gitleaks on the staged diff, and CI then runs on the push.
+- Waiting for their week or for an order: next 16.4.6 (from 2026-11-17), the fixes of the twelve moderate or low
+  advisories (typescript-eslint 8.73.0, published 2026-11-16, among them), lucide-react 1.71.0 to 1.73.0,
+  actions/setup-node v7.1.0 (a pin changes only after CI passes on a temporary branch), and the minors zustand
+  5.1.0, @base-ui/react 1.9.0 and @types/node 22.20.
 - Accessibility was checked in Chromium (contrast, control names, visible focus, keyboard paths), not with a screen reader.
-- When usage cannot be parsed, the served model the response named is not carried into receipts or manual reconciliation (F-01). The panel's Forget key reaches only the selected provider; the terminal helper reaches any (F-02).
+- F-01 and F-02, the two follow-ups of the R1 review, are done (Round 9). R1-16 stays an open observation.
 - In `npm run dev` only, about one browser-check run in fifteen found the canvas cards focused without their outline; production never did. The cause is unproven (R1-16).
 
 ## Open debts and limits
