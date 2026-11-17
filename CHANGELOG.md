@@ -6,7 +6,7 @@ that carried them.
 ## Unreleased: Round 10 (2026-11-16 and 2026-11-17)
 
 On `claude/inspiring-pasteur-vkzyic`, which merges Round 9's branch, and on `main` by fast-forward on 2026-11-17. No
-request with a real key. The test floor rose from 555 to 566.
+request with a real key. The test floor rose from 555 to 567.
 
 - The gate is green again. It had turned red on advisories published since Round 8; Round 9 had already moved next to
   16.4.1 for the two critical ones (GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr) and GHSA-p3m5-59mp-jv5r, but that
@@ -28,6 +28,9 @@ request with a real key. The test floor rose from 555 to 566.
 - The audit exception changed by operator decision (2026-11-17): GHSA-fc5q-39xc-vjpf in picomatch (high, no fixed
   release, run only by ESLint and the shadcn CLI) is excepted until 2026-12-17, and the braces exception, which
   `npm audit` no longer reports, is removed (R10-7).
+- In `npm run dev` the connection chip read "Loading connection state" for about two seconds after every page load:
+  React's development double mount aborted the first status request and the remount joined that dead request
+  instead of starting its own. It now shows within the first request (R10-10).
 
 ## Unreleased: Round 9 (2026-10-22)
 

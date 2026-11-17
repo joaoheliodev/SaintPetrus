@@ -54,3 +54,24 @@ test('an explicit provider refresh preempts stale polling', async () => {
   await command;
   assert.deepEqual(projected, [snapshot]);
 });
+
+test('after abort, the next poll loads again instead of joining the aborted request', async () => {
+  // React mounts twice in development: the first unmount aborts, and the remount polls at once.
+  const signals: AbortSignal[] = [];
+  const resolves: Array<(status: ProviderStatusSnapshot) => void> = [];
+  const projected: ProviderStatusSnapshot[] = [];
+  const refresher = createProviderStatusRefresher(signal => new Promise<ProviderStatusSnapshot>((accept, reject) => {
+    signals.push(signal); resolves.push(accept);
+    signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+  }), status => projected.push(status));
+
+  const first = refresher.refresh('poll');
+  refresher.abort();
+  const second = refresher.refresh('poll');
+  assert.equal(signals.length, 2, 'the remount must start its own request');
+  assert.deepEqual(signals.map(signal => signal.aborted), [true, false]);
+  resolves[1]?.(snapshot);
+  await assert.rejects(first, { name: 'AbortError' });
+  await second;
+  assert.deepEqual(projected, [snapshot], 'the status shows at once, not one polling interval later');
+});

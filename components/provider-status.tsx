@@ -25,7 +25,8 @@ export function createProviderStatusRefresher(
       active = request;
       return request.promise;
     },
-    abort() { active?.controller.abort(); },
+    // Forgotten at once, so a remount (React's development double mount) loads again instead of joining a dead request.
+    abort() { active?.controller.abort(); active = undefined; },
   };
 }
 // "Connected" must mean a real call succeeded. A stored credential alone only earns "configured".

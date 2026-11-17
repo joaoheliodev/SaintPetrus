@@ -1087,6 +1087,7 @@ Gitleaks job included). On 2026-11-17 the operator asked for the errors to be re
 | R10-7 | The audit exceptions (operator, 2026-11-17) | GHSA-fc5q-39xc-vjpf in picomatch, published since 2026-11-16 with no fixed release, excepted until 2026-12-17; the braces entry removed; policy, its tests and the three documents the R7-1 test holds; mutations | done |
 | R10-8 | `main` | On the operator's order ("faz o merge", 2026-11-17), `main` fast-forwarded from `ddc7b56` to this branch, no merge commit of its own; gate green before, CI green on `main` after | done |
 | R10-9 | Correct the picomatch record | AGENTS.md, SECURITY.md, STATUS and the policy say where picomatch runs, Next.js's compiled copy included | done |
+| R10-10 | The connection chip waited a polling interval in development | `createProviderStatusRefresher.abort()` forgets the aborted request, so the remount loads at once; a test that the mutation kills; floor 566 → 567 | done |
 
 #### Updates (ages on 2026-11-16)
 
@@ -1208,6 +1209,14 @@ eslint 10, @types/node 26, @xyflow/react 13 and cn 0.5 (majors).
   the project's own configuration. AGENTS.md, SECURITY.md, STATUS and the policy's `why` now say that. Documentation
   and a printed sentence only: no mutation. When the gate's exception ends because a fix exists, a next release that
   updates its compiled copy is a separate update to look for.
+- R10-10 (2026-11-17). Running the project for the operator showed the connection chip at "Loading connection
+  state" and the agent card at "No connection" right after a Run once in `npm run dev`. The server was fine:
+  `GET /api/provider` answered at once. React's development double mount runs the status effect, cleans it up
+  (aborting the first request) and runs it again; the remount's poll found `active` still set to the aborted
+  request, joined it, swallowed its AbortError and waited the two-second polling interval. `abort()` now forgets the
+  request it aborts. Measured in Chromium: the chip showed 32 ms after the page settled, against about 2000 ms
+  before. Production mounts once and was not affected. The mutation that keeps the dead request is killed by the new
+  test in `tests/provider-status.test.ts`; floor 566 → 567.
 
 #### Questions for João
 
@@ -1488,6 +1497,7 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R10-7 | the exception a day longer; on another package | both killed by "R10-A picomatch's advisory without a fixed release passes the audit through 2026-12-17…" |
 | R10-7 | the braces entry kept beside picomatch's | killed by "R6-A every other high or critical advisory still fails the audit…" (braces' advisory must block) |
 | R10-7 | README.md keeps the braces sentence; SECURITY.md with the wrong date; AGENTS.md without the new id | all killed by "R7-1 the documents name the audit exception the policy holds" |
+| R10-10 | `abort()` keeps the aborted request as the active one | killed by "after abort, the next poll loads again instead of joining the aborted request" |
 
 Every Round 10 mutation was applied and removed by a script that keeps the file's text in memory and writes it back
 whatever the outcome; `git status` after each batch listed only the round's own changes.
@@ -1793,5 +1803,6 @@ Everything below is yours; nothing in it needs this conversation.
   `test:browser` with 4 PASS on fresh instances. Committed and pushed on the operator's order (`11a03e7`,
   `9443ffa`, CI run 124 green with Gitleaks). On 2026-11-17, on the operator's order, Round 9's branch was merged
   (R10-6), GHSA-fc5q-39xc-vjpf in picomatch excepted until 2026-12-17 and the braces entry removed (R10-7, six
-  mutations killed). Then, on the operator's order, `main` was fast-forwarded to the branch (R10-8). No request
-  reached a provider. No question is open.
+  mutations killed). Then, on the operator's order, `main` was fast-forwarded to the branch (R10-8). The picomatch
+  record was corrected (R10-9), and running the project for the operator found and fixed a two-second wait for the
+  connection state in development (R10-10, floor 567). No request reached a provider. No question is open.
