@@ -1,4 +1,4 @@
-// F-02 (Round 9): the panel can forget any provider's saved key. The server reports which providers have an encrypted
+// F-02 (Round 10): the panel can forget any provider's saved key. The server reports which providers have an encrypted
 // copy by name only, also after Disconnect or a restart, and the Connection view offers Forget for each.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

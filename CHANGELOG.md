@@ -3,29 +3,42 @@
 Notable changes, newest first. Dates are UTC. No release has been tagged; entries are grouped by the branch
 that carried them.
 
-## Unreleased: Round 9 (2026-11-16)
+## Unreleased: Round 10 (2026-11-16 and 2026-11-17)
 
-Not committed: the working tree holds it for the operator. No request with a real key. The test floor rose from 555
-to 566.
+On `claude/inspiring-pasteur-vkzyic`, which merges Round 9's branch. No request with a real key. The test floor rose
+from 555 to 566.
 
-- The gate is green again. It had turned red on advisories published since Round 8, two of them critical in next
-  (GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr, with GHSA-p3m5-59mp-jv5r, high). next and eslint-config-next 16.4.5;
-  undici 7.30.2, zod 4.6.7 and systeminformation 5.33.19 through the lockfile; shadcn 4.23.0, which drops the MCP SDK
-  and its express tree, body-parser with it. Every version taken was published seven days or more before (R9-1).
+- The gate is green again. It had turned red on advisories published since Round 8; Round 9 had already moved next to
+  16.4.1 for the two critical ones (GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr) and GHSA-p3m5-59mp-jv5r, but that
+  branch never reached `main`. next and eslint-config-next 16.4.5; undici 7.30.2, zod 4.6.7 and systeminformation
+  5.33.19 through the lockfile; shadcn 4.23.0, which drops the MCP SDK and its express tree, body-parser and hono with
+  it. Every version taken was published seven days or more before (R10-1).
 - The updates that were waiting for their week: react and react-dom 19.3.1, @xyflow/react 12.12.1, tailwindcss and
   @tailwindcss/postcss 4.3.5, zustand 5.0.16 and lucide-react 1.70.0. The main screen is the same before and after,
-  one pixel apart by one level (R9-2).
+  one pixel apart by one level (R10-2).
 - A response that names its model and then cannot be used keeps that name. The provider failure carries the served
   model, for Gemini, DeepSeek and OpenAI, plain or streamed, so the reservation, the `call`, `expiry` and `manual`
   receipts of `GET /api/receipts` say who answered instead of `null`, `provider.rerouted` records a divergence, and a
   manual reconciliation protects the served model's price history as well as the requested one's. What an expired
-  reservation is charged does not change (R9-3, follow-up F-01).
+  reservation is charged does not change (R10-3, follow-up F-01).
 - **Saved keys** in Connection lists every provider with an encrypted copy on this machine and forgets any of them,
   also after Disconnect, after a restart and in MOCK mode. `GET /api/provider` gains `savedKeys`: provider names read
   from the vault's file names, never content. Forgetting another provider's key says that the call in flight is
-  cancelled and the connection must be tested again (R9-4, follow-up F-02).
-- The braces exception lapsed on 2026-10-20 unrenewed, and `npm audit` no longer reports its advisory: the gate
-  excepts nothing.
+  cancelled and the connection must be tested again (R10-4, follow-up F-02).
+- The audit exception changed by operator decision (2026-11-17): GHSA-fc5q-39xc-vjpf in picomatch (high, no fixed
+  release, run only by ESLint and the shadcn CLI) is excepted until 2026-12-17, and the braces exception, which
+  `npm audit` no longer reports, is removed (R10-7).
+
+## Unreleased: Round 9 (2026-10-22)
+
+Security fixes and one renewed exception: no new feature and no request with a real key. The test floor stays at 555.
+
+- next and eslint-config-next 16.3.8 -> 16.4.1, the release that fixes GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr
+  (critical, unauthenticated remote code execution) and GHSA-p3m5-59mp-jv5r (high, denial of service). 16.4.2,
+  six days old, adds only Turbopack and documentation fixes, so it waits.
+- hono 4.13.7 -> 4.13.13 and ip-address 10.7.2 -> 10.7.4 in the lockfile, for two moderate advisories.
+- The braces exception (GHSA-vfj7-8cjw-p6xm) lapsed after 2026-10-20 with no fix released; by operator decision it
+  is renewed until 2026-11-20, or until a fix within a minor release exists (R6-Q1).
 
 ## Unreleased: Round 8 on `main` (2026-10-08)
 

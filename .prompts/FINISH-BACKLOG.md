@@ -1046,20 +1046,45 @@ Pulled in with them, each published seven days or more: lightningcss 1.32.0, enh
 
 - R6-Q1 stays open (Phase 12, and "Perguntas para o João").
 
-### Phase 15 — Round 9: analyse, improve and finish (2026-11-16)
+### Phase 15 — Round 9: security fixes (2026-10-22)
+
+On `main` from `ddc7b56`, at the operator's request to finish so that real calls can be made. No behaviour change and
+no request with a real key; the working tree is left for the operator to commit (`AGENTS.md`, Commits).
+
+| ID | Item | Acceptance criterion | Status |
+| --- | --- | --- | --- |
+| R9-1 | next's three advisories | next and eslint-config-next 16.4.1 (published 2026-10-14, 8.1 days), which the release notes name as the fix for GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr (critical) and GHSA-p3m5-59mp-jv5r (high); hono 4.13.13 and ip-address 10.7.4 for two moderate advisories; lockfile from npm 11 under `--before` seven days back; 38 `libc` fields, every `resolved` on registry.npmjs.org, no new install script or license; every gate step but the audit green (555 tests, build); `test:e2e` 25 PASS, `test:browser` 4 PASS, REAL without a key refused with `dispatches` 0 and the security headers in place | done (uncommitted) |
+| R9-2 | braces | The exception lapsed after 2026-10-20; braces 3.0.3 is still the latest and still affected. The operator renewed it until 2026-11-20 (R6-Q1, D-17); the date moves in the policy, its test and the three documents the R7-1 test holds to it; the full gate is green again | done (uncommitted) |
+
+#### Decisions taken
+
+- R9-1 (2026-10-22). 16.4.1 rather than 16.4.2: 16.4.1 is the security release, while 16.4.2 (2026-10-15, 6.9
+  days) carries only Turbopack and documentation fixes, so it waits its week. The Next.js upgrade guide in
+  `node_modules/next/dist/docs/` describes the move to 16 and nothing specific to 16.4. No code needed a change.
+  Dependency updates have no mutation; the gate and the browser checks are the proof.
+
+#### Questions for João
+
+- None open. R6-Q1 was answered on 2026-10-22 (D-17).
+
+### Phase 16 — Round 10: analyse, improve and finish (2026-11-16)
 
 On the working branch `claude/inspiring-pasteur-vkzyic`, level with `main` at `ddc7b56`. The operator's whole request
 was "Analise este projeto, melhore ele e termine o que falta". The backlog was read first: every phase was done, so
 "what is missing" is what the documents still listed as open and that needs neither an operator decision nor a real
-key. Nothing was committed: `AGENTS.md` leaves that to the operator, and this round was given no authorization.
+key. On 2026-11-16 the operator authorized one commit and push of this branch (`11a03e7`, `9443ffa`; CI run 124 green,
+Gitleaks job included). On 2026-11-17 the operator asked for the errors to be resolved and Round 9's branch merged
+(R10-6, R10-7). Both authorizations are for this round only, not a precedent (`AGENTS.md`, Commits).
 
 | ID | Item | Acceptance criterion | Status |
 | --- | --- | --- | --- |
-| R9-1 | The starting gate was red | `npm audit --audit-level=high` failed on the clean tree with ten high or critical advisories published since 2026-10-08; each fixed with a patch or minor release published seven days or more; lockfile from npm 11, `npm ci`, 38 `libc` fields, every `resolved` on registry.npmjs.org, no new license or install script; gate, `test:e2e` | done (uncommitted) |
-| R9-2 | The updates Round 8 deferred | Patch releases of the pinned packages and lucide-react inside its range, each a week old; gate, `test:e2e`, `test:browser`, the main screen compared before and after | done (uncommitted) |
-| R9-3 | F-01: a usage failure names the served model | The failure carries the served model for every adapter, plain and streamed; reservation, `call`, `expiry` and `manual` receipts and the reconciled interval name it; a divergence is recorded; expiry charges the same; tests, mutations, documents | done (uncommitted) |
-| R9-4 | F-02: forget any saved key from the panel | The server reports saved copies by provider name only; Connection lists them with Forget for each, after Disconnect, after a restart and in MOCK mode; every Forget asks first; tests, mutations, a hand check in a browser, documents | done (uncommitted) |
-| R9-5 | Records | `AGENTS.md` (floor 566 and the two rules), STATUS checkpoint and round, CHANGELOG, this phase, the checklist | done (uncommitted) |
+| R10-1 | The starting gate was red | `npm audit --audit-level=high` failed on the clean tree with ten high or critical advisories published since 2026-10-08; each fixed with a patch or minor release published seven days or more; lockfile from npm 11, `npm ci`, 38 `libc` fields, every `resolved` on registry.npmjs.org, no new license or install script; gate, `test:e2e` | done |
+| R10-2 | The updates Round 8 deferred | Patch releases of the pinned packages and lucide-react inside its range, each a week old; gate, `test:e2e`, `test:browser`, the main screen compared before and after | done |
+| R10-3 | F-01: a usage failure names the served model | The failure carries the served model for every adapter, plain and streamed; reservation, `call`, `expiry` and `manual` receipts and the reconciled interval name it; a divergence is recorded; expiry charges the same; tests, mutations, documents | done |
+| R10-4 | F-02: forget any saved key from the panel | The server reports saved copies by provider name only; Connection lists them with Forget for each, after Disconnect, after a restart and in MOCK mode; every Forget asks first; tests, mutations, a hand check in a browser, documents | done |
+| R10-5 | Records | `AGENTS.md` (floor 566 and the two rules), STATUS checkpoint and round, CHANGELOG, this phase, the checklist | done |
+| R10-6 | Merge Round 9 | `claude/pensive-einstein-w804lj` (Phase 15, never on `main`) merged into this branch; the package files keep this round's newer versions; both rounds' records kept in order; gate and browser checks green after the merge | done |
+| R10-7 | The audit exceptions (operator, 2026-11-17) | GHSA-fc5q-39xc-vjpf in picomatch, published since 2026-11-16 with no fixed release, excepted until 2026-12-17; the braces entry removed; policy, its tests and the three documents the R7-1 test holds; mutations | done |
 
 #### Updates (ages on 2026-11-16)
 
@@ -1071,11 +1096,11 @@ key. Nothing was committed: `AGENTS.md` leaves that to the operator, and this ro
 | systeminformation | 5.33.8 | 5.33.19 | 17.6 days | GHSA-3f7j-7jwc-fxfj (high) |
 | shadcn | 4.21.3 | 4.23.0 | 19.5 days | inside `^4.21.0`; it no longer depends on `@modelcontextprotocol/sdk`, so express, hono and body-parser (GHSA-27r3-jxmh-p828, high) leave the tree: 65 packages removed, `@modelcontextprotocol/core` and `server` 2.4.0 added |
 | typescript-eslint and its parts | 8.69.0 | 8.72.2 | 7.1 days | with eslint-config-next; 8.73.0, which fixes the moderate minimatch advisory, was published on 2026-11-16 and waits |
-| react, react-dom | 19.3.0 | 19.3.1 | 33.1 days | R9-2 |
-| @xyflow/react | 12.12.0 | 12.12.1 | 14.4 days | R9-2; with @xyflow/system 0.0.84 and d3 patch releases |
-| tailwindcss, @tailwindcss/postcss | 4.3.3 | 4.3.5 | 10.2 days | R9-2; with lightningcss 1.33.0, enhanced-resolve 5.26.1 and magic-string 1.4.5 |
-| zustand | 5.0.15 | 5.0.16 | 25.6 days | R9-2 |
-| lucide-react | 1.49.0 | 1.70.0 | 10.5 days | R9-2, lockfile only, inside `^1.41.0` |
+| react, react-dom | 19.3.0 | 19.3.1 | 33.1 days | R10-2 |
+| @xyflow/react | 12.12.0 | 12.12.1 | 14.4 days | R10-2; with @xyflow/system 0.0.84 and d3 patch releases |
+| tailwindcss, @tailwindcss/postcss | 4.3.3 | 4.3.5 | 10.2 days | R10-2; with lightningcss 1.33.0, enhanced-resolve 5.26.1 and magic-string 1.4.5 |
+| zustand | 5.0.15 | 5.0.16 | 25.6 days | R10-2 |
+| lucide-react | 1.49.0 | 1.70.0 | 10.5 days | R10-2, lockfile only, inside `^1.41.0` |
 
 Left where they were: next 16.4.6 (from 2026-11-17), lucide-react 1.71.0 to 1.73.0, zustand 5.1.0, @base-ui/react
 1.9.0, @types/node 22.20.5 and actions/setup-node v7.1.0 (minors and a CI pin nobody ordered); typescript 7,
@@ -1083,7 +1108,7 @@ eslint 10, @types/node 26, @xyflow/react 13 and cn 0.5 (majors).
 
 #### Decisions taken
 
-- R9-1 (2026-11-16). `npx npm@11 audit fix` alone resolved 28 packages to versions younger than a week, several
+- R10-1 (2026-11-16). `npx npm@11 audit fix` alone resolved 28 packages to versions younger than a week, several
   published that day (typescript-eslint 8.73.0, browserslist 4.29.6), and next to 16.4.6. An advisory's fix does not
   wait, but nothing here needed a version that young: the lockfile was restored and regenerated with npm 11 under
   `--before` seven days back (`install --package-lock-only`, then `audit fix --package-lock-only`), next and
@@ -1091,16 +1116,16 @@ eslint 10, @types/node 26, @xyflow/react 13 and cn 0.5 (majors).
   under seven days. `npm audit` went from 22 advisories (1 critical, 6 high, 14 moderate, 1 low, by package) to 12
   (10 moderate, 2 low). `ajv-formats` 3.0.1 → 2.1.1 and `json-schema-typed` 8.0.2 → 7.0.3 are not downgrades of a
   dependency: the copies the MCP SDK needed left with it and the ones `conf` needs were hoisted.
-- R9-1, braces. The exception lapsed on 2026-10-20 and R6-Q1 was never answered, so by its own default it was not
-  renewed. `npm audit` no longer lists braces at all (3.0.3 is still the newest release and is still installed
-  through shadcn → fast-glob → micromatch), so the gate passes with no exception applied. The entry in
-  `scripts/audit-policy.mjs` is dead but was left: the comment above it and `AGENTS.md` make the list the operator's,
-  and removing it also changes `tests/audit-policy.test.ts`, the R7-1 test and three documents.
-- R9-2. One gate for the batch, not one per package as in Round 8, because nothing is committed between them. The
+- R10-1, braces (corrected on 2026-11-17). This entry first said the exception had lapsed unrenewed: this round
+  started from `main`, which did not have Round 9's branch, where the operator had renewed it until 2026-11-20 on
+  2026-10-22 (R6-Q1, D-17). The rest held: `npm audit` no longer lists braces at all (3.0.3 is still the newest
+  release and still installed through shadcn → fast-glob → micromatch), so no exception applied. On 2026-11-17 the
+  operator ordered the entry removed (R10-Q1, R10-7).
+- R10-2. One gate for the batch, not one per package as in Round 8, because nothing is committed between them. The
   main screen of a fresh production instance at 1440×900 was captured twice before (identical) and once after: one
   pixel of 1,296,000 differs, by one level of one channel. The two React Flow reference decisions were not re-read
   against 12.12.1's code; `test:e2e` (drag, keyboard move, connect, minimap present) passed.
-- R9-3 (F-01). `ProviderFailure` gains an optional third field, `servedModel`, and `servedBy(model)`, which names a
+- R10-3 (F-01). `ProviderFailure` gains an optional third field, `servedModel`, and `servedBy(model)`, which names a
   failure only when it was not named already. Each adapter reads the identity leniently (`servedModelId`: what
   `normalizeModelId` accepts, else nothing) as soon as the payload is parsed, and its one catch names whatever it
   throws from then on; the streamed OpenAI path names a usage failure inside the completed frame. A status refusal
@@ -1110,7 +1135,7 @@ eslint 10, @types/node 26, @xyflow/react 13 and cn 0.5 (majors).
   "Provider usage missing." and "Provider usage invalid." name it too), and in the failure path for a named
   failure. The served model was already journaled, validated and shown for the unpriced case, so the durable state,
   the snapshot and Budgets needed nothing.
-- R9-3, what it must not change. Expiry: the floor stays the greater of the hold and the dearest eligible captured
+- R10-3, what it must not change. Expiry: the floor stays the greater of the hold and the dearest eligible captured
   candidate. A test runs the same failure named and unnamed, with the served model unpriced, cheaper, equal and
   dearer and a third model dearer than both, and requires identical figures in every row before and after expiry;
   the mutation that narrows the floor to the named model survived the first version of that test (no third model)
@@ -1118,29 +1143,29 @@ eslint 10, @types/node 26, @xyflow/react 13 and cn 0.5 (majors).
   its agent (R5-Q2); the mutation that treats a named model as reported usage is killed. The stricter side is manual
   reconciliation: its interval now lists the served model, so a later validity that would reprice that period for
   that model is refused, as for the requested one.
-- R9-3, a ratchet did its job. The first gate failed on "authored type assertions rose from 105 to 109": the new
+- R10-3, a ratchet did its job. The first gate failed on "authored type assertions rose from 105 to 109": the new
   test file had four `as const`. They became typed declarations; the pin was not touched.
-- R9-4 (F-02). `EncryptedVault.saved()` lists the vault directory and keeps the known providers that have a
+- R10-4 (F-02). `EncryptedVault.saved()` lists the vault directory and keeps the known providers that have a
   `<provider>.json`; it opens no file and does not ask the keyring, and a missing directory means nothing is saved.
   `Credentials.saved()` passes it on. It is served on `GET /api/provider` as `savedKeys` rather than on
   `GET /api/credentials`, because the panel has one reader of provider state and the direct-fetch ratchet holds its
   count; if the vault cannot be listed the status still answers, naming none. `remembered` is unchanged in both
   routes. The panel shows only names it knows (`savedKeyProviders`), in its own order.
-- R9-4, the server's side of Forget is unchanged: it still cancels the call in flight and clears the verification
+- R10-4, the server's side of Forget is unchanged: it still cancels the call in flight and clears the verification
   whichever provider it names, as Disconnect does. So forgetting a provider that is not the connected one leaves the
   connection "Configured, not verified"; the question says so in that case (`forgetQuestion`). Narrowing that to the
   selected provider would relax a guarantee and was not done.
-- R9-4, an existing test moved with the code. `tests/confirm-dialog.test.ts` pinned the Forget question's source
+- R10-4, an existing test moved with the code. `tests/confirm-dialog.test.ts` pinned the Forget question's source
   text inside the `confirm` call; the question is now built by `forgetQuestion`, so that pair left the list and two
   assertions took its place: the question's exact text is still in the source, and the call still names
   `confirmLabel: 'Forget key'` as destructive. Nothing else in that test changed.
-- R9-4, checked by hand in Chromium on a throwaway MOCK instance whose vault held two files named `gemini.json` and
+- R10-4, checked by hand in Chromium on a throwaway MOCK instance whose vault held two files named `gemini.json` and
   `deepseek.json` with placeholder text (no key material): Connection listed Google Gemini and DeepSeek; Forget
   DeepSeek key asked "Forget the deepseek key?" and Cancel changed nothing; confirming deleted only `deepseek.json`
   and the list followed; after the second one the vault was empty, the section gone, `savedKeys` `[]` and
   `dispatches.total` 0; no console error and no native dialog. It is not in `npm run test:e2e`: that check runs on a
   fresh instance it is only pointed at, and does not know its data directory.
-- R9-5. `AGENTS.md` gains two paragraphs, each marked as the assistant's recommendation: the served model a failure
+- R10-5. `AGENTS.md` gains two paragraphs, each marked as the assistant's recommendation: the served model a failure
   may carry (Money locks) and what the panel may know of saved keys (Operator decisions). README, SECURITY,
   `docs/architecture.md`, `docs/provider-validation.md` and the two reference documents were updated with the
   change they describe.
@@ -1148,22 +1173,47 @@ eslint 10, @types/node 26, @xyflow/react 13 and cn 0.5 (majors).
   one dev run in fifteen) was not seen in this round's three `test:e2e` runs and its cause is still unproven.
   `lib/utils.ts` waits for a decision, as `AGENTS.md` says. Everything else open needs a real key or the operator.
 
-#### Verification (2026-11-16, uncommitted tree)
+#### Verification (2026-11-16, before the merge)
 
 | Step | Result |
 | --- | --- |
 | `npm run gate` | passed: 566 tests in 29 suites, none failed, cancelled, skipped or todo; "audit: No high or critical advisory without an exception."; build passed on next 16.4.5 |
-| `test:e2e` | `PORT=3310 npm run dev` on an empty data directory: 25 PASS, after R9-1, after R9-2 and at the end |
-| `test:browser` | production build with the preview on: 4 PASS, after R9-2 and at the end |
+| `test:e2e` | `PORT=3310 npm run dev` on an empty data directory: 25 PASS, after R10-1, after R10-2 and at the end |
+| `test:browser` | production build with the preview on: 4 PASS, after R10-2 and at the end |
 | Mutations | 39 killed, none surviving: 20 for F-01 (one only after the test gained a third model) and 19 for F-02 |
-| Not run | Gitleaks (no binary here and none installed), a fresh-clone proof and CI: nothing was committed or pushed |
+| Not run locally | Gitleaks (no binary here, and running a downloaded one was refused by the environment) and a fresh-clone proof. CI, Gitleaks job included, passed on `9443ffa` (run 124) |
+
+- R10-6 (2026-11-17). Round 9's branch merged with `git merge --no-ff`. `package.json` and `package-lock.json` took
+  this branch's side whole: next 16.4.5 contains 16.4.1's fixes, hono left the tree with the MCP SDK, and ip-address
+  is 10.7.6 here against 10.7.4 there. Its renewal of the braces exception, D-17 and its answer to R6-Q1 merged as
+  they were; its CHANGELOG, STATUS and Phase 15 entries are kept as Round 9, and this round, which had also called
+  itself Round 9 and Phase 15, became Round 10 and Phase 16.
+- R10-7 (2026-11-17). Between the round's first push and the merge, GHSA-fc5q-39xc-vjpf (picomatch, high, CWE-1333,
+  ReDoS through single-branch repeated extglobs, range `<=4.0.7`) turned the audit red: picomatch 4.0.7, the newest,
+  and 2.3.2, the line micromatch 4 needs, are both affected, and the only offered fix is shadcn 2.10.0, a major
+  downgrade. It reaches the tree through eslint-config-next (eslint-import-resolver-typescript → tinyglobby) and
+  shadcn (@dotenvx/dotenvx, fast-glob → micromatch); the app imports only `shadcn/tailwind.css`. Asked, the operator
+  chose the recommended option: except that advisory of that package until 2026-12-17 (thirty days) or until a fix
+  within a minor release exists. Asked in the same message, the operator ordered the dead braces entry removed. The
+  policy's tests moved from braces to picomatch as their worked example, with the same five tests and one more
+  assertion: braces' advisory blocks again if it ever comes back.
 
 #### Questions for João
 
-- **R9-Q1** Remove the lapsed braces entry from `scripts/audit-policy.mjs`? The advisory is no longer reported, so
-  the entry does nothing. Removing it changes its test, the R7-1 test and the sentences in `AGENTS.md`, `README.md`
-  and `SECURITY.md`. Recommended: yes. Until you answer it stays.
-- R6-Q1 is closed by events: the exception lapsed unrenewed and nothing needs it.
+- **R10-Q1** Remove the lapsed braces entry from `scripts/audit-policy.mjs`? **Answered 2026-11-17:** "Remover agora".
+  Removed with its test, the R7-1 documents and the AGENTS.md paragraph (R10-7).
+- **R10-Q2** GHSA-fc5q-39xc-vjpf in picomatch has no fix: except it? **Answered 2026-11-17:** "Exceptuar até 17/12"
+  (the recommended option of three). Until 2026-12-17, or until a fix within a minor release exists (R10-7, D-18).
+
+#### Verification (2026-11-17, after the merge)
+
+| Step | Result |
+| --- | --- |
+| `npm run gate` | passed: 566 tests in 29 suites, none failed, cancelled, skipped or todo; the audit step excepted only GHSA-fc5q-39xc-vjpf in picomatch; build passed on next 16.4.5 |
+| `test:e2e` | 25 PASS on a fresh development instance |
+| `test:browser` | 4 PASS on the production build with the preview on |
+| Mutations | 6 for R10-7, all killed: the exception a day longer, on another package, the braces entry kept beside it, and README, SECURITY.md and AGENTS.md each left behind |
+
 
 ## V0 review of Part 2 (`1445177`)
 
@@ -1411,19 +1461,24 @@ The commit is documentation only and carries no secret or leaky instruction.
 | R7-1 | AGENTS.md's exception date moved to 2026-10-27 | killed by the same; restored, sha256 identical |
 | R8-1 | the Gitleaks action back to the tag `@v2` | killed by "R8-1 CI pins its runner and every action" and by "R4-6 the gate is CI's blocking steps in CI's order…"; restored from the saved bytes, sha256 identical |
 | R8-1 | the `checks` job back to `runs-on: ubuntu-latest` | killed by "R8-1 CI pins its runner and every action"; restored, sha256 identical |
-| R9-3 | `servedBy` never names; overwrites a name already given; drops the field names | each killed by "F-01 every adapter names the model…" or "F-01 servedBy keeps the first name…" |
-| R9-3 | `servedModelId` returns the raw string | killed by "F-01 every adapter names the model…" (Gemini's `models/` prefix, the unusable identities) |
-| R9-3 | DeepSeek, Gemini and OpenAI each: the model is not read; the failure is not named; DeepSeek names the requested model; Gemini's reader failure is not named; the streamed failure is not named | all nine killed by "F-01 every adapter names the model…" |
-| R9-3 | the service ignores the failure's name; names only after the usage checks; records no divergence; records one for the same model | killed by "F-01 an unparsed response names its served model…" and "F-01 the served model is named before usage is checked…" |
-| R9-3 | expiry narrows its floor to the named model's price | survived the first version of "F-01 naming the served model never changes what an expired reservation is charged"; killed once the test priced a third model dearer than both |
-| R9-3 | a named model turns the estimate into a reconciliation hold; manual reconciliation journals only the requested model | both killed by "F-01 an unparsed response names its served model…" |
-| R9-4 | the vault lists every `.json`; lists all providers; matches by prefix; throws without a directory; swallows every error | killed by "F-02 the vault lists saved copies by file name alone…", the last by "F-02 MOCK mode still names saved copies…" |
-| R9-4 | `Credentials.saved` reports memory instead of disk; the status omits `savedKeys`; the status fails when the vault cannot be listed | killed by the vault, Disconnect and MOCK tests |
-| R9-4 | the panel lists unknown names; trusts a non-array; hides the section; always shows it | all killed by "F-02 the Connection view lists every saved key…" |
-| R9-4 | a row forgets the selected provider; Forget ignores its target; `configure` ignores its target; the question asks about the selected provider | all killed by "F-02 a saved key's button forgets that provider, not the selected one" |
-| R9-4 | the question never mentions the other connection; always mentions it; mentions it with nothing connected | all killed by "F-02 the Forget question names the provider…" |
+| R9-2 | the policy's date back to 2026-10-20 | killed by the two R6-A tests that pin the exception and its date; restored from the saved bytes, sha256 identical |
+| R9-2 | README.md left at the old date | killed by "R7-1 the documents name the audit exception the policy holds"; restored, sha256 identical |
+| R10-3 | `servedBy` never names; overwrites a name already given; drops the field names | each killed by "F-01 every adapter names the model…" or "F-01 servedBy keeps the first name…" |
+| R10-3 | `servedModelId` returns the raw string | killed by "F-01 every adapter names the model…" (Gemini's `models/` prefix, the unusable identities) |
+| R10-3 | DeepSeek, Gemini and OpenAI each: the model is not read; the failure is not named; DeepSeek names the requested model; Gemini's reader failure is not named; the streamed failure is not named | all nine killed by "F-01 every adapter names the model…" |
+| R10-3 | the service ignores the failure's name; names only after the usage checks; records no divergence; records one for the same model | killed by "F-01 an unparsed response names its served model…" and "F-01 the served model is named before usage is checked…" |
+| R10-3 | expiry narrows its floor to the named model's price | survived the first version of "F-01 naming the served model never changes what an expired reservation is charged"; killed once the test priced a third model dearer than both |
+| R10-3 | a named model turns the estimate into a reconciliation hold; manual reconciliation journals only the requested model | both killed by "F-01 an unparsed response names its served model…" |
+| R10-4 | the vault lists every `.json`; lists all providers; matches by prefix; throws without a directory; swallows every error | killed by "F-02 the vault lists saved copies by file name alone…", the last by "F-02 MOCK mode still names saved copies…" |
+| R10-4 | `Credentials.saved` reports memory instead of disk; the status omits `savedKeys`; the status fails when the vault cannot be listed | killed by the vault, Disconnect and MOCK tests |
+| R10-4 | the panel lists unknown names; trusts a non-array; hides the section; always shows it | all killed by "F-02 the Connection view lists every saved key…" |
+| R10-4 | a row forgets the selected provider; Forget ignores its target; `configure` ignores its target; the question asks about the selected provider | all killed by "F-02 a saved key's button forgets that provider, not the selected one" |
+| R10-4 | the question never mentions the other connection; always mentions it; mentions it with nothing connected | all killed by "F-02 the Forget question names the provider…" |
+| R10-7 | the exception a day longer; on another package | both killed by "R10-A picomatch's advisory without a fixed release passes the audit through 2026-12-17…" |
+| R10-7 | the braces entry kept beside picomatch's | killed by "R6-A every other high or critical advisory still fails the audit…" (braces' advisory must block) |
+| R10-7 | README.md keeps the braces sentence; SECURITY.md with the wrong date; AGENTS.md without the new id | all killed by "R7-1 the documents name the audit exception the policy holds" |
 
-Every Round 9 mutation was applied and removed by a script that keeps the file's text in memory and writes it back
+Every Round 10 mutation was applied and removed by a script that keeps the file's text in memory and writes it back
 whatever the outcome; `git status` after each batch listed only the round's own changes.
 
 ## R1 independent review (two reviewer subagents over `0662647..HEAD`)
@@ -1450,7 +1505,7 @@ parallel without editing the tree. Each finding is listed with its disposition.
 | R1-15 | major, found while fixing R1-04 | `npm run test:browser` hung since f42e1e1: "Run preview mock" now asks first and the preview check never answered the dialog | fixed (this commit): the check accepts and asserts the question; passes again |
 | R1-16 | open observation | In `npm run dev` only, about 1 run in 15 the Tab walk found the canvas cards and edge focused (`:focus-visible` true) without the override outline, while every other stop kept its ring; never in production (every run passed). The compiled CSS contains the rule; the cause is unproven (a stale dev stylesheet is the leading suspect). The check now reports whether the override was loaded when it fails | open |
 
-Follow-ups recorded by the review. Both were done in Round 9 (Phase 15, R9-3 and R9-4, 2026-11-16):
+Follow-ups recorded by the review. Both were done in Round 10 (Phase 16, R10-3 and R10-4, 2026-11-16):
 
 - **F-01** When a usage shape cannot be parsed, every adapter throws before returning, so the served model the
   response did name is lost: receipts show `servedModel: null` and manual reconciliation journals only the requested
@@ -1538,6 +1593,12 @@ Follow-ups recorded by the review. Both were done in Round 9 (Phase 15, R9-3 and
   2026-10-20 or until a fix within a minor release exists, and only the operator renews or extends it.
 - **D-16 shadcn/ui attribution (operator, R6-1, 2026-10-06).** The components the shadcn CLI generated in
   `components/ui/` keep shadcn/ui's MIT notice, copied verbatim, in `components/ui/LICENSE`.
+- **D-17 The braces exception renewed (operator, R6-Q1, 2026-10-22).** GHSA-vfj7-8cjw-p6xm in braces stays excepted
+  until 2026-11-20, or until a fix within a minor release exists; braces 3.0.3 is still the latest and still affected.
+  The date moved in `scripts/audit-policy.mjs`, `tests/audit-policy.test.ts`, `AGENTS.md`, `README.md` and `SECURITY.md`.
+- **D-18 The picomatch exception, and braces' removed (operator, R10-Q1 and R10-Q2, 2026-11-17).** GHSA-fc5q-39xc-vjpf
+  in picomatch, which has no fixed release and is run only by ESLint and the shadcn CLI, is excepted until 2026-12-17
+  or until a fix within a minor release exists. The braces entry, which `npm audit` no longer matched, is removed.
 
 ## Perguntas para o João (questions for the operator)
 
@@ -1585,22 +1646,25 @@ Follow-ups recorded by the review. Both were done in Round 9 (Phase 15, R9-3 and
   before any OpenAI use, or should OpenAI be removed from the allowlist until then? **Answered 2026-09-27 (Phase
   7):** OpenAI removed from the allowlist and documented as unsupported until validated; no snapshot or price
   registered. A-07.
-- **R9-Q1** Remove the lapsed braces entry from `scripts/audit-policy.mjs`, with its test and the sentences that
-  name it? **Open** (asked in Phase 15). Recommended: yes; until you answer it stays, doing nothing.
-- **R6-Q1** Renew the braces exception (GHSA-vfj7-8cjw-p6xm) when it lapses on 2026-10-20? **Closed by events
-  (2026-11-16):** it lapsed unrenewed, and `npm audit` no longer reports the advisory. Was open (asked in Phase
+- **R10-Q1** Remove the lapsed braces entry from `scripts/audit-policy.mjs`, with its test and the sentences that
+  name it? **Answered 2026-11-17:** "Remover agora". Removed (Phase 16, R10-7).
+- **R10-Q2** GHSA-fc5q-39xc-vjpf in picomatch has no fixed release: except it? **Answered 2026-11-17:** "Exceptuar até
+  17/12". Excepted until 2026-12-17, or until a fix within a minor release exists (Phase 16, R10-7, D-18).
+- **R6-Q1** Renew the braces exception (GHSA-vfj7-8cjw-p6xm) when it lapses on 2026-10-20? Was open (asked in Phase
   12). Until you answer, the code's default stands: the exception is not renewed; from 2026-10-21, or as soon as a fix
   within a minor release exists, the gate and CI fail at the audit step; a fix comes in through `npm audit fix` under
   the patch and minor rule (`AGENTS.md`, Dependencies); only the operator renews. Recommended: check on 2026-10-19.
+  **Answered 2026-10-22:** "Renovar até 20/11" (the recommended option, chosen from three). The exception now holds
+  until 2026-11-20, or until a fix within a minor release exists, whichever comes first. Round 9, D-17. Removed on
+  the operator's order on 2026-11-17, once `npm audit` no longer reported the advisory (R10-Q1).
 
 ## Checklist do João
 
 Everything below is yours; nothing in it needs this conversation.
 
-0. **Round 9 is not committed.** The working tree of `claude/inspiring-pasteur-vkzyic` holds it (Phase 15). Review the
-   diff, run `npm run gate` (566 tests), run Gitleaks on the staged diff as the hook does, and commit; CI then runs
-   on the push. A cloud session's container is temporary: if you want the agent to commit and push that branch, say
-   so explicitly, because `AGENTS.md` forbids it otherwise.
+0. **Rounds 9 and 10 are on `claude/inspiring-pasteur-vkzyic`, not on `main`.** `main` is still at `ddc7b56`. The branch
+   holds Round 9 (merged in R10-6) and Round 10, with a green gate and CI. Review it and bring it into `main` when you
+   are ready; nothing else waits on it.
 
 1. **Verify `main`.** A fresh, full clone (`git clone https://github.com/joaoheliodev/SaintPetrus.git`, no `--depth`),
    then `npm ci`, `npm run setup:hooks` and `npm run gate`. Expect at least 555 tests and no skip (the floor in
@@ -1609,8 +1673,8 @@ Everything below is yours; nothing in it needs this conversation.
    connect two agents (drag, or Connect to in the inspector), move a card with the arrow keys, Run once (mock), open
    Budgets, Prices and Connection, Export graph, delete a connection, reset. Optional, with Chromium and a fresh
    instance: `PORT=3310 npm run dev` then `TEST_APP_PORT=3310 npm run test:e2e`; and the preview check from the README.
-3. **Questions.** Q-01 to Q-10 are answered (2026-09-27; Q-05 and Q-06 on 2026-10-06). What stays with you: R9-Q1
-   (item 9), DeepSeek's model and price (D7 in `STATUS.md`; no agent enters them) and the first real call (item 7).
+3. **Questions.** Q-01 to Q-10 are answered (2026-09-27; Q-05 and Q-06 on 2026-10-06). What stays with you: the
+   picomatch exception's date (item 9), DeepSeek's model and price (D7 in `STATUS.md`; no agent enters them) and the first real call (item 7).
 4. **Review the decisions** D-01 to D-16 in "Decisões tomadas" and revert any you disagree with; each is reversible.
 5. **Switch on private vulnerability reporting** in the repository's Settings, Advanced Security, so the "Report a
    vulnerability" button `SECURITY.md` points to exists. Optional, in the same panel: Secret scanning, Push protection
@@ -1626,23 +1690,22 @@ Everything below is yours; nothing in it needs this conversation.
    `night/price-schema` and `night/provider-validation-ready`. You can delete them on GitHub, or keep them. Delete
    `ci/r8-prova` too: Round 8's temporary branch, at `825ed84`, which `main` contains; this environment was refused
    when it tried to delete it (Phase 14, R8-1).
-9. **The braces exception** (GHSA-vfj7-8cjw-p6xm) lapsed on 2026-10-20 and nothing needs it now: `npm audit` stopped
-   reporting the advisory (Round 9). Its dead entry waits for your order to remove it (R9-Q1). What this item said
-   while it held: after that date, or as soon as a fix
+9. **The audit exception** is GHSA-fc5q-39xc-vjpf in picomatch, through 2026-12-17 inclusive (your decision, 2026-11-17,
+   R10-7, D-18); the braces one is removed. After that date, or as soon as a fix
    exists: `npx npm@11 audit fix` if the fix comes in under the patch and minor rule (`AGENTS.md`, Dependencies), then
    `npm ci` and a green gate; an advisory's fix does not wait the seven days other updates wait. To renew the exception instead, the date changes in `scripts/audit-policy.mjs`, in the
    test that pins it (`tests/audit-policy.test.ts`), in `AGENTS.md`, `README.md` and `SECURITY.md` (the R7-1 test in
-   `tests/repository-metadata.test.ts` makes the documents move together), and only on your order (R6-Q1).
+   `tests/repository-metadata.test.ts` makes the documents move together), and only on your order.
 10. **Optional maintenance.** CI runs on `ubuntu-24.04` with every action pinned to a commit SHA (`AGENTS.md`,
     Operator decisions, 2026-10-08); a pin changes only in a deliberate commit that passes CI on a temporary branch
-    first. Updates wait seven days from their publication (Phases 14 and 15 have the tables). Round 9 took next and
+    first. Updates wait seven days from their publication (Phases 14 to 16 have the tables). Round 10 took next and
     eslint-config-next 16.4.5, shadcn 4.23.0 and lucide-react 1.70.0. Waiting now: next 16.4.6 (from 2026-11-17),
     typescript-eslint 8.73.0 (from 2026-11-23; it fixes a moderate advisory), lucide-react 1.71.0 to 1.73.0,
     actions/setup-node v7.1.0 (old enough; the pin needs its temporary branch) and the minors zustand 5.1.0,
     @base-ui/react 1.9.0 and @types/node 22.20. Majors, yours to approve: typescript 7, eslint 10 (ESLint 9 is out of
     support, as Round 8 records), @types/node 26, @xyflow/react 13 and cn 0.5 (in 0.x a minor breaks). Dependabot version updates for
     github-actions and npm are optional, and switching them on is yours.
-11. **Follow-ups** F-01 and F-02 are done (Round 9). Observation R1-16 is listed with the review findings above and
+11. **Follow-ups** F-01 and F-02 are done (Round 10). Observation R1-16 is listed with the review findings above and
     is still open.
 
 ## Session log
@@ -1706,11 +1769,18 @@ Everything below is yours; nothing in it needs this conversation.
   PASS, `test:browser` 4 PASS, REAL without a key with `dispatches` 0, Gitleaks clean over every branch. Floor 554 →
   555. Two mutations, both killed. CI green on every push (runs 116 to 121). Gitleaks clean on every staged diff. No
   request reached a provider. One question is open (R6-Q1).
-- Phase 15, Round 9 (2026-11-16, on `claude/inspiring-pasteur-vkzyic`, uncommitted): the operator asked for the
+- Phase 15, Round 9 (2026-10-22): next and eslint-config-next 16.4.1 for three advisories (two critical), hono and
+  ip-address for two moderate ones. Every gate step but the audit green (555 tests, build); `test:e2e` 25 PASS,
+  `test:browser` 4 PASS, REAL without a key with `dispatches` 0. The braces exception had lapsed after 2026-10-20; the
+  operator renewed it until 2026-11-20 (R6-Q1, D-17) and the full gate is green. Left uncommitted for the operator. No
+  request reached a provider. No question is open.
+- Phase 16, Round 10 (2026-11-16 and 2026-11-17, on `claude/inspiring-pasteur-vkzyic`): the operator asked for the
   project to be analysed, improved and finished. The starting gate was red on ten high or critical advisories, two
-  critical in next: R9-1 took next 16.4.5 and the transitive fixes, every version a week old; R9-2 the patch releases
-  Round 8 had left waiting; R9-3 closed F-01 (a usage failure names its served model, and expiry charges the same);
-  R9-4 closed F-02 (Saved keys in Connection forgets any provider's copy); R9-5 is this record. Floor 555 → 566.
+  critical in next: R10-1 took next 16.4.5 and the transitive fixes, every version a week old; R10-2 the patch releases
+  Round 8 had left waiting; R10-3 closed F-01 (a usage failure names its served model, and expiry charges the same);
+  R10-4 closed F-02 (Saved keys in Connection forgets any provider's copy); R10-5 is this record. Floor 555 → 566.
   Thirty-nine mutations, all killed, one only after its test was strengthened. `test:e2e` passed with 25 PASS and
-  `test:browser` with 4 PASS on fresh instances. Not run: Gitleaks, a fresh-clone proof and CI, since nothing was
-  committed. No request reached a provider. One question is open (R9-Q1).
+  `test:browser` with 4 PASS on fresh instances. Committed and pushed on the operator's order (`11a03e7`,
+  `9443ffa`, CI run 124 green with Gitleaks). On 2026-11-17, on the operator's order, Round 9's branch was merged
+  (R10-6), GHSA-fc5q-39xc-vjpf in picomatch excepted until 2026-12-17 and the braces entry removed (R10-7, six
+  mutations killed). No request reached a provider. No question is open.

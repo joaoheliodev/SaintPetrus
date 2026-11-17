@@ -1,11 +1,11 @@
 // The gate's audit step: `npm audit --audit-level=high`, judged here so that the one advisory the operator excepted
-// (AGENTS.md, Operator decisions, 2026-10-06) does not fail it while every other high or critical advisory still does.
+// (AGENTS.md, Operator decisions, 2026-11-17) does not fail it while every other high or critical advisory still does.
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 // Only the operator adds, renews or extends an entry. One lapses on its date, or as soon as a non-major fix exists.
 export const auditExceptions = [
-  { id: 'GHSA-vfj7-8cjw-p6xm', package: 'braces', until: '2026-10-20', why: 'no fixed release exists; only the shadcn CLI and ESLint run it, never the server' },
+  { id: 'GHSA-fc5q-39xc-vjpf', package: 'picomatch', until: '2026-12-17', why: 'no fixed release exists; only the shadcn CLI and ESLint run it, never the server' },
 ];
 const blockingSeverities = ['high', 'critical'];
 
